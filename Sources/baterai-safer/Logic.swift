@@ -6,6 +6,7 @@ enum Paths {
     static let status = dir + "/status.json"
     static let label = "io.github.lshinkuro.baterai-safer"
     static let plist = "/Library/LaunchDaemons/\(label).plist"
+    static let history = NSHomeDirectory() + "/Library/Application Support/BateraiSafer/history.json"
 }
 
 struct Config: Codable, Equatable {

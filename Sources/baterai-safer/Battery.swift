@@ -10,6 +10,9 @@ struct Battery {
     var maxCapacity = 0     // mAh
     var designCapacity = 0  // mAh
     var temp: Double?       // °C
+    var watts = 0.0         // + charging, − discharging
+    var minutesLeft: Int?   // to full when charging, to empty otherwise
+    var adapterName: String?
 
     var health: Int { designCapacity > 0 ? maxCapacity * 100 / designCapacity : 0 }
 
@@ -27,6 +30,12 @@ struct Battery {
         b.cycles = d["CycleCount"] as? Int ?? 0
         b.maxCapacity = data["FullChargeCapacity"] as? Int ?? d["AppleRawMaxCapacity"] as? Int ?? 0
         b.designCapacity = data["DesignCapacity"] as? Int ?? d["DesignCapacity"] as? Int ?? 0
+        let num = { (k: String) in (d[k] as? NSNumber)?.int64Value }
+        b.watts = Double((num("InstantAmperage") ?? num("Amperage") ?? 0) * (num("Voltage") ?? 0)) / 1e6
+        // 65535 means "still estimating"
+        b.minutesLeft = (d[b.charging ? "AvgTimeToFull" : "TimeRemaining"] as? Int).flatMap { $0 > 0 && $0 < 65535 ? $0 : nil }
+        let adapter = d["AdapterDetails"] as? [String: Any]
+        b.adapterName = b.ac ? adapter?["Name"] as? String ?? (adapter?["Watts"] as? Int).map { "\($0)W" } : nil
         b.temp = SMC.batteryTemp() ?? (d["Temperature"] as? Int).map { Double($0) / 100 }
         return b
     }
