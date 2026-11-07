@@ -12,6 +12,7 @@ enum Paths {
     static let clips = user + "/clips.json"
     static let clipDir = user + "/clips"
     static let focus = user + "/focus.json"
+    static let notes = user + "/notes.json"
 }
 
 struct Config: Codable, Equatable {
@@ -129,5 +130,25 @@ func selfTest() {
     let rp = reviewPrompt(pr, PRDetail(), diff: "d", guides: "=== api-guide.md ===\nx", sonar: "Temuan SonarQube: y")
     assert(rp.contains("PANDUAN TIM") && rp.contains("SONARQUBE") && rp.contains("[sonar]"), "prompt includes context")
     assert(!reviewPrompt(pr, PRDetail(), diff: "d").contains("PANDUAN TIM"), "no empty sections")
+    // Dev Utils
+    let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJidWRpIiwiZXhwIjoxMDAwMDAwMDAwfQ.sig"
+    let jc = conversions(jwt, now: Date(timeIntervalSince1970: 2_000_000_000))
+    assert(jc.map(\.title) == ["JWT header", "JWT payload", "JWT exp — SUDAH KEDALUWARSA"] && jc[1].output.contains("\"sub\" : \"budi\""), "jwt")
+    let jsc = conversions(#"{"b":1,"a":[1,2]}"#)
+    assert(jsc[0].title == "JSON rapi" && jsc[0].output.hasPrefix("{\n  \"a\"") && jsc[1].title == "JSON ringkas" && jsc[1].output.count == 17, "json pretty (sorted) + minified")
+    assert(conversions("1700000000").first?.title == "Timestamp → tanggal" && conversions("1700000000000").first!.output.contains("2023-11-14T22:13:20Z"), "timestamp s/ms")
+    assert(conversions("aGFsbyBkdW5pYQ==").contains(Conversion(title: "Base64 decode", output: "halo dunia")), "base64")
+    assert(conversions("a%20b%26c").first == Conversion(title: "URL decode", output: "a b&c"), "url decode")
+    assert(conversions("abc").contains(Conversion(title: "SHA-256", output: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")), "sha256")
+    assert(conversions("abc").contains(Conversion(title: "MD5", output: "900150983cd24fb0d6963f7d28e17f72")), "md5")
+    assert(conversions("   ").isEmpty && !conversions("hello world").contains { $0.title == "Base64 decode" }, "no false base64")
+    // Meetings
+    assert(meetingLink([nil, "Ruang 3", "Join: https://bri.zoom.us/j/123456?pwd=x\nPasscode"])?.absoluteString == "https://bri.zoom.us/j/123456?pwd=x", "zoom link")
+    assert(meetingLink(["https://meet.google.com/abc-defg-hij"])?.host == "meet.google.com" && meetingLink(["https://example.com"]) == nil, "meet link")
+    let now = Date(), mt = Meeting(title: "Standup", start: now.addingTimeInterval(299), end: now.addingTimeInterval(1200), link: nil, color: nil)
+    assert(mt.when(now) == "5m lagi" && mt.isSoon(now) && !Meeting(title: "x", start: now.addingTimeInterval(3600), end: now.addingTimeInterval(4000), link: nil, color: nil).isSoon(now), "meeting timing")
+    assert(Meeting(title: "x", start: now.addingTimeInterval(-60), end: now.addingTimeInterval(60), link: nil, color: nil).when(now) == "berlangsung")
+    // Notes
+    assert(Note(text: "# Belanja\n- susu").title == "Belanja" && Note().title == "Catatan baru", "note title")
     print("selftest ok")
 }

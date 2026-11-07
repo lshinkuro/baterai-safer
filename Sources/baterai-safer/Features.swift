@@ -215,7 +215,7 @@ func recognizeText(_ data: Data, _ done: @escaping (String) -> Void) {
         req.recognitionLevel = .accurate
         req.automaticallyDetectsLanguage = true
         try? VNImageRequestHandler(data: data).perform([req])
-        let text = (req.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        let text = (req.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
         DispatchQueue.main.async { done(text) }
     }
 }

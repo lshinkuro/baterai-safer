@@ -56,6 +56,7 @@ struct ToolsTab: View {
                     Action(title: "Dark / Light", icon: "circle.lefthalf.filled", color: Palette.indigo) { t.toggleDarkMode() }
                     Action(title: "Matikan layar", icon: "display", color: Palette.slate) { t.sleepDisplay() }
                     Action(title: "Screenshot", icon: "camera.viewfinder", color: Palette.pink) { t.screenshot() }
+                    Action(title: "Teks dari layar", icon: "text.viewfinder", color: Palette.teal) { Notch.shared.ocr() }
                     Action(title: "Activity Monitor", icon: "waveform.path.ecg", color: Palette.green) {
                         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
                     }
@@ -65,7 +66,7 @@ struct ToolsTab: View {
                 ForEach(Array(HotKeys.bindings.enumerated()), id: \.offset) { i, b in
                     HStack {
                         Circle().fill(Palette.cycle[i % Palette.cycle.count]).frame(width: 7, height: 7)
-                        Text(b.2?.title ?? "Buka / tutup notch").font(.system(size: 13, weight: .medium))
+                        Text(b.2).font(.system(size: 13, weight: .medium))
                         Spacer()
                         Keycap(b.1)
                     }

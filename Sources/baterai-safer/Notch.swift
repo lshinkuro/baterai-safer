@@ -2,16 +2,17 @@ import SwiftUI
 import Charts
 
 enum NTab: Int, CaseIterable {
-    case music, focus, ai, clipboard, shelf, git, stats
-    var icon: String { ["music.note", "timer", "sparkles", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium"][rawValue] }
-    var title: String { ["Musik", "Fokus", "AI", "Clipboard", "Shelf", "Git", "Stats"][rawValue] }
-    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.teal, Palette.blue, Palette.indigo, Palette.green][rawValue] }
-    var theme: Theme { [Theme.violet, .amber, .violet, .mint, .electric, .electric, .mint][rawValue] }
+    case music, focus, ai, notes, dev, clipboard, shelf, git, stats
+    var icon: String { ["music.note", "timer", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium"][rawValue] }
+    var title: String { ["Musik", "Fokus", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats"][rawValue] }
+    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green][rawValue] }
+    var theme: Theme { [Theme.violet, .amber, .violet, .amber, .electric, .mint, .electric, .electric, .mint][rawValue] }
 }
 
 final class NotchState: ObservableObject {
     @Published var expanded = false
     @Published var tab = NTab.music
+    @Published var toast: String?           // short message dropped below the notch
     var notch = CGSize(width: 185, height: 32)
 }
 
@@ -23,10 +24,10 @@ final class NotchPanel: NSPanel {
 /// collapsed, so the menu bar under it keeps working; hovering the notch expands it.
 final class Notch {
     static let shared = Notch()
-    static let size = CGSize(width: 680, height: 330) // window; the visible island is smaller
+    static let size = CGSize(width: 760, height: 340) // window; the visible island is smaller
     let state = NotchState()
     let media = NowPlaying(), focus = Focus(), clips = ClipboardModel(), shelf = Shelf(), sys = SystemModel()
-    let git = GitModel(), ai = AIModel(), pr = PRModel()
+    let git = GitModel(), ai = AIModel(), pr = PRModel(), notes = NotesModel(), meet = MeetingModel()
     private var panel: NotchPanel?
     private var monitors: [Any] = []
     private var heldOpen = false              // opened by shortcut: stay open until the mouse visits and leaves
@@ -49,8 +50,8 @@ final class Notch {
         p.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         p.ignoresMouseEvents = true
         p.acceptsMouseMovedEvents = true
-        p.contentView = NSHostingView(rootView: NotchView(state: state, media: media, focus: focus, ai: ai,
-                                                          clips: clips, shelf: shelf, sys: sys, git: git, pr: pr))
+        p.contentView = NSHostingView(rootView: NotchView(state: state, media: media, focus: focus, ai: ai, meet: meet,
+                                                          clips: clips, shelf: shelf, sys: sys, git: git, pr: pr, notes: notes))
         p.orderFrontRegardless()
         panel = p
 
@@ -64,6 +65,7 @@ final class Notch {
                         return nil
                     }].compactMap { $0 }
         HotKeys.register()
+        meet.start()
         media.start()
         clips.start()
     }
@@ -74,6 +76,7 @@ final class Notch {
         panel?.orderOut(nil)
         panel = nil
         HotKeys.unregister()
+        meet.stop()
         media.stop()
         clips.stop()
     }
@@ -90,6 +93,21 @@ final class Notch {
             heldOpen = false
         } else if state.expanded, !heldOpen {
             set(false)
+        }
+    }
+
+    /// Select an area of the screen; its text lands on the clipboard.
+    func ocr() {
+        if state.expanded { set(false) }
+        captureText { text in
+            self.flash(text.isEmpty ? "Tidak ada teks terbaca" : "Teks disalin · \(text.split(separator: "\n").count) baris")
+        }
+    }
+
+    func flash(_ message: String) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { state.toast = message }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            if self.state.toast == message { withAnimation(.easeOut) { self.state.toast = nil } }
         }
     }
 
@@ -237,20 +255,24 @@ struct Equalizer: View {
 // MARK: Island
 
 struct NotchView: View {
-    static let open = CGSize(width: 620, height: 290)
+    static let open = CGSize(width: 720, height: 300)
     @ObservedObject var state: NotchState
     @ObservedObject var media: NowPlaying
     @ObservedObject var focus: Focus
     @ObservedObject var ai: AIModel
-    let clips: ClipboardModel, shelf: Shelf, sys: SystemModel, git: GitModel, pr: PRModel
+    @ObservedObject var meet: MeetingModel
+    let clips: ClipboardModel, shelf: Shelf, sys: SystemModel, git: GitModel, pr: PRModel, notes: NotesModel
     @Local private var dropping = false
     @Namespace private var ns
 
-    var live: Bool { media.playing || focus.running || ai.running }
+    var soon: Meeting? { meet.next.flatMap { $0.isSoon(Date()) ? $0 : nil } }
+    var live: Bool { media.playing || focus.running || ai.running || soon != nil }
 
     var body: some View {
         let n = state.notch
-        let size = state.expanded ? Self.open : CGSize(width: n.width + (live ? 96 : 0), height: n.height)
+        let size = state.expanded ? Self.open
+            : state.toast != nil ? CGSize(width: n.width + 200, height: n.height + 30)
+            : CGSize(width: n.width + (live ? 96 : 0), height: n.height)
         ZStack(alignment: .top) {
             ZStack {
                 Color.black
@@ -269,8 +291,15 @@ struct NotchView: View {
                 expanded(n)
                     .frame(width: Self.open.width, height: Self.open.height)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-            } else if live {
-                collapsed.frame(width: size.width, height: n.height).transition(.opacity)
+            } else {
+                VStack(spacing: 0) {
+                    if live { collapsed.frame(width: size.width, height: n.height) } else if state.toast != nil { Color.clear.frame(height: n.height) }
+                    if let t = state.toast {
+                        Label(t, systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(Palette.green).lineLimit(1).frame(height: 26)
+                    }
+                }
+                .transition(.opacity)
             }
         }
         .frame(width: Notch.size.width, height: Notch.size.height, alignment: .top)
@@ -284,6 +313,8 @@ struct NotchView: View {
             Group {
                 if ai.running {
                     Image(systemName: "sparkles").foregroundStyle(.purple)
+                } else if let m = soon {
+                    Image(systemName: m.link == nil ? "calendar" : "video.fill").foregroundStyle(Color(nsColor: m.color ?? .systemBlue))
                 } else if focus.running {
                     Image(systemName: "timer").foregroundStyle(.orange)
                 } else if let art = media.artwork {
@@ -297,6 +328,9 @@ struct NotchView: View {
             Spacer()
             if ai.running {
                 ProgressView().controlSize(.mini).tint(.purple)
+            } else if let m = soon {
+                Text(m.start <= Date() ? "live" : m.when(Date()).replacingOccurrences(of: " lagi", with: ""))
+                    .font(.system(size: 12, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(Palette.sky)
             } else if focus.running {
                 Text(focus.clock).font(.system(size: 12, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(.orange)
             } else {
@@ -333,8 +367,12 @@ struct NotchView: View {
                 .background(Color.white.opacity(0.07), in: Capsule())
                 Spacer(minLength: n.width + 12)
                 HStack(spacing: 8) {
-                    Text(state.tab.title).font(.system(size: 12, weight: .bold))
-                    StatusClock()
+                    if let m = meet.next, m.start.timeIntervalSinceNow < 3600 {
+                        MeetingChip(m: m) { meet.join() } // takes the clock's place; there isn't room for both
+                    } else {
+                        Text(state.tab.title).font(.system(size: 12, weight: .bold))
+                        StatusClock()
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -346,6 +384,8 @@ struct NotchView: View {
                 case .music: MusicView(m: media)
                 case .focus: FocusView(f: focus)
                 case .ai: AIView(ai: ai)
+                case .notes: NotesView(n: notes, ai: ai)
+                case .dev: DevView()
                 case .clipboard: ClipView(c: clips)
                 case .shelf: ShelfView(s: shelf, dropping: dropping)
                 case .git: GitView(g: git, pr: pr, ai: ai)
@@ -1216,5 +1256,147 @@ struct ConnectForm: View {
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(Color.white.opacity(0.09), in: Capsule())
+    }
+}
+
+struct MeetingChip: View {
+    let m: Meeting
+    let join: () -> Void
+
+    var body: some View {
+        Button(action: join) {
+            HStack(spacing: 5) {
+                Image(systemName: m.link == nil ? "calendar" : "video.fill")
+                Text(m.title).lineLimit(1).frame(maxWidth: 110, alignment: .leading)
+                Text(m.when(Date())).foregroundStyle(.white.opacity(0.8)).fixedSize()
+                if m.link != nil {
+                    Text("Join").font(.system(size: 10.5, weight: .heavy)).fixedSize().padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(.white, in: Capsule()).foregroundStyle(Palette.blue)
+                }
+            }
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .padding(.leading, 9).padding(.trailing, 4).padding(.vertical, 4)
+            .background(Theme.electric.gradient, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("\(m.title) — \(m.link == nil ? "buka Kalender" : "gabung rapat")")
+    }
+}
+
+struct NotesView: View {
+    @ObservedObject var n: NotesModel
+    let ai: AIModel
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(spacing: 6) {
+                NButton(icon: "plus", title: "Baru", tint: Palette.yellow) { n.add(); focused = true }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ScrollView {
+                    VStack(spacing: 3) {
+                        ForEach(n.notes) { note in
+                            let on = note.id == n.selected
+                            Button { n.selected = note.id } label: {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(note.title).font(.system(size: 11.5, weight: .bold)).lineLimit(1)
+                                    Text(note.updated, format: Date.RelativeFormatStyle(presentation: .named, locale: Locale(identifier: "id_ID"))).font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.5))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 9).padding(.vertical, 6)
+                                .background(on ? AnyShapeStyle(Theme.amber.gradient) : AnyShapeStyle(Color.white.opacity(0.05)),
+                                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu { Button("Hapus", role: .destructive) { n.delete(note.id) } }
+                        }
+                    }
+                }
+            }
+            .frame(width: 170)
+
+            if let note = n.current {
+                NCard(padding: 10) {
+                    VStack(spacing: 8) {
+                        TextEditor(text: Binding(get: { n.current?.text ?? "" }, set: { n.update($0) }))
+                            .font(.system(size: 12.5)).scrollContentBackground(.hidden).focused($focused)
+                        HStack(spacing: 6) {
+                            Text("\(note.text.count) karakter").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                            Spacer()
+                            if n.thinking { ProgressView().controlSize(.small) }
+                            NButton(icon: "sparkles", title: "Rapikan dengan AI", tint: Palette.violet) { n.tidy(ai) }.disabled(n.thinking)
+                            NButton(icon: "doc.on.doc") { copyText(note.text) }.help("Salin catatan")
+                            NButton(icon: "trash", tint: Palette.red) { n.delete(note.id) }.help("Hapus catatan")
+                        }
+                    }
+                }
+            } else {
+                NCard { Placeholder(icon: "note.text", title: "Belum ada catatan", subtitle: "Klik Baru, atau ⌃⌥N dari mana saja", color: Palette.yellow) }
+            }
+        }
+        .onAppear { if n.notes.isEmpty { n.add() }; focused = true }
+    }
+}
+
+struct DevView: View {
+    @Local private var input = ""
+    @Local private var copied = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let results = conversions(input)
+        HStack(spacing: 10) {
+            VStack(spacing: 6) {
+                NCard(padding: 8) {
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $input).font(.system(size: 11.5, design: .monospaced)).scrollContentBackground(.hidden).focused($focused)
+                        if input.isEmpty {
+                            Text("Tempel JSON, JWT, Base64, URL, timestamp, atau teks apa pun").font(.system(size: 11.5))
+                                .foregroundStyle(.white.opacity(0.4)).padding(.leading, 5).allowsHitTesting(false)
+                        }
+                    }
+                }
+                HStack(spacing: 6) {
+                    NButton(icon: "doc.on.clipboard", title: "Tempel", tint: Palette.sky) { input = NSPasteboard.general.string(forType: .string) ?? "" }
+                    NButton(icon: "clock") { input = String(Int(Date().timeIntervalSince1970)) }.help("Timestamp sekarang")
+                    NButton(icon: "number") { input = UUID().uuidString; copyText(input); copied = "UUID" }.help("Buat & salin UUID baru")
+                    Spacer()
+                    if !input.isEmpty { NButton(icon: "xmark") { input = "" } }
+                }
+            }
+            .frame(width: 290)
+
+            ScrollView {
+                VStack(spacing: 6) {
+                    if results.isEmpty {
+                        Placeholder(icon: "curlybraces", title: "Dev Utils", subtitle: "Hasil konversi muncul otomatis. Semua diproses di Mac ini.", color: Palette.sky)
+                            .frame(height: 200)
+                    }
+                    ForEach(Array(results.enumerated()), id: \.element.id) { i, r in
+                        let color = Palette.cycle[i % Palette.cycle.count]
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(r.title).font(.system(size: 10.5, weight: .heavy, design: .rounded)).foregroundStyle(color)
+                                Spacer()
+                                Button(copied == r.title ? "Disalin ✓" : "Salin") { copyText(r.output); copied = r.title }
+                                    .buttonStyle(.plain).font(.system(size: 10.5, weight: .bold)).foregroundStyle(copied == r.title ? Palette.green : .white.opacity(0.7))
+                            }
+                            Text(r.output).font(.system(size: 11, design: .monospaced)).lineLimit(8).textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(9)
+                        .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+            }
+        }
+        .onAppear {
+            focused = true
+            // Start from whatever was just copied if it looks like something to convert.
+            if input.isEmpty, let c = NSPasteboard.general.string(forType: .string), c.count < 20_000,
+               conversions(c).contains(where: { !["Base64 encode", "URL encode", "SHA-256", "MD5"].contains($0.title) }) { input = c }
+        }
+        .onChange(of: input) { _ in copied = "" }
     }
 }

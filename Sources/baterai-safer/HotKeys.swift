@@ -7,13 +7,16 @@ enum HotKeys {
     private static var installed = false
 
     static let ctrlOpt = UInt32(controlKey | optionKey)
-    /// (key code, label, tab or nil = toggle the island)
-    static let bindings: [(UInt32, String, NTab?)] = [
-        (UInt32(kVK_Space), "⌃⌥Space", nil),
-        (UInt32(kVK_ANSI_V), "⌃⌥V", .clipboard),
-        (UInt32(kVK_ANSI_A), "⌃⌥A", .ai),
-        (UInt32(kVK_ANSI_F), "⌃⌥F", .focus),
-        (UInt32(kVK_ANSI_G), "⌃⌥G", .git),
+    /// (key code, keys, what it does, action)
+    static let bindings: [(UInt32, String, String, () -> Void)] = [
+        (UInt32(kVK_Space), "⌃⌥Space", "Buka / tutup notch", { Notch.shared.toggle(nil) }),
+        (UInt32(kVK_ANSI_N), "⌃⌥N", "Catatan", { Notch.shared.toggle(.notes) }),
+        (UInt32(kVK_ANSI_D), "⌃⌥D", "Dev Utils", { Notch.shared.toggle(.dev) }),
+        (UInt32(kVK_ANSI_V), "⌃⌥V", "Clipboard", { Notch.shared.toggle(.clipboard) }),
+        (UInt32(kVK_ANSI_A), "⌃⌥A", "AI", { Notch.shared.toggle(.ai) }),
+        (UInt32(kVK_ANSI_T), "⌃⌥T", "Salin teks dari layar", { Notch.shared.ocr() }),
+        (UInt32(kVK_ANSI_F), "⌃⌥F", "Fokus", { Notch.shared.toggle(.focus) }),
+        (UInt32(kVK_ANSI_G), "⌃⌥G", "Git", { Notch.shared.toggle(.git) }),
     ]
 
     static func register() {
@@ -31,7 +34,7 @@ enum HotKeys {
         unregister()
         for (i, b) in bindings.enumerated() {
             let id = UInt32(i + 1)
-            actions[id] = { Notch.shared.toggle(b.2) }
+            actions[id] = b.3
             var ref: EventHotKeyRef?
             if RegisterEventHotKey(b.0, ctrlOpt, EventHotKeyID(signature: OSType(0x4253_4146), id: id), GetApplicationEventTarget(), 0, &ref) == noErr,
                let ref { refs.append(ref) }

@@ -22,6 +22,10 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Untuk menampilkan dan mengontrol lagu di Spotify/Music, dan mengganti mode gelap.</string>
 </dict>

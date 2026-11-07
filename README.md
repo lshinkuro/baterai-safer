@@ -64,12 +64,16 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka:
 | Musik | Spotify / Apple Music: album art, kontrol, lirik berjalan (lrclib.net) |
 | Fokus | Pomodoro 25/5, streak, grafik 7 hari |
 | AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool |
+| Catatan | Quick notes multi-halaman, tersimpan otomatis, "Rapikan dengan AI" |
+| Dev Utils | Tempel apa saja: JSON rapi/ringkas, decode JWT (+ cek kedaluwarsa), Base64, URL, timestamp, SHA-256/MD5, UUID — semua offline |
 | Clipboard | Riwayat copy, pin, OCR teks di gambar; isi dari password manager diabaikan |
 | Shelf | Seret file ke notch, seret keluar, atau AirDrop |
 | Git | Status repo, fetch/pull/push, commit dengan pesan dari AI; review PR GitHub (`gh`) dan Bitbucket Server (HTTP access token di Keychain) dengan AI, kirim review & merge |
 | Stats | Baterai, CPU, memori, disk |
 
-Shortcut: ⌃⌥Space buka/tutup, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, Esc menutup.
+Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, **⌃⌥T salin teks dari layar (OCR)**, Esc menutup.
+
+Rapat berikutnya dari Kalender muncul di samping kamera 10 menit sebelum mulai, dengan tombol **Join** untuk Zoom/Meet/Teams/Webex (perlu izin Kalender).
 
 Notch bisa dimatikan di tab Tools. Now Playing butuh izin Automation untuk Spotify/Music.
 
