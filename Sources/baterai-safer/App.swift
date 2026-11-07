@@ -252,8 +252,8 @@ struct BatteryTab: View {
 struct HistoryChart: View {
     let samples: [Sample]
     let limit: Int?
-    @State private var metric = 0
-    @State private var hours = 6
+    @Local private var metric = 0
+    @Local private var hours = 6
 
     let metrics = [("Baterai", "%", Color.green), ("Suhu", "°", Color.orange), ("Daya", "W", Color.blue)]
 

@@ -2,6 +2,18 @@ import SwiftUI
 
 // Shared building blocks for all tabs.
 
+/// Drop-in for `@State`. In recent SDKs `@State` needs the SwiftUI macro plugin, which ships only
+/// with Xcode; Homebrew builds with Command Line Tools, where a plain `State` value still works.
+@propertyWrapper struct Local<Value>: DynamicProperty {
+    private let state: State<Value>
+    init(wrappedValue: Value) { state = State(initialValue: wrappedValue) }
+    var wrappedValue: Value {
+        get { state.wrappedValue }
+        nonmutating set { state.wrappedValue = newValue }
+    }
+    var projectedValue: Binding<Value> { state.projectedValue }
+}
+
 enum Tab: Int, CaseIterable {
     case battery, system, cleaner, tools
     var title: String { ["Baterai", "Sistem", "Cleaner", "Tools"][rawValue] }
@@ -187,7 +199,7 @@ struct StatusPill: View {
 /// List row that highlights on hover and tells its content whether it is hovered.
 struct HoverRow<Content: View>: View {
     @ViewBuilder let content: (Bool) -> Content
-    @State private var hover = false
+    @Local private var hover = false
 
     var body: some View {
         content(hover)
@@ -229,7 +241,7 @@ struct ToggleTile: View {
 
 struct Action: View {
     let title: String, icon: String, color: Color, run: () -> Void
-    @State private var hover = false
+    @Local private var hover = false
 
     var body: some View {
         Button(action: run) {

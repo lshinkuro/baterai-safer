@@ -196,7 +196,7 @@ final class CleanerModel: ObservableObject {
 
 struct CleanerTab: View {
     @ObservedObject var c: CleanerModel
-    @State private var query = ""
+    @Local private var query = ""
 
     var body: some View {
         let total = c.junk.compactMap(\.size).reduce(0, +), scanning = c.junk.contains { $0.size == nil }

@@ -88,7 +88,7 @@ func bytes(_ b: Double) -> String { ByteCountFormatter.string(fromByteCount: Int
 
 struct SystemTab: View {
     @ObservedObject var s: SystemModel
-    @State private var byMemory = false
+    @Local private var byMemory = false
 
     var body: some View {
         let mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0

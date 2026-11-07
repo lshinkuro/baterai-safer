@@ -161,7 +161,7 @@ struct NButton: View {
     var tint: Color = .white
     var prominent = false
     let run: () -> Void
-    @State private var hover = false
+    @Local private var hover = false
 
     var body: some View {
         Button(action: run) {
@@ -241,7 +241,7 @@ struct NotchView: View {
     @ObservedObject var focus: Focus
     @ObservedObject var ai: AIModel
     let clips: ClipboardModel, shelf: Shelf, sys: SystemModel, git: GitModel, pr: PRModel
-    @State private var dropping = false
+    @Local private var dropping = false
     @Namespace private var ns
 
     var live: Bool { media.playing || focus.running || ai.running }
@@ -592,8 +592,8 @@ func copyText(_ s: String) {
 
 struct ClipView: View {
     @ObservedObject var c: ClipboardModel
-    @State private var query = ""
-    @State private var copied: UUID?
+    @Local private var query = ""
+    @Local private var copied: UUID?
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -753,8 +753,8 @@ struct GitView: View {
     @ObservedObject var pr: PRModel
     let ai: AIModel
     @AppStorage("gitPane") private var showPR = false
-    @State private var composing: Repo?
-    @State private var connecting: String? // "bitbucket" / "sonar"
+    @Local private var composing: Repo?
+    @Local private var connecting: String? // "bitbucket" / "sonar"
 
     var body: some View {
         VStack(spacing: 10) {
@@ -883,7 +883,7 @@ struct PRPane: View {
     let ai: AIModel
     let repos: [String]
     let connectSonar: () -> Void
-    @State private var editing = false
+    @Local private var editing = false
 
     var body: some View {
         if !pr.error.isEmpty && pr.prs.isEmpty {
@@ -1078,12 +1078,12 @@ struct CommitPane: View {
     let ai: AIModel
     let repo: Repo
     let close: () -> Void
-    @State private var files: [String] = []
-    @State private var message = ""
-    @State private var push = false
-    @State private var thinking = false
-    @State private var busy = false
-    @State private var result = ""
+    @Local private var files: [String] = []
+    @Local private var message = ""
+    @Local private var push = false
+    @Local private var thinking = false
+    @Local private var busy = false
+    @Local private var result = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1165,10 +1165,10 @@ struct ConnectForm: View {
     let title: String, help: String, placeholder: String
     let connect: (String, String, @escaping (Bool, String) -> Void) -> Void
     let done: () -> Void
-    @State var url: String
-    @State private var token = ""
-    @State private var status = ""
-    @State private var busy = false
+    @Local var url: String
+    @Local private var token = ""
+    @Local private var status = ""
+    @Local private var busy = false
 
     var body: some View {
         NCard {
