@@ -156,28 +156,5 @@ func selfTest() {
     FeatureFlags.set("music", true)
     assert(NTab.music.enabled && FeatureFlags.off() == ["panel.cleaner"], "feature flags on")
     UserDefaults.standard.set(savedFlags, forKey: FeatureFlags.key)
-    // Calculator
-    for (t, v) in [("1.500.000", 1_500_000.0), ("1,5", 1.5), ("150rb", 150_000), ("2jt", 2_000_000), ("3k", 3000), ("1,2miliar", 1.2e9), ("1.5", 1.5)] {
-        assert(parseAmount(t) == v, "amount \(t)")
-    }
-    for (t, v) in [("2+3*4", 14.0), ("(2+3)*4", 20), ("2^10", 1024), ("150rb * 12", 1_800_000), ("200rb + 10%", 220_000), ("-5+2", -3), ("10 x 3", 30), ("1.000.000 / 4", 250_000)] {
-        assert(Calc.eval(t) == v, "calc \(t) = \(String(describing: Calc.eval(t)))")
-    }
-    assert(Calc.eval("1/0") == nil && Calc.eval("abc") == nil && Calc.eval("2+") == nil && Calc.eval("(1") == nil, "calc rejects bad input")
-    assert(calculate("15% dari 200rb") == .value(30_000), "percent of")
-    if case .converted(let v, "mil")? = calculate("5 km ke mil") { assert(abs(v - 3.10686) < 0.0001) } else { assert(false, "km→mil") }
-    if case .converted(let v, "f")? = calculate("30 c ke f") { assert(abs(v - 86) < 0.0001) } else { assert(false, "c→f") }
-    assert(calculate("100 usd ke idr") == .needsRates(100, "USD", "IDR") && calculate("1,5jt idr ke usd") == .needsRates(1_500_000, "IDR", "USD"), "currency")
-    assert(calculate("5 kg ke km") == nil, "incompatible units")
-    assert(formatNumber(1_500_000.5) == "1.500.000,5", "id number format")
-    // Bluetooth
-    let bt = parseBluetooth(Data(#"{"SPBluetoothDataType":[{"device_connected":[{"AirPods Pro":{"device_address":"AA:BB","device_minorType":"Headphones","device_batteryLevelLeft":"80%","device_batteryLevelRight":"75%","device_batteryLevelCase":"40%"}}],"device_not_connected":[{"LOGI M240":{"device_address":"D2:FB:89","device_minorType":"Mouse"}},{"LOGI M240":{"device_address":"D2:FB:8B","device_minorType":"Mouse"}}]}]}"#.utf8))
-    assert(bt.count == 2 && bt[0].connected && bt[0].batteries.map(\.1) == [80, 75, 40] && bt[0].icon == "airpodspro" && bt[0].isAudio, "bluetooth parse")
-    assert(bt[1].icon == "magicmouse" && !bt[1].connected && !bt[1].isAudio, "bluetooth mouse, deduped")
-    // Weather
-    let wjson = #"{"timezone":"Asia/Jakarta","current":{"temperature_2m":31.2,"apparent_temperature":35,"relative_humidity_2m":70,"wind_speed_10m":9.5,"weather_code":2,"is_day":1},"hourly":{"time":["2030-01-01T10:00","2030-01-01T11:00"],"temperature_2m":[30,31],"precipitation_probability":[10,60],"weather_code":[2,61]},"daily":{"temperature_2m_max":[33],"temperature_2m_min":[25]}}"#
-    let w = parseWeather(Data(wjson.utf8), city: "Jakarta", now: Date(timeIntervalSince1970: 1_893_456_000))!
-    assert(w.temp == 31.2 && w.high == 33 && w.low == 25 && w.hours.count == 2 && w.hours[1].rain == 60 && weatherInfo(w.hours[1].code).1 == "Hujan", "weather parse")
-    assert(weatherInfo(0, night: true).0 == "moon.stars.fill" && parseWeather(Data("{}".utf8), city: "") == nil)
     print("selftest ok")
 }

@@ -26,8 +26,6 @@
 	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Untuk menampilkan baterai AirPods/mouse/keyboard dan menyambungkannya sekali klik.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Untuk menampilkan dan mengontrol lagu di Spotify/Music, dan mengganti mode gelap.</string>
 </dict>
