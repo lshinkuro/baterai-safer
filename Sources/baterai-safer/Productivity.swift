@@ -49,11 +49,13 @@ func parseNotesList(_ out: String, now: Date) -> [Note] {
     }
 }
 
-/// AppleScript bridge to the "Baterai Safer" folder in Apple Notes. Arguments go in as argv, never into the script text.
+/// AppleScript bridge to the "Poni" folder in Apple Notes. Arguments go in as argv, never into the script text.
 enum NotesSync {
     static let folder = """
         tell application "Notes" to tell default account
-            if not (exists folder "Baterai Safer") then make new folder with properties {name:"Baterai Safer"}
+            -- the folder was called "Baterai Safer" before the rename
+            if (exists folder "Baterai Safer") and not (exists folder "Poni") then set name of folder "Baterai Safer" to "Poni"
+            if not (exists folder "Poni") then make new folder with properties {name:"Poni"}
         end tell
         """
     static let list = """
@@ -63,7 +65,7 @@ enum NotesSync {
             set US to character id 31
             set out to ""
             tell application "Notes" to tell default account
-                repeat with n in notes of folder "Baterai Safer"
+                repeat with n in notes of folder "Poni"
                     set ro to ((count of attachments of n) > 0) or ((body of n) contains "<table")
                     set out to out & (id of n) & US & (((modification date of n) - (current date)) as string) & US & (ro as string) & US & (plaintext of n) & RS
                 end repeat
@@ -75,7 +77,7 @@ enum NotesSync {
         on run argv
             \(folder)
             tell application "Notes" to tell default account
-                return id of (make new note at folder "Baterai Safer" with properties {body:item 1 of argv})
+                return id of (make new note at folder "Poni" with properties {body:item 1 of argv})
             end tell
         end run
         """

@@ -19,6 +19,6 @@ case "status":
     print("\(b.percent)% ac=\(b.ac) charging=\(s.charging) adapter=\(s.adapter) health=\(b.health)% cycles=\(b.cycles) temp=\(b.temp.map { String(format: "%.1f", $0) } ?? "-")")
 case nil: BateraiApp.main()
 default:
-    print("usage: baterai-safer [daemon|install-daemon [user]|uninstall-daemon|status|ai-usage|selftest]")
+    print("usage: poni [daemon|install-daemon [user]|uninstall-daemon|status|ai-usage|selftest]")
     exit(2)
 }

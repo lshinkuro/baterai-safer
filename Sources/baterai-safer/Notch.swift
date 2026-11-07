@@ -1558,7 +1558,7 @@ struct NotesView: View {
                 Button { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!) } label: {
                     Label("Tersimpan lokal · izinkan Notes", systemImage: "exclamationmark.triangle.fill").foregroundStyle(Palette.amber)
                 }
-                .buttonStyle(.plain).help("System Settings → Privacy & Security → Automation → Baterai Safer → Notes")
+                .buttonStyle(.plain).help("System Settings → Privacy & Security → Automation → Poni → Notes")
             } else if n.syncing || note.dirty || (!note.synced && !note.text.isEmpty) {
                 Label("Menyinkron…", systemImage: "arrow.triangle.2.circlepath").foregroundStyle(.white.opacity(0.5))
             } else if note.synced {

@@ -76,7 +76,7 @@ enum Daemon {
     // Homebrew upgrades replace the Cellar path, so point launchd at the stable opt/ path.
     static func stableBinary() -> String {
         let p = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().path
-        return p.replacingOccurrences(of: #"/Cellar/baterai-safer/[^/]+/"#, with: "/opt/baterai-safer/", options: .regularExpression)
+        return p.replacingOccurrences(of: #"/Cellar/([^/]+)/[^/]+/"#, with: "/opt/$1/", options: .regularExpression)
     }
 
     static func install(user: String) {

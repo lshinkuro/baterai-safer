@@ -1,34 +1,38 @@
-# Baterai Safer
+# Poni
 
-Aplikasi menu bar macOS (Apple Silicon) untuk menjaga kesehatan baterai: charge limiter, discharge, heat protection, sailing, kalibrasi, dan top up.
+<img src="Resources/icon.png" width="96" align="right">
+
+> Dulu bernama **Baterai Safer**.
+
+Notch & menu bar untuk Mac Apple Silicon: jaga kesehatan baterai (charge limit, kalibrasi, top up), fokus, rapat, catatan yang tersinkron ke Apple Notes, belajar bahasa, dan banyak alat kecil lainnya.
 
 ## Install
 
 ```sh
-brew tap lshinkuro/baterai-safer https://github.com/lshinkuro/baterai-safer
-brew trust lshinkuro/baterai-safer   # Homebrew baru wajib trust tap pihak ketiga
-brew install baterai-safer
-brew services start baterai-safer   # jalankan di menu bar + otomatis saat login
-ln -sf "$(brew --prefix)/opt/baterai-safer/Baterai Safer.app" /Applications/   # opsional: Launchpad/Spotlight
+brew tap lshinkuro/poni https://github.com/lshinkuro/poni
+brew trust lshinkuro/poni   # Homebrew baru wajib trust tap pihak ketiga
+brew install poni
+brew services start poni   # jalankan di menu bar + otomatis saat login
+ln -sf "$(brew --prefix)/opt/poni/Poni.app" /Applications/   # opsional: Launchpad/Spotlight
 ```
 
-Klik ikon baterai di menu bar → **Install helper…** (minta password admin sekali). Helper adalah daemon root yang menulis ke SMC, jadi batas tetap berlaku saat aplikasi ditutup.
+Klik ikon baterai Poni di menu bar → **Install helper…** (minta password admin sekali). Helper adalah daemon root yang menulis ke SMC, jadi batas tetap berlaku saat aplikasi ditutup.
 
-Atau lewat terminal: `sudo baterai-safer install-daemon`.
+Atau lewat terminal: `sudo poni install-daemon`.
 
 ### Tanpa Homebrew (DMG)
 
-Download `BateraiSafer.dmg` dari [Releases](https://github.com/lshinkuro/baterai-safer/releases/latest), buka, lalu seret **Baterai Safer** ke **Applications**. Aplikasi otomatis berjalan saat login (bisa dimatikan di System Settings → General → Login Items).
+Download `Poni.dmg` dari [Releases](https://github.com/lshinkuro/poni/releases/latest), buka, lalu seret **Poni** ke **Applications**. Aplikasi otomatis berjalan saat login (bisa dimatikan di System Settings → General → Login Items).
 
 Aplikasi belum ditandatangani Developer ID, jadi saat pertama dibuka macOS akan memblokirnya. Buka System Settings → Privacy & Security → **Open Anyway**, atau jalankan:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/Baterai Safer.app"
+xattr -dr com.apple.quarantine "/Applications/Poni.app"
 ```
 
-Update: download DMG terbaru dan timpa aplikasi di Applications. Uninstall: `sudo "/Applications/Baterai Safer.app/Contents/MacOS/baterai-safer" uninstall-daemon`, lalu hapus aplikasinya.
+Update: download DMG terbaru dan timpa aplikasi di Applications. Uninstall: `sudo "/Applications/Poni.app/Contents/MacOS/baterai-safer" uninstall-daemon`, lalu hapus aplikasinya.
 
-Membuat DMG sendiri: `scripts/dmg.sh <versi>` → `.build/BateraiSafer.dmg`.
+Membuat DMG sendiri: `scripts/dmg.sh <versi>` → `.build/Poni.dmg`.
 
 ## Update
 
@@ -38,15 +42,15 @@ Manual:
 
 ```sh
 brew update                          # ambil versi terbaru dari tap
-brew upgrade baterai-safer
-brew services restart baterai-safer  # jalankan versi baru
+brew upgrade poni
+brew services restart poni  # jalankan versi baru
 ```
 
-Helper (root) tidak perlu dipasang ulang: ia menjalankan binary di `$(brew --prefix)/opt/baterai-safer`, yang otomatis menunjuk ke versi baru, dan dimulai ulang saat reboot. Pengaturan, riwayat, dan token di Keychain tetap tersimpan.
+Helper (root) tidak perlu dipasang ulang: ia menjalankan binary di `$(brew --prefix)/opt/poni`, yang otomatis menunjuk ke versi baru, dan dimulai ulang saat reboot. Pengaturan, riwayat, dan token di Keychain tetap tersimpan.
 
 Aplikasi belum ditandatangani Developer ID Apple, jadi setelah update macOS bisa meminta ulang izin (Automation untuk Spotify/Music, akses Keychain untuk token). Pilih **Izinkan / Always Allow**.
 
-Cek versi yang terpasang: `brew list --versions baterai-safer`.
+Cek versi yang terpasang: `brew list --versions poni`.
 
 Kalau `brew install`/`upgrade` gagal dengan error compile, pastikan Command Line Tools terbaru (`softwareupdate --list`) lalu coba lagi; laporkan di Issues bila masih gagal.
 
@@ -65,7 +69,7 @@ Kalau `brew install`/`upgrade` gagal dengan error compile, pastikan Command Line
 
 ### macOS 27+
 
-Firmware macOS 27 mengunci key SMC untuk menghentikan pengisian (`CHTE`, `CH0B`, `CH0C`). Di sistem ini Baterai Safer otomatis memakai **Charge Limit bawaan macOS** (80, 85, 90, 95, 100%), yang tetap berlaku saat sleep dan saat aplikasi ditutup. Discharge dan kalibrasi memakai key `CHIE` (memutus daya charger), jadi selama itu Mac berjalan pakai baterai. Sailing dan heat protection tidak tersedia di mode ini (heat protection dengan memutus charger membuat Mac tidak bisa dicas sama sekali).
+Firmware macOS 27 mengunci key SMC untuk menghentikan pengisian (`CHTE`, `CH0B`, `CH0C`). Di sistem ini Poni otomatis memakai **Charge Limit bawaan macOS** (80, 85, 90, 95, 100%), yang tetap berlaku saat sleep dan saat aplikasi ditutup. Discharge dan kalibrasi memakai key `CHIE` (memutus daya charger), jadi selama itu Mac berjalan pakai baterai. Sailing dan heat protection tidak tersedia di mode ini (heat protection dengan memutus charger membuat Mac tidak bisa dicas sama sekali).
 
 Top up dan kalibrasi di macOS 27 membutuhkan aplikasi menu bar tetap berjalan.
 
@@ -83,7 +87,7 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka, atau
 | Rapat | Kalender bulanan: tambah rapat di tanggal & jam tertentu, atur pengingat per acara (tanpa pengingat, 5/10/15/30 menit, 1 jam sebelum). Tersimpan ke Kalender macOS, jadi ikut sinkron iCloud dan notifikasinya tetap muncul walau aplikasi ditutup |
 | Fokus | Pomodoro 25/50/90 menit, niat sesi ("Mau mengerjakan apa?"), blokir aplikasi pengganggu selama fokus (Slack, WhatsApp, Discord, … bisa diatur), refleksi setelah sesi yang tersimpan ke catatan **Jurnal Fokus**, otomatis dijeda saat rapat di Kalender dimulai, niat sesi tampil di notch yang tertutup, streak, grafik 7 hari |
 | AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool. **Pemakaian AI (eksperimental):** halaman Pemakaian berisi token Claude Code hari ini, 7 hari, per model, dan berapa yang dipakai chat aplikasi ini. Bisa dimatikan di Tools → Fitur → Pemakaian AI β |
-| Catatan | Quick notes multi-halaman, tersinkron ke folder **"Baterai Safer"** di Apple Notes (muncul juga di iPhone / iCloud), "Rapikan dengan AI". Catatan dengan gambar atau tabel hanya bisa dibaca di notch (edit di Notes). Tanpa izin Automation → Notes, catatan tetap tersimpan lokal |
+| Catatan | Quick notes multi-halaman, tersinkron ke folder **"Poni"** di Apple Notes (muncul juga di iPhone / iCloud), "Rapikan dengan AI". Catatan dengan gambar atau tabel hanya bisa dibaca di notch (edit di Notes). Tanpa izin Automation → Notes, catatan tetap tersimpan lokal |
 | Dev Utils | Tempel apa saja: JSON rapi/ringkas, decode JWT (+ cek kedaluwarsa), Base64, URL, timestamp, SHA-256/MD5, UUID — semua offline |
 | Clipboard | Riwayat copy, pin, OCR teks di gambar; isi dari password manager diabaikan |
 | Shelf | Seret file ke notch, seret keluar, atau AirDrop |
@@ -100,19 +104,19 @@ Notch bisa dimatikan di tab Tools, begitu juga tiap fitur (tab notch, Rapat, tab
 ## CLI
 
 ```
-baterai-safer                    # aplikasi menu bar
-baterai-safer status             # info baterai
-baterai-safer ai-usage           # pemakaian token Claude Code 7 hari
-baterai-safer selftest           # cek logika
-sudo baterai-safer install-daemon / uninstall-daemon
+poni                    # aplikasi menu bar
+poni status             # info baterai
+poni ai-usage           # pemakaian token Claude Code 7 hari
+poni selftest           # cek logika
+sudo poni install-daemon / uninstall-daemon
 ```
 
 ## Uninstall
 
 ```sh
-sudo baterai-safer uninstall-daemon   # pengisian dikembalikan normal
-brew services stop baterai-safer
-brew uninstall baterai-safer
+sudo poni uninstall-daemon   # pengisian dikembalikan normal
+brew services stop poni
+brew uninstall poni
 ```
 
 **macOS 27:** uninstall tidak mengembalikan Charge Limit bawaan macOS. Batas terakhir (mis. 80%) tetap aktif, jadi baterai berhenti mengisi di situ. Kembalikan ke 100% di System Settings → Battery → Charge Limit.
@@ -129,3 +133,13 @@ Sejak v0.6.2 daemon membersihkan dirinya sendiri dalam beberapa detik setelah ap
 ## Catatan
 
 Memakai API privat Apple (AppleSMC, PowerUI) yang bisa berubah di update macOS. Hanya Apple Silicon. Gunakan dengan risiko sendiri.
+
+## Dari Baterai Safer ke Poni
+
+Semua pengaturan, catatan, progres, dan izin tetap. Yang berubah hanya nama dan ikon.
+
+- **DMG:** update otomatis seperti biasa. Aplikasi lama tetap di `Baterai Safer.app` (supaya helper tetap jalan), isinya sudah Poni.
+- **Homebrew:** `brew upgrade baterai-safer` tetap jalan dan memasang Poni. Mau pindah ke nama baru: `sudo poni uninstall-daemon && brew uninstall baterai-safer && brew install poni`, lalu klik **Install helper…** lagi.
+- Folder **Baterai Safer** di Apple Notes otomatis berganti nama jadi **Poni**.
+
+Ikon dibuat dengan `scripts/icon.swift`.

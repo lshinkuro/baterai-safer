@@ -78,7 +78,7 @@ struct BateraiApp: App {
             d.set(true, forKey: "migratedDomain")
         }
         // DMG installs have no `brew services`; start at login once (user can turn it off in Login Items).
-        let homebrew = URL(fileURLWithPath: Bundle.main.bundlePath).resolvingSymlinksInPath().path.contains("/baterai-safer/")
+        let homebrew = URL(fileURLWithPath: Bundle.main.bundlePath).resolvingSymlinksInPath().path.contains("/Cellar/")
         if Bundle.main.bundleIdentifier != nil, !homebrew, !d.bool(forKey: "loginItemRegistered") {
             try? SMAppService.mainApp.register()
             d.set(true, forKey: "loginItemRegistered")
@@ -109,9 +109,9 @@ struct Panel: View {
         let theme = (Tab(rawValue: tab) ?? .battery).theme
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                IconBadge(icon: "bolt.shield.fill", color: Palette.green, size: 30)
+                Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Baterai Safer").font(.system(size: 15, weight: .heavy, design: .rounded))
+                    Text("Poni").font(.system(size: 15, weight: .heavy, design: .rounded))
                     Text("\(m.battery.percent)% · \(m.battery.ac ? "dicas" : "pakai baterai")").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                 }
                 Spacer()

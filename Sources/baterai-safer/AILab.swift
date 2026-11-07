@@ -133,7 +133,7 @@ struct UsagePage: View {
                         }
                         .font(.system(size: 10.5))
                     }
-                    Text("Dari chat Baterai Safer: \(tokens(r.ours))").font(.system(size: 10)).foregroundStyle(Palette.violet)
+                    Text("Dari chat Poni: \(tokens(r.ours))").font(.system(size: 10)).foregroundStyle(Palette.violet)
                 }
             }
 

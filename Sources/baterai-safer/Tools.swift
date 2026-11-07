@@ -34,7 +34,7 @@ final class ToolsModel: ObservableObject {
         if !awake { awakeTimer?.invalidate(); awakeUntil = nil }
         if awake {
             IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
-                                        IOPMAssertionLevel(kIOPMAssertionLevelOn), "Baterai Safer: tetap menyala" as CFString, &assertion)
+                                        IOPMAssertionLevel(kIOPMAssertionLevelOn), "Poni: tetap menyala" as CFString, &assertion)
         } else {
             IOPMAssertionRelease(assertion)
         }

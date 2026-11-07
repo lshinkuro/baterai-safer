@@ -1,8 +1,8 @@
 #!/bin/sh
-# Wraps the release binary into "Baterai Safer.app" (name + icon in permission dialogs, Finder, Spotlight).
+# Wraps the release binary into "Poni.app" (name + icon in permission dialogs, Finder, Spotlight).
 set -e
 cd "$(dirname "$0")/.."
-APP=".build/Baterai Safer.app"
+APP=".build/Poni.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/baterai-safer "$APP/Contents/MacOS/"

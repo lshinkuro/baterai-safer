@@ -124,7 +124,7 @@ struct AgendaView: View {
             switch a.access {
             case false?:
                 Placeholder(icon: "calendar.badge.exclamationmark", title: "Izin Kalender ditolak",
-                            subtitle: "System Settings → Privacy & Security → Calendars → Baterai Safer", color: Palette.sky)
+                            subtitle: "System Settings → Privacy & Security → Calendars → Poni", color: Palette.sky)
             case nil:
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             default:

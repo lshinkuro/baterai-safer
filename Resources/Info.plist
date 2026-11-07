@@ -5,9 +5,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>io.github.lshinkuro.BateraiSafer</string>
 	<key>CFBundleName</key>
-	<string>Baterai Safer</string>
+	<string>Poni</string>
 	<key>CFBundleDisplayName</key>
-	<string>Baterai Safer</string>
+	<string>Poni</string>
 	<key>CFBundleExecutable</key>
 	<string>baterai-safer</string>
 	<key>CFBundleIconFile</key>

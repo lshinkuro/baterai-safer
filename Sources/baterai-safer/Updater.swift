@@ -20,7 +20,7 @@ func isNewer(_ a: String, than b: String) -> Bool {
 
 final class Updater: ObservableObject {
     static let shared = Updater()
-    static let api = URL(string: "https://api.github.com/repos/lshinkuro/baterai-safer/releases/latest")!
+    static let api = URL(string: "https://api.github.com/repos/lshinkuro/poni/releases/latest")!
     @Published var latest: String?           // newer version available, e.g. "0.7.0"
     @Published var status = ""
     @Published var busy = false
@@ -32,7 +32,12 @@ final class Updater: ObservableObject {
 
     let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     var appURL: URL { Bundle.main.bundleURL.resolvingSymlinksInPath() }
-    var viaHomebrew: Bool { appURL.path.contains("/Cellar/baterai-safer/") }
+    var viaHomebrew: Bool { appURL.path.contains("/Cellar/") }
+    /// Formula this copy came from: "poni", or "baterai-safer" for installs from before the rename.
+    var formula: String {
+        let c = appURL.pathComponents
+        return c.firstIndex(of: "Cellar").map { c[$0 + 1] } ?? "poni"
+    }
     /// Local builds (swift build / .build) never update themselves.
     var updatable: Bool { !current.contains("dev") && Bundle.main.bundleIdentifier != nil && !appURL.path.contains("/.build/") }
 
@@ -60,7 +65,7 @@ final class Updater: ObservableObject {
                 let first = self.latest != tag
                 self.latest = tag
                 self.status = "v\(tag) tersedia"
-                if first { Notch.shared.flash("Baterai Safer v\(tag) tersedia" + (self.auto && self.updatable ? " · memasang…" : "")) }
+                if first { Notch.shared.flash("Poni v\(tag) tersedia" + (self.auto && self.updatable ? " · memasang…" : "")) }
                 // Don't restart under someone mid-session; the next check tries again.
                 if self.auto, self.updatable, !Notch.shared.focus.running { self.install() }
             }
@@ -74,8 +79,8 @@ final class Updater: ObservableObject {
             status = "Memperbarui lewat Homebrew… (1–2 menit)"
             let brew = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"].first(where: FileManager.default.isExecutableFile) ?? "/opt/homebrew/bin/brew"
             runAsync(brew, ["update", "--quiet"]) { _, _, _ in
-                runAsync(brew, ["upgrade", "baterai-safer"]) { code, _, err in
-                    let opt = URL(fileURLWithPath: (brew as NSString).deletingLastPathComponent + "/../opt/baterai-safer/Baterai Safer.app").standardizedFileURL
+                runAsync(brew, ["upgrade", self.formula]) { code, _, err in
+                    let opt = URL(fileURLWithPath: (brew as NSString).deletingLastPathComponent + "/../opt/\(self.formula)/Poni.app").standardizedFileURL
                     code == 0 ? self.relaunch(opt, v) : self.fail(err.split(separator: "\n").last.map(String.init) ?? "brew upgrade gagal")
                 }
             }
@@ -106,9 +111,11 @@ final class Updater: ObservableObject {
         guard shRun("/usr/bin/hdiutil", "attach", dmgFile.path, "-nobrowse", "-readonly", "-quiet", "-mountpoint", mount.path) == 0 else {
             throw UpdateError("DMG tidak bisa dibuka")
         }
-        let staged = appURL.deletingLastPathComponent().appendingPathComponent(".Baterai Safer.update.app")
+        let staged = appURL.deletingLastPathComponent().appendingPathComponent(".Poni.update.app")
         try? fm.removeItem(at: staged)
-        guard shRun("/usr/bin/ditto", mount.appendingPathComponent("Baterai Safer.app").path, staged.path) == 0 else {
+        // Copies keep their own file name (an install from before the rename stays "Baterai Safer.app"),
+        // so the helper daemon, which runs the binary by path, keeps working.
+        guard shRun("/usr/bin/ditto", mount.appendingPathComponent("Poni.app").path, staged.path) == 0 else {
             throw UpdateError("Tidak bisa menyalin ke \(appURL.deletingLastPathComponent().path)")
         }
         _ = try fm.replaceItemAt(appURL, withItemAt: staged)

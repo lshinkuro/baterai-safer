@@ -1,9 +1,12 @@
+# Baterai Safer is now Poni. This formula stays so existing installs keep upgrading: it builds Poni,
+# and keeps "Baterai Safer.app" and the baterai-safer command as links, because the helper daemon
+# and v0.6.10's updater use those paths. New installs: brew install poni.
 class BateraiSafer < Formula
-  desc "Menu bar battery charge limiter for Apple Silicon Macs"
-  homepage "https://github.com/lshinkuro/baterai-safer"
-  url "https://github.com/lshinkuro/baterai-safer.git", tag: "v0.6.10", revision: "43f7f5d833d108efd91124cbabe050ff4f5b1c7b"
+  desc "Now called Poni (brew install poni)"
+  homepage "https://github.com/lshinkuro/poni"
+  url "https://github.com/lshinkuro/poni.git", tag: "v0.6.10", revision: "43f7f5d833d108efd91124cbabe050ff4f5b1c7b"
   license "MIT"
-  head "https://github.com/lshinkuro/baterai-safer.git", branch: "main"
+  head "https://github.com/lshinkuro/poni.git", branch: "main"
 
   depends_on arch: :arm64
   depends_on :macos
@@ -11,27 +14,30 @@ class BateraiSafer < Formula
   def install
     system "swift", "build", "--disable-sandbox", "-c", "release"
     system "scripts/bundle.sh", version.to_s
-    prefix.install ".build/Baterai Safer.app"
-    bin.install_symlink prefix/"Baterai Safer.app/Contents/MacOS/baterai-safer"
+    prefix.install ".build/Poni.app"
+    prefix.install_symlink "Poni.app" => "Baterai Safer.app"
+    bin.install_symlink prefix/"Poni.app/Contents/MacOS/baterai-safer"
+    bin.install_symlink prefix/"Poni.app/Contents/MacOS/baterai-safer" => "poni"
   end
 
   def caveats
     <<~EOS
+      Baterai Safer sekarang bernama Poni. Aplikasi tetap terupdate lewat formula ini.
+
       Supaya muncul di Launchpad/Spotlight:
-        ln -sf "#{opt_prefix}/Baterai Safer.app" /Applications/
+        ln -sf "#{opt_prefix}/Poni.app" /Applications/
 
       Sebelum uninstall, kembalikan pengisian normal:
-        sudo baterai-safer uninstall-daemon
+        sudo poni uninstall-daemon
     EOS
   end
 
   service do
-    # Run from inside the bundle so macOS shows "Baterai Safer" (and its icon) in permission prompts.
-    run [opt_prefix/"Baterai Safer.app/Contents/MacOS/baterai-safer"]
+    run [opt_prefix/"Poni.app/Contents/MacOS/baterai-safer"]
     keep_alive false
   end
 
   test do
-    assert_match "selftest ok", shell_output("#{bin}/baterai-safer selftest")
+    assert_match "selftest ok", shell_output("#{bin}/poni selftest")
   end
 end

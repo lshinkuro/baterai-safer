@@ -106,7 +106,7 @@ final class NowPlaying: ObservableObject {
         c.queryItems = [.init(name: "artist_name", value: artist), .init(name: "track_name", value: title),
                         .init(name: "album_name", value: album), .init(name: "duration", value: String(Int(duration)))]
         var r = URLRequest(url: c.url!)
-        r.setValue("BateraiSafer (https://github.com/lshinkuro/baterai-safer)", forHTTPHeaderField: "User-Agent")
+        r.setValue("Poni (https://github.com/lshinkuro/poni)", forHTTPHeaderField: "User-Agent")
         let key = trackKey
         URLSession.shared.dataTask(with: r) { d, _, _ in
             let synced = (d.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any])?["syncedLyrics"] as? String
