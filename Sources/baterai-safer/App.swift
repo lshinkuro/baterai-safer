@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import CSMC
+import ServiceManagement
 
 struct Sample: Codable {
     var t: Double
@@ -75,6 +76,12 @@ struct BateraiApp: App {
             // "notch" is skipped: people have been using the island in the bundled app since then.
             for (k, v) in old where d.object(forKey: k) == nil && k != "notch" { d.set(v, forKey: k) }
             d.set(true, forKey: "migratedDomain")
+        }
+        // DMG installs have no `brew services`; start at login once (user can turn it off in Login Items).
+        let homebrew = URL(fileURLWithPath: Bundle.main.bundlePath).resolvingSymlinksInPath().path.contains("/baterai-safer/")
+        if Bundle.main.bundleIdentifier != nil, !homebrew, !d.bool(forKey: "loginItemRegistered") {
+            try? SMAppService.mainApp.register()
+            d.set(true, forKey: "loginItemRegistered")
         }
         DispatchQueue.main.async { if UserDefaults.standard.object(forKey: "notch") as? Bool ?? true { Notch.shared.show() } }
     }

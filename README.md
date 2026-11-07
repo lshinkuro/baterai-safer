@@ -16,6 +16,20 @@ Klik ikon baterai di menu bar → **Install helper…** (minta password admin se
 
 Atau lewat terminal: `sudo baterai-safer install-daemon`.
 
+### Tanpa Homebrew (DMG)
+
+Download `BateraiSafer.dmg` dari [Releases](https://github.com/lshinkuro/baterai-safer/releases/latest), buka, lalu seret **Baterai Safer** ke **Applications**. Aplikasi otomatis berjalan saat login (bisa dimatikan di System Settings → General → Login Items).
+
+Aplikasi belum ditandatangani Developer ID, jadi saat pertama dibuka macOS akan memblokirnya. Buka System Settings → Privacy & Security → **Open Anyway**, atau jalankan:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Baterai Safer.app"
+```
+
+Update: download DMG terbaru dan timpa aplikasi di Applications. Uninstall: `sudo "/Applications/Baterai Safer.app/Contents/MacOS/baterai-safer" uninstall-daemon`, lalu hapus aplikasinya.
+
+Membuat DMG sendiri: `scripts/dmg.sh <versi>` → `.build/BateraiSafer.dmg`.
+
 ## Update
 
 ```sh
