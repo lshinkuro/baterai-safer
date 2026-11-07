@@ -75,7 +75,7 @@ Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Cl
 
 Rapat berikutnya dari Kalender muncul di samping kamera 10 menit sebelum mulai, dengan tombol **Join** untuk Zoom/Meet/Teams/Webex (perlu izin Kalender).
 
-Notch bisa dimatikan di tab Tools. Now Playing butuh izin Automation untuk Spotify/Music.
+Notch bisa dimatikan di tab Tools, begitu juga tiap fitur (tab notch, Rapat, tab Sistem/Cleaner): fitur yang dimatikan hilang dan proses latarnya berhenti. Now Playing butuh izin Automation untuk Spotify/Music.
 
 ## CLI
 

@@ -106,13 +106,14 @@ final class MeetingModel: ObservableObject {
     private var timer: Timer?
 
     func start() {
+        guard timer == nil else { return }
         let granted = { (ok: Bool) in
             DispatchQueue.main.async {
                 self.denied = !ok
                 guard ok else { return }
                 self.refresh()
                 self.timer = .scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refresh() }
-                NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: self.store, queue: .main) { [weak self] _ in self?.refresh() }
+                NotificationCenter.default.addObserver(self, selector: #selector(self.storeChanged), name: .EKEventStoreChanged, object: self.store)
             }
         }
         if #available(macOS 14, *) {
@@ -122,9 +123,15 @@ final class MeetingModel: ObservableObject {
         }
     }
 
-    func stop() { timer?.invalidate(); timer = nil }
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        next = nil
+        NotificationCenter.default.removeObserver(self, name: .EKEventStoreChanged, object: store)
+    }
 
     func refresh() {
+        guard timer != nil else { return }
         let now = Date()
         let pred = store.predicateForEvents(withStart: now.addingTimeInterval(-3 * 3600), end: now.addingTimeInterval(24 * 3600), calendars: nil)
         let e = store.events(matching: pred)
@@ -134,6 +141,8 @@ final class MeetingModel: ObservableObject {
         next = e.map { Meeting(title: $0.title ?? "Rapat", start: $0.startDate, end: $0.endDate,
                                link: meetingLink([$0.url?.absoluteString, $0.location, $0.notes]), color: $0.calendar?.color) }
     }
+
+    @objc private func storeChanged() { refresh() }
 
     func join() {
         if let l = next?.link { NSWorkspace.shared.open(l) } else { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app")) }
@@ -146,9 +155,9 @@ final class MeetingModel: ObservableObject {
 func captureText(done: @escaping (String) -> Void) {
     let file = NSTemporaryDirectory() + "bs-ocr-\(UUID().uuidString).png"
     runAsync("/usr/sbin/screencapture", ["-i", "-x", file]) { _, _, _ in
-        guard let data = FileManager.default.contents(atPath: file) else { done(""); return }
-        try? FileManager.default.removeItem(atPath: file)
-        recognizeText(data) { text in
+        guard FileManager.default.fileExists(atPath: file) else { done(""); return } // selection cancelled
+        recognizeText(file: file) { text in
+            try? FileManager.default.removeItem(atPath: file)
             if !text.isEmpty {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)

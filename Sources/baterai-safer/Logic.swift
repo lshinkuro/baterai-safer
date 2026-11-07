@@ -150,5 +150,11 @@ func selfTest() {
     assert(Meeting(title: "x", start: now.addingTimeInterval(-60), end: now.addingTimeInterval(60), link: nil, color: nil).when(now) == "berlangsung")
     // Notes
     assert(Note(text: "# Belanja\n- susu").title == "Belanja" && Note().title == "Catatan baru", "note title")
+    let savedFlags = UserDefaults.standard.string(forKey: FeatureFlags.key)
+    FeatureFlags.set("music", false); FeatureFlags.set("panel.cleaner", false)
+    assert(!NTab.music.enabled && NTab.focus.enabled && !Tab.cleaner.enabled && Tab.battery.enabled, "feature flags off")
+    FeatureFlags.set("music", true)
+    assert(NTab.music.enabled && FeatureFlags.off() == ["panel.cleaner"], "feature flags on")
+    UserDefaults.standard.set(savedFlags, forKey: FeatureFlags.key)
     print("selftest ok")
 }

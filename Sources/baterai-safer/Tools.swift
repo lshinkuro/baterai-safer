@@ -42,6 +42,11 @@ final class ToolsModel: ObservableObject {
 
 struct ToolsTab: View {
     @ObservedObject var t: ToolsModel
+    @AppStorage(FeatureFlags.key) private var featuresOff = ""
+
+    func feature(_ id: String) -> Binding<Bool> {
+        Binding(get: { FeatureFlags.isOn(id) }, set: { FeatureFlags.set(id, $0); Notch.shared.applyFeatures() })
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -50,6 +55,23 @@ struct ToolsTab: View {
                 ToggleTile(title: "Tetap menyala", icon: "cup.and.saucer.fill", theme: .amber, on: $t.awake)
                 ToggleTile(title: "File tersembunyi", icon: "eye.fill", theme: .electric, on: $t.hiddenFiles)
                 ToggleTile(title: "Ikon desktop", icon: "menubar.dock.rectangle", theme: .mint, on: $t.desktopIcons)
+            }
+            Card(title: "Fitur", icon: "switch.2") {
+                Text("Matikan yang tidak dipakai: tab-nya hilang dan proses latarnya berhenti.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("Notch").font(.system(size: 11.5, weight: .bold, design: .rounded))
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                    ForEach(NTab.allCases, id: \.self) { tab in
+                        FeatureChip(title: tab.title, icon: tab.icon, color: tab.color, on: feature("\(tab)"))
+                    }
+                    FeatureChip(title: "Rapat", icon: "video.fill", color: Palette.sky, on: feature("meeting"))
+                }
+                .disabled(!t.notch).opacity(t.notch ? 1 : 0.45)
+                Text("Menu bar").font(.system(size: 11.5, weight: .bold, design: .rounded))
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                    FeatureChip(title: "Sistem", icon: Tab.system.icon, color: Palette.blue, on: feature("panel.system"))
+                    FeatureChip(title: "Cleaner", icon: Tab.cleaner.icon, color: Palette.orange, on: feature("panel.cleaner"))
+                }
             }
             Card(title: "Aksi cepat", icon: "bolt.fill") {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
@@ -88,5 +110,29 @@ struct Keycap: View {
             .overlay(alignment: .bottom) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.12)).frame(height: 2).padding(.horizontal, 1)
             }
+    }
+}
+
+/// Compact on/off pill for a feature.
+struct FeatureChip: View {
+    let title: String, icon: String, color: Color
+    @Binding var on: Bool
+
+    var body: some View {
+        Button { withAnimation(.easeInOut(duration: 0.15)) { on.toggle() } } label: {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 10, weight: .bold))
+                Text(title).font(.system(size: 11, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                Image(systemName: on ? "checkmark" : "xmark").font(.system(size: 8.5, weight: .heavy)).opacity(0.8)
+            }
+            .foregroundStyle(on ? Color.white : Color.secondary)
+            .padding(.horizontal, 9).padding(.vertical, 7)
+            .background(on ? AnyShapeStyle(LinearGradient(colors: [color.opacity(0.85), color], startPoint: .top, endPoint: .bottom))
+                           : AnyShapeStyle(Color.primary.opacity(0.06)), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(on ? "Klik untuk mematikan \(title)" : "Klik untuk menyalakan \(title)")
     }
 }

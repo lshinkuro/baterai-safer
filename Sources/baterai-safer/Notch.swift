@@ -7,6 +7,7 @@ enum NTab: Int, CaseIterable {
     var title: String { ["Musik", "Fokus", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats"][rawValue] }
     var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green][rawValue] }
     var theme: Theme { [Theme.violet, .amber, .violet, .amber, .electric, .mint, .electric, .electric, .mint][rawValue] }
+    var enabled: Bool { FeatureFlags.isOn("\(self)") }
 }
 
 final class NotchState: ObservableObject {
@@ -65,9 +66,7 @@ final class Notch {
                         return nil
                     }].compactMap { $0 }
         HotKeys.register()
-        meet.start()
-        media.start()
-        clips.start()
+        applyFeatures()
     }
 
     func hide() {
@@ -87,13 +86,22 @@ final class Notch {
         let hot = NSRect(x: f.midX - n.width / 2 - 50, y: f.maxY - n.height - 4, width: n.width + 100, height: n.height + 4)
         let open = NSRect(x: f.midX - o.width / 2, y: f.maxY - o.height, width: o.width, height: o.height).insetBy(dx: -14, dy: -14)
         if !state.expanded, hot.contains(p) {
-            if dragging { state.tab = .shelf } // dragging a file in → straight to the shelf
+            if dragging && NTab.shelf.enabled { state.tab = .shelf } // dragging a file in → straight to the shelf
             set(true)
         } else if state.expanded, open.contains(p) {
             heldOpen = false
         } else if state.expanded, !heldOpen {
             set(false)
         }
+    }
+
+    /// Starts or stops each feature's background work to match the user's switches.
+    func applyFeatures() {
+        guard panel != nil else { return }
+        if NTab.music.enabled { media.start() } else { media.stop() }       // AppleScript poll every second
+        if NTab.clipboard.enabled { clips.start() } else { clips.stop() }   // pasteboard check every 0.5 s
+        if FeatureFlags.isOn("meeting") { meet.start() } else { meet.stop() }
+        if !state.tab.enabled, let first = NTab.allCases.first(where: \.enabled) { state.tab = first }
     }
 
     /// Select an area of the screen; its text lands on the clipboard.
@@ -113,7 +121,7 @@ final class Notch {
 
     /// Shortcut: open on `tab` (nil keeps the current one), or close if already showing it.
     func toggle(_ tab: NTab?) {
-        guard panel != nil else { return }
+        guard panel != nil, tab?.enabled != false else { return }
         if state.expanded && (tab == nil || state.tab == tab) { set(false); return }
         if let tab { state.tab = tab }
         if !state.expanded { set(true) }
@@ -264,6 +272,7 @@ struct NotchView: View {
     let clips: ClipboardModel, shelf: Shelf, sys: SystemModel, git: GitModel, pr: PRModel, notes: NotesModel
     @Local private var dropping = false
     @Namespace private var ns
+    @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
 
     var soon: Meeting? { meet.next.flatMap { $0.isSoon(Date()) ? $0 : nil } }
     var live: Bool { media.playing || focus.running || ai.running || soon != nil }
@@ -346,7 +355,7 @@ struct NotchView: View {
             // Top row sits beside the camera housing: tabs left, status right.
             HStack(spacing: 0) {
                 HStack(spacing: 1) {
-                    ForEach(NTab.allCases, id: \.self) { t in
+                    ForEach(NTab.allCases.filter(\.enabled), id: \.self) { t in
                         let on = state.tab == t
                         Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { state.tab = t } } label: {
                             Image(systemName: t.icon).font(.system(size: 11.5, weight: .bold))

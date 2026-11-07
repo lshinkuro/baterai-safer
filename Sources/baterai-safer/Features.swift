@@ -209,14 +209,20 @@ struct Clip: Codable, Identifiable, Equatable {
     var pinned = false
 }
 
-func recognizeText(_ data: Data, _ done: @escaping (String) -> Void) {
-    DispatchQueue.global(qos: .utility).async {
-        let req = VNRecognizeTextRequest()
-        req.recognitionLevel = .accurate
-        req.automaticallyDetectsLanguage = true
-        try? VNImageRequestHandler(data: data).perform([req])
-        let text = (req.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-        DispatchQueue.main.async { done(text) }
+/// Synchronous OCR; only called by the `ocr` subcommand.
+func ocrText(_ data: Data) -> String {
+    let req = VNRecognizeTextRequest()
+    req.recognitionLevel = .accurate
+    req.automaticallyDetectsLanguage = true
+    try? VNImageRequestHandler(data: data).perform([req])
+    return (req.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+}
+
+/// Vision keeps 20–60 MB of model weights resident after first use, so OCR runs in a
+/// short-lived child process (this binary's `ocr` subcommand) and the memory goes away with it.
+func recognizeText(file: String, _ done: @escaping (String) -> Void) {
+    runAsync(Bundle.main.executablePath ?? CommandLine.arguments[0], ["ocr", file]) { _, out, _ in
+        done(out.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 }
 
@@ -246,7 +252,7 @@ final class ClipboardModel: ObservableObject {
             guard (try? png.write(to: URL(fileURLWithPath: Paths.clipDir + "/" + name))) != nil else { return }
             let c = Clip(image: name)
             add(c)
-            recognizeText(png) { text in
+            recognizeText(file: Paths.clipDir + "/" + name) { text in
                 if let i = self.items.firstIndex(where: { $0.id == c.id }) { self.items[i].ocr = text; self.persist() }
             }
         }

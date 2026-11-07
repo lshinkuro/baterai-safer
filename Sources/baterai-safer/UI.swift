@@ -50,20 +50,35 @@ extension EnvironmentValues {
     }
 }
 
+/// Features switched off by the user, stored comma-separated so `@AppStorage(FeatureFlags.key)` can observe it.
+enum FeatureFlags {
+    static let key = "featuresOff"
+    static func off() -> Set<String> { Set((UserDefaults.standard.string(forKey: key) ?? "").split(separator: ",").map(String.init)) }
+    static func isOn(_ f: String) -> Bool { !off().contains(f) }
+    static func set(_ f: String, _ on: Bool) {
+        var o = off()
+        if on { o.remove(f) } else { o.insert(f) }
+        UserDefaults.standard.set(o.sorted().joined(separator: ","), forKey: key)
+    }
+}
+
 enum Tab: Int, CaseIterable {
     case battery, system, cleaner, tools
     var title: String { ["Baterai", "Sistem", "Cleaner", "Tools"][rawValue] }
     var icon: String { ["bolt.fill", "cpu.fill", "sparkles", "square.grid.2x2.fill"][rawValue] }
     var theme: Theme { [Theme.mint, .electric, .coral, .violet][rawValue] }
+    /// Baterai and Tools (where features are switched back on) can't be turned off.
+    var enabled: Bool { self == .battery || self == .tools || FeatureFlags.isOn("panel.\(self)") }
 }
 
 struct TabBar: View {
     @Binding var tab: Int
+    let tabs: [Tab]
     @Namespace private var ns
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(Tab.allCases, id: \.self) { t in
+            ForEach(tabs, id: \.self) { t in
                 let on = tab == t.rawValue
                 Button { withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) { tab = t.rawValue } } label: {
                     HStack(spacing: 5) {

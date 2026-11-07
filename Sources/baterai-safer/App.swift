@@ -69,6 +69,13 @@ struct BateraiApp: App {
 
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)
+        // Before the .app bundle, settings lived in the executable-name domain; carry them over once.
+        let d = UserDefaults.standard
+        if Bundle.main.bundleIdentifier != nil, !d.bool(forKey: "migratedDomain"), let old = d.persistentDomain(forName: "baterai-safer") {
+            // "notch" is skipped: people have been using the island in the bundled app since then.
+            for (k, v) in old where d.object(forKey: k) == nil && k != "notch" { d.set(v, forKey: k) }
+            d.set(true, forKey: "migratedDomain")
+        }
         DispatchQueue.main.async { if UserDefaults.standard.object(forKey: "notch") as? Bool ?? true { Notch.shared.show() } }
     }
 
@@ -88,6 +95,7 @@ struct Panel: View {
     @ObservedObject var m: Model
     let sys: SystemModel, cleaner: CleanerModel, tools: ToolsModel
     @AppStorage("tab") private var tab = 0
+    @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
 
     var body: some View {
         let theme = (Tab(rawValue: tab) ?? .battery).theme
@@ -108,12 +116,12 @@ struct Panel: View {
             }
             .padding(.horizontal, 16).padding(.top, 14)
 
-            TabBar(tab: $tab).padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
+            TabBar(tab: $tab, tabs: Tab.allCases.filter(\.enabled)).padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
 
             // Fixed panel size: the menu bar window doesn't resize cleanly between tabs of different heights.
             ScrollView {
                 Group {
-                    switch Tab(rawValue: tab) ?? .battery {
+                    switch Tab(rawValue: tab).flatMap({ $0.enabled ? $0 : nil }) ?? .battery {
                     case .battery: BatteryTab(m: m)
                     case .system: SystemTab(s: sys)
                     case .cleaner: CleanerTab(c: cleaner)
