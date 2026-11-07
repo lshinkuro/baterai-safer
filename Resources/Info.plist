@@ -22,6 +22,10 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Untuk latihan ngobrol dengan suara di Belajar Bahasa. Suara diproses di Mac ini.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Untuk mengubah ucapanmu jadi teks saat latihan ngobrol di Belajar Bahasa, di Mac ini.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Untuk Kamera cermin di notch: cek penampilan sebelum rapat. Video tidak direkam atau dikirim ke mana pun.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
@@ -29,6 +33,6 @@
 	<key>NSCalendarsUsageDescription</key>
 	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Untuk menampilkan dan mengontrol lagu di Spotify/Music, dan mengganti mode gelap.</string>
+	<string>Untuk menampilkan dan mengontrol lagu di Spotify/Music, menyimpan catatan ke Apple Notes, dan mengganti mode gelap.</string>
 </dict>
 </plist>

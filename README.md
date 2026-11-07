@@ -79,13 +79,13 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka, atau
 | Rapat | Kalender bulanan: tambah rapat di tanggal & jam tertentu, atur pengingat per acara (tanpa pengingat, 5/10/15/30 menit, 1 jam sebelum). Tersimpan ke Kalender macOS, jadi ikut sinkron iCloud dan notifikasinya tetap muncul walau aplikasi ditutup |
 | Fokus | Pomodoro 25/50/90 menit, niat sesi ("Mau mengerjakan apa?"), blokir aplikasi pengganggu selama fokus (Slack, WhatsApp, Discord, … bisa diatur), refleksi setelah sesi yang tersimpan ke catatan **Jurnal Fokus**, otomatis dijeda saat rapat di Kalender dimulai, niat sesi tampil di notch yang tertutup, streak, grafik 7 hari |
 | AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool. **Pemakaian AI (eksperimental):** halaman Pemakaian berisi token Claude Code hari ini, 7 hari, per model, dan berapa yang dipakai chat aplikasi ini. Bisa dimatikan di Tools → Fitur → Pemakaian AI β |
-| Catatan | Quick notes multi-halaman, tersimpan otomatis, "Rapikan dengan AI" |
+| Catatan | Quick notes multi-halaman, tersinkron ke folder **"Baterai Safer"** di Apple Notes (muncul juga di iPhone / iCloud), "Rapikan dengan AI". Catatan dengan gambar atau tabel hanya bisa dibaca di notch (edit di Notes). Tanpa izin Automation → Notes, catatan tetap tersimpan lokal |
 | Dev Utils | Tempel apa saja: JSON rapi/ringkas, decode JWT (+ cek kedaluwarsa), Base64, URL, timestamp, SHA-256/MD5, UUID — semua offline |
 | Clipboard | Riwayat copy, pin, OCR teks di gambar; isi dari password manager diabaikan |
 | Shelf | Seret file ke notch, seret keluar, atau AirDrop |
 | Git | Status repo, fetch/pull/push, commit dengan pesan dari AI; review PR GitHub (`gh`) dan Bitbucket Server (HTTP access token di Keychain) dengan AI, kirim review & merge |
 | Stats | Baterai, CPU, memori, disk |
-| Lainnya | **Notif baterai penuh** ("boleh cabut charger" saat mencapai batas), **Mic Mute** untuk semua aplikasi (⌃⌥M), **Kamera cermin** sebelum rapat, **Color picker** (hex langsung tersalin) |
+| Lainnya | **Notif baterai penuh** ("boleh cabut charger" saat mencapai batas), **Mic Mute** untuk semua aplikasi (⌃⌥M), **Kamera cermin** sebelum rapat, **Color picker** (hex langsung tersalin), **Tetap menyala** 30 menit / 1 jam / 2 jam / sampai jam tertentu, **Download** (notif saat selesai + Tampilkan di Finder), **Eject USB**, **Belajar Bahasa** (Inggris & Spanyol: target kata harian + streak, flashcard dengan jadwal hafalan, kuis arti kata, **latihan soal TOEFL / DELE** dengan pembahasan, ngobrol lewat teks atau **suara dengan orb** yang mengoreksi kalimatmu, **Progres** (kata hafal, akurasi 7 hari, riwayat skor tes), pilihan AI **Apple Intelligence** (di Mac) atau **Claude** (lewat Claude Code), dan pilihan suara) |
 
 Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, ⌃⌥R Rapat, ⌃⌥S mulai/jeda fokus, ⌃⌥M bisukan mic, **⌃⌥T salin teks dari layar (OCR)**, Esc menutup.
 

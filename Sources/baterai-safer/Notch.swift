@@ -1524,10 +1524,19 @@ struct NotesView: View {
             if let note = n.current {
                 NCard(padding: 10) {
                     VStack(spacing: 8) {
+                        if note.readOnly {
+                            HStack(spacing: 6) {
+                                Image(systemName: "lock.fill")
+                                Text("Ada gambar atau tabel: edit di Notes supaya tidak rusak").lineLimit(1)
+                                Spacer()
+                                NButton(icon: "arrow.up.forward.app", title: "Buka di Notes", tint: Palette.yellow) { n.openInNotes(note.id) }
+                            }
+                            .font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Palette.yellow)
+                        }
                         TextEditor(text: Binding(get: { n.current?.text ?? "" }, set: { n.update($0) }))
-                            .font(.system(size: 12.5)).scrollContentBackground(.hidden).focused($focused)
+                            .font(.system(size: 12.5)).scrollContentBackground(.hidden).focused($focused).disabled(note.readOnly)
                         HStack(spacing: 6) {
-                            Text("\(note.text.count) karakter").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                            syncStatus(note)
                             Spacer()
                             if n.thinking { ProgressView().controlSize(.small) }
                             NButton(icon: "sparkles", title: "Rapikan dengan AI", tint: Palette.violet) { n.tidy(ai) }.disabled(n.thinking)
@@ -1540,7 +1549,23 @@ struct NotesView: View {
                 NCard { Placeholder(icon: "note.text", title: "Belum ada catatan", subtitle: "Klik Baru, atau ⌃⌥N dari mana saja", color: Palette.yellow) }
             }
         }
-        .onAppear { if n.notes.isEmpty { n.add() }; focused = true }
+        .onAppear { if n.notes.isEmpty { n.add() }; focused = true; n.sync() }
+    }
+
+    @ViewBuilder func syncStatus(_ note: Note) -> some View {
+        Group {
+            if n.denied {
+                Button { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!) } label: {
+                    Label("Tersimpan lokal · izinkan Notes", systemImage: "exclamationmark.triangle.fill").foregroundStyle(Palette.amber)
+                }
+                .buttonStyle(.plain).help("System Settings → Privacy & Security → Automation → Baterai Safer → Notes")
+            } else if n.syncing || note.dirty || (!note.synced && !note.text.isEmpty) {
+                Label("Menyinkron…", systemImage: "arrow.triangle.2.circlepath").foregroundStyle(.white.opacity(0.5))
+            } else if note.synced {
+                Label("Apple Notes", systemImage: "checkmark.icloud.fill").foregroundStyle(.white.opacity(0.5))
+            }
+        }
+        .font(.system(size: 10))
     }
 }
 
