@@ -19,6 +19,9 @@ class BateraiSafer < Formula
     <<~EOS
       Supaya muncul di Launchpad/Spotlight:
         ln -sf "#{opt_prefix}/Baterai Safer.app" /Applications/
+
+      Sebelum uninstall, kembalikan pengisian normal:
+        sudo baterai-safer uninstall-daemon
     EOS
   end
 

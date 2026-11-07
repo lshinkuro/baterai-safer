@@ -241,8 +241,10 @@ struct BatteryTab: View {
                     Switch("Auto discharge ke batas", "arrow.down.to.line", $m.config.autoDischarge, color: Palette.violet)
                 }
                 Card(title: "Proteksi", icon: "shield.lefthalf.filled") {
-                    Switch(SMC.canInhibit ? "Heat protection" : "Heat protection (putus charger)", "flame.fill", $m.config.heatProtection, color: Palette.red)
-                    if m.config.heatProtection {
+                    if SMC.canInhibit {
+                        Switch("Heat protection", "flame.fill", $m.config.heatProtection, color: Palette.red)
+                    }
+                    if SMC.canInhibit && m.config.heatProtection {
                         HStack(spacing: 10) {
                             IconBadge(icon: "thermometer.high", color: Palette.orange)
                             Stepper(String(format: "Berhenti di ≥ %.0f °C", m.config.maxTemp), value: $m.config.maxTemp, in: 30...45)

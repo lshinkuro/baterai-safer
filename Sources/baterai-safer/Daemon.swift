@@ -19,13 +19,24 @@ enum Daemon {
         save(status, Paths.status)
     }
 
+    static var binaryMisses = 0
+
     static func tick() {
+        // `brew uninstall` without `uninstall-daemon` leaves us running; restore power and remove ourselves.
+        // Two misses in a row, so the brief opt/ relink during `brew upgrade` doesn't trigger it.
+        binaryMisses = FileManager.default.fileExists(atPath: CommandLine.arguments[0]) ? 0 : binaryMisses + 1
+        if binaryMisses >= 2 {
+            log("binary removed, uninstalling daemon")
+            try? FileManager.default.removeItem(atPath: Paths.plist)
+            apply(charge: true, adapter: true)
+            sh("/bin/launchctl", "bootout", "system/\(Paths.label)")
+            exit(0)
+        }
         let c = load(Paths.config, Config()), b = Battery.read()
         var r = decide(c, b, &status)
         if !SMC.canInhibit {
-            // Native mode: firmware stops at the limit itself; cutting the adapter is our only lever against heat.
-            let hot = c.enabled && c.heatProtection && (b.temp ?? 0) >= c.maxTemp
-            if hot && b.percent < nativeTarget(c, status) { r.adapter = false }
+            // Native mode: firmware stops at the limit itself. No heat cut here: on battery the temp stays high,
+            // so cutting the adapter for heat locked users out of charging entirely.
             r.charge = r.adapter && b.charging
         }
         apply(charge: r.charge, adapter: r.adapter)
