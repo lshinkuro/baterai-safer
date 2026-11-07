@@ -2,11 +2,11 @@ import SwiftUI
 import Charts
 
 enum NTab: Int, CaseIterable {
-    case music, focus, ai, notes, dev, clipboard, shelf, git, stats
-    var icon: String { ["music.note", "timer", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium"][rawValue] }
-    var title: String { ["Musik", "Fokus", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats"][rawValue] }
-    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green][rawValue] }
-    var theme: Theme { [Theme.violet, .amber, .violet, .amber, .electric, .mint, .electric, .electric, .mint][rawValue] }
+    case music, focus, ai, notes, dev, clipboard, shelf, git, stats, more
+    var icon: String { ["music.note", "timer", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "square.grid.2x2.fill"][rawValue] }
+    var title: String { ["Musik", "Fokus", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Lainnya"][rawValue] }
+    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green, Palette.slate][rawValue] }
+    var theme: Theme { [Theme.violet, .amber, .violet, .amber, .electric, .mint, .electric, .electric, .mint, .electric][rawValue] }
     var enabled: Bool { FeatureFlags.isOn("\(self)") }
 }
 
@@ -35,6 +35,7 @@ final class Notch {
     private var previous: NSRunningApplication? // gets keyboard focus back when the island closes
     private var meetingTimer: Timer?
     private var meetingPause = MeetingPause()
+    private var fullCharge = FullChargeAlert()
     /// Open on click instead of hover (Tools → Fitur).
     static var clickToOpen: Bool { UserDefaults.standard.bool(forKey: "notchClick") }
 
@@ -73,7 +74,7 @@ final class Notch {
                     }].compactMap { $0 }
         HotKeys.register()
         applyFeatures()
-        meetingTimer = .scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.checkMeeting() }
+        meetingTimer = .scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.checkMeeting(); self?.checkCharge() }
     }
 
     func hide() {
@@ -123,6 +124,22 @@ final class Notch {
         focus.toggle()
         let task = focus.intention.trimmingCharacters(in: .whitespaces)
         flash(focus.running ? (focus.onBreak ? "Istirahat dimulai" : "Fokus dimulai" + (task.isEmpty ? "" : " · \(task)")) : "Dijeda · \(focus.clock)")
+    }
+
+    /// "Unplug" cue when the battery reaches the charge limit (Lainnya → Notif baterai penuh).
+    private func checkCharge() {
+        guard UserDefaults.standard.object(forKey: "fullChargeAlert") as? Bool ?? true else { return }
+        let b = Battery.read(), limit = load(Paths.config, Config()).limit
+        if fullCharge.step(percent: b.percent, ac: b.ac, target: limit) {
+            flash("Baterai \(b.percent)% · boleh cabut charger")
+            NSSound(named: "Glass")?.play()
+        }
+    }
+
+    /// ⌃⌥M: mute or unmute the default microphone for every app.
+    func toggleMic() {
+        guard let on = Mic.toggle() else { flash("Tidak ada mikrofon"); return }
+        flash(on ? "Mic dibisukan" : "Mic aktif")
     }
 
     /// Pauses focus when a calendar meeting starts and, once it ends, points at ⌃⌥S to resume.
@@ -450,6 +467,7 @@ struct NotchView: View {
                 case .shelf: ShelfView(s: shelf, dropping: dropping)
                 case .git: GitView(g: git, pr: pr, ai: ai)
                 case .stats: StatsView(s: sys)
+                case .more: MoreView()
                 }
             }
             .id(state.tab)

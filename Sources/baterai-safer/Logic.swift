@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 enum Paths {
     static let dir = "/Library/Application Support/BateraiSafer"
@@ -161,6 +161,13 @@ func selfTest() {
     let jd = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 7, hour: 14, minute: 5))!
     assert(journalLine(" Laporan Q3 ", "draft selesai\n", minutes: 50, at: jd) == "- 7 Nov 14.05 · 50m · **Laporan Q3** — draft selesai", "journal line")
     assert(journalLine("", "", minutes: 25, at: jd) == "- 7 Nov 14.05 · 25m · **Sesi fokus**", "journal line: empty")
+    // Lainnya
+    var fc = FullChargeAlert()
+    assert(!fc.step(percent: 79, ac: true, target: 80) && fc.step(percent: 80, ac: true, target: 80), "full charge fires at target")
+    assert(!fc.step(percent: 80, ac: true, target: 80) && !fc.step(percent: 79, ac: true, target: 80), "fires once, no re-arm at -1%")
+    assert(!fc.step(percent: 77, ac: true, target: 80) && fc.step(percent: 80, ac: true, target: 80), "re-arms after dropping 2%+")
+    assert(!fc.step(percent: 80, ac: false, target: 80) && fc.step(percent: 80, ac: true, target: 80), "re-arms after unplug")
+    assert(ColorPick.hex(NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)) == "#FF8000" && Color(hexString: "#FF8000") != nil && Color(hexString: "red") == nil, "color hex")
     // Meeting pause
     var mp = MeetingPause(); let m1 = Date(timeIntervalSince1970: 1000), m2 = Date(timeIntervalSince1970: 5000)
     assert(mp.step(meeting: m1, focusing: true) == .pause, "pause when meeting starts")

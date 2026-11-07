@@ -22,6 +22,8 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Untuk Kamera cermin di notch: cek penampilan sebelum rapat. Video tidak direkam atau dikirim ke mana pun.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
 	<key>NSCalendarsUsageDescription</key>

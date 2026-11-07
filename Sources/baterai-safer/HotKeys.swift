@@ -17,6 +17,7 @@ enum HotKeys {
         (UInt32(kVK_ANSI_T), "⌃⌥T", "Salin teks dari layar", { Notch.shared.ocr() }),
         (UInt32(kVK_ANSI_F), "⌃⌥F", "Fokus", { Notch.shared.toggle(.focus) }),
         (UInt32(kVK_ANSI_S), "⌃⌥S", "Mulai / jeda fokus", { Notch.shared.toggleFocus() }),
+        (UInt32(kVK_ANSI_M), "⌃⌥M", "Bisukan / aktifkan mic", { Notch.shared.toggleMic() }),
         (UInt32(kVK_ANSI_G), "⌃⌥G", "Git", { Notch.shared.toggle(.git) }),
     ]
 
