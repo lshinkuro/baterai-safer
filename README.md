@@ -16,6 +16,22 @@ Klik ikon baterai di menu bar → **Install helper…** (minta password admin se
 
 Atau lewat terminal: `sudo baterai-safer install-daemon`.
 
+## Update
+
+```sh
+brew update                          # ambil versi terbaru dari tap
+brew upgrade baterai-safer
+brew services restart baterai-safer  # jalankan versi baru
+```
+
+Helper (root) tidak perlu dipasang ulang: ia menjalankan binary di `$(brew --prefix)/opt/baterai-safer`, yang otomatis menunjuk ke versi baru, dan dimulai ulang saat reboot. Pengaturan, riwayat, dan token di Keychain tetap tersimpan.
+
+Aplikasi belum ditandatangani Developer ID Apple, jadi setelah update macOS bisa meminta ulang izin (Automation untuk Spotify/Music, akses Keychain untuk token). Pilih **Izinkan / Always Allow**.
+
+Cek versi yang terpasang: `brew list --versions baterai-safer`.
+
+Kalau `brew install`/`upgrade` gagal dengan error compile, pastikan Command Line Tools terbaru (`softwareupdate --list`) lalu coba lagi; laporkan di Issues bila masih gagal.
+
 ## Fitur
 
 | Fitur | Keterangan |
