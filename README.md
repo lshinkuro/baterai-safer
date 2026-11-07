@@ -94,7 +94,16 @@ brew services stop baterai-safer
 brew uninstall baterai-safer
 ```
 
-Di macOS 27, matikan juga Charge Limit di System Settings → Battery jika perlu.
+**macOS 27:** uninstall tidak mengembalikan Charge Limit bawaan macOS. Batas terakhir (mis. 80%) tetap aktif, jadi baterai berhenti mengisi di situ. Kembalikan ke 100% di System Settings → Battery → Charge Limit.
+
+Kalau sudah terlanjur `brew uninstall` tanpa `uninstall-daemon` dan charger tidak mau mengisi, jalankan:
+
+```sh
+sudo launchctl bootout system/io.github.lshinkuro.baterai-safer
+sudo rm /Library/LaunchDaemons/io.github.lshinkuro.baterai-safer.plist
+```
+
+Sejak v0.6.2 daemon membersihkan dirinya sendiri dalam beberapa detik setelah aplikasinya dihapus.
 
 ## Catatan
 
