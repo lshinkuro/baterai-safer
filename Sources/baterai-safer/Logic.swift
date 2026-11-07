@@ -168,6 +168,7 @@ func selfTest() {
     assert(!fc.step(percent: 77, ac: true, target: 80) && fc.step(percent: 80, ac: true, target: 80), "re-arms after dropping 2%+")
     assert(!fc.step(percent: 80, ac: false, target: 80) && fc.step(percent: 80, ac: true, target: 80), "re-arms after unplug")
     assert(ColorPick.hex(NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)) == "#FF8000" && Color(hexString: "#FF8000") != nil && Color(hexString: "red") == nil, "color hex")
+    assert(newDownloads(old: ["a.pdf"], now: ["a.pdf", "b.zip", "c.zip.crdownload", ".DS_Store", "d.part", "e.download", "F.PNG"]) == ["b.zip", "F.PNG"], "new downloads")
     // Meeting pause
     var mp = MeetingPause(); let m1 = Date(timeIntervalSince1970: 1000), m2 = Date(timeIntervalSince1970: 5000)
     assert(mp.step(meeting: m1, focusing: true) == .pause, "pause when meeting starts")

@@ -74,6 +74,8 @@ final class Notch {
                     }].compactMap { $0 }
         HotKeys.register()
         applyFeatures()
+        Volumes.shared.start()
+        if UserDefaults.standard.bool(forKey: "downloadAlert") { Downloads.shared.start() }
         meetingTimer = .scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.checkMeeting(); self?.checkCharge() }
     }
 
@@ -85,6 +87,7 @@ final class Notch {
         HotKeys.unregister()
         meetingTimer?.invalidate()
         meetingTimer = nil
+        Downloads.shared.stop()
         meet.stop()
         media.stop()
         clips.stop()

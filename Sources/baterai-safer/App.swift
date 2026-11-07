@@ -66,7 +66,7 @@ struct BateraiApp: App {
     @StateObject private var m = Model()
     @StateObject private var sys = SystemModel()
     @StateObject private var cleaner = CleanerModel()
-    @StateObject private var tools = ToolsModel()
+    @StateObject private var tools = ToolsModel.shared
 
     init() {
         NSApplication.shared.setActivationPolicy(.accessory)

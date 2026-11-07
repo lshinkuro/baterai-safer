@@ -6,15 +6,32 @@ func finderBool(_ key: String, _ fallback: Bool) -> Bool {
 }
 
 final class ToolsModel: ObservableObject {
+    static let shared = ToolsModel() // menu bar and the notch's Lainnya tab share one sleep assertion
     @Published var notch = UserDefaults.standard.object(forKey: "notch") as? Bool ?? true {
         didSet { UserDefaults.standard.set(notch, forKey: "notch"); notch ? Notch.shared.show() : Notch.shared.hide() }
     }
     @Published var awake = false { didSet { if awake != oldValue { setAwake() } } }
+    @Published var awakeUntil: Date?        // nil while awake = until turned off
+    private var awakeTimer: Timer?
     @Published var hiddenFiles = finderBool("AppleShowAllFiles", false) { didSet { setFinder("AppleShowAllFiles", hiddenFiles) } }
     @Published var desktopIcons = finderBool("CreateDesktop", true) { didSet { setFinder("CreateDesktop", desktopIcons) } }
     private var assertion = IOPMAssertionID(0)
 
+    /// Keep awake for `minutes`, until `until`, or (both nil) until turned off; ends on its own.
+    func keepAwake(minutes: Int? = nil, until: Date? = nil) {
+        awakeTimer?.invalidate()
+        awakeUntil = until ?? minutes.map { Date().addingTimeInterval(Double($0) * 60) }
+        awake = true
+        if let end = awakeUntil {
+            awakeTimer = Timer.scheduledTimer(withTimeInterval: max(1, end.timeIntervalSinceNow), repeats: false) { [weak self] _ in
+                self?.awake = false
+                Notch.shared.flash("Mode tetap menyala selesai")
+            }
+        }
+    }
+
     private func setAwake() {
+        if !awake { awakeTimer?.invalidate(); awakeUntil = nil }
         if awake {
             IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
                                         IOPMAssertionLevel(kIOPMAssertionLevelOn), "Baterai Safer: tetap menyala" as CFString, &assertion)

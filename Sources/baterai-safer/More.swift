@@ -143,6 +143,91 @@ extension Color {
     }
 }
 
+// MARK: Downloads
+
+/// Names in `now` that weren't in `old`, skipping hidden files and browsers' in-progress files.
+func newDownloads(old: Set<String>, now: [String]) -> [String] {
+    let partial = ["crdownload", "download", "part", "tmp", "partial", "opdownload"]
+    return now.filter { !old.contains($0) && !$0.hasPrefix(".") && !partial.contains(($0 as NSString).pathExtension.lowercased()) }
+}
+
+final class Downloads: ObservableObject {
+    static let shared = Downloads()
+    static let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+    @Published var recent: [URL] = []
+    private var source: DispatchSourceFileSystemObject?
+    private var known = Set<String>()
+
+    var names: [String] { (try? FileManager.default.contentsOfDirectory(atPath: Self.dir.path)) ?? [] }
+
+    /// Watches the Downloads folder itself; a browser finishing a file renames or adds an entry there.
+    func start() {
+        guard source == nil else { return }
+        let fd = open(Self.dir.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        known = Set(names)
+        let s = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
+        s.setEventHandler { [weak self] in self?.scan() }
+        s.setCancelHandler { close(fd) }
+        s.resume()
+        source = s
+    }
+
+    func stop() { source?.cancel(); source = nil }
+
+    private func scan() {
+        let now = names
+        let fresh = newDownloads(old: known, now: now)
+        known = Set(now)
+        guard let name = fresh.last else { return }
+        recent = Array((fresh.map { Self.dir.appendingPathComponent($0) } + recent).prefix(6))
+        Notch.shared.flash("\(name) selesai diunduh")
+    }
+}
+
+// MARK: Removable drives
+
+final class Volumes: ObservableObject {
+    static let shared = Volumes()
+    @Published var list: [URL] = []
+    private var observers: [Any] = []
+
+    func start() {
+        guard observers.isEmpty else { return }
+        refresh()
+        let nc = NSWorkspace.shared.notificationCenter
+        observers = [
+            nc.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main) { [weak self] n in
+                self?.refresh()
+                if let url = n.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL, self?.list.contains(where: { $0.path == url.path }) == true {
+                    Notch.shared.flash("\(url.lastPathComponent) terpasang · eject dari Lainnya")
+                }
+            },
+            nc.addObserver(forName: NSWorkspace.didUnmountNotification, object: nil, queue: .main) { [weak self] _ in self?.refresh() },
+        ]
+    }
+
+    func refresh() {
+        let keys: [URLResourceKey] = [.volumeIsEjectableKey, .volumeIsInternalKey]
+        list = (FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []).filter {
+            let v = try? $0.resourceValues(forKeys: Set(keys))
+            return v?.volumeIsEjectable == true && v?.volumeIsInternal != true
+        }
+    }
+
+    func eject(_ url: URL) {
+        let name = url.lastPathComponent
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try NSWorkspace.shared.unmountAndEjectDevice(at: url)
+                DispatchQueue.main.async { self.refresh(); Notch.shared.flash("\(name) aman dicabut") }
+            } catch {
+                DispatchQueue.main.async { Notch.shared.flash("Gagal eject \(name): sedang dipakai") }
+            }
+        }
+    }
+}
+
 // MARK: Views
 
 struct MoreView: View {
@@ -151,12 +236,20 @@ struct MoreView: View {
     @Local private var micMuted = Mic.muted
     @Local private var colors = ColorPick.recent
     @StateObject private var camera = CameraBox()
+    @ObservedObject private var tools = ToolsModel.shared
+    @ObservedObject private var downloads = Downloads.shared
+    @ObservedObject private var volumes = Volumes.shared
+    @AppStorage("downloadAlert") private var downloadAlert = false
+    @Local private var until = Date().addingTimeInterval(3600)
 
     static let tools: [(id: String, icon: String, title: String, subtitle: String, color: Color)] = [
         ("charge", "battery.100percent.bolt", "Notif baterai penuh", "Kabari saat sampai batas", Palette.green),
         ("mic", "mic.slash.fill", "Mic Mute", "Bisukan mic di semua aplikasi · ⌃⌥M", Palette.red),
         ("camera", "camera.fill", "Kamera cermin", "Cek penampilan sebelum rapat", Palette.sky),
         ("color", "eyedropper", "Color picker", "Ambil warna dari layar", Palette.pink),
+        ("awake", "cup.and.saucer.fill", "Tetap menyala", "30 menit, 1 jam, atau sampai jam tertentu", Palette.amber),
+        ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.blue),
+        ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.indigo),
     ]
 
     var body: some View {
@@ -171,6 +264,9 @@ struct MoreView: View {
                     case "charge": chargePage
                     case "mic": micPage
                     case "camera": cameraPage
+                    case "awake": awakePage
+                    case "downloads": downloadsPage
+                    case "drives": drivesPage
                     default: colorPage
                     }
                 }
@@ -187,7 +283,7 @@ struct MoreView: View {
                             Text(t.title).font(.system(size: 12.5, weight: .bold))
                             Text(t.subtitle).font(.system(size: 10.5)).foregroundStyle(.gray).lineLimit(2)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
                         .padding(12)
                         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .contentShape(Rectangle())
@@ -196,6 +292,87 @@ struct MoreView: View {
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    var awakePage: some View {
+        HStack(spacing: 14) {
+            NCard {
+                VStack(spacing: 10) {
+                    Image(systemName: tools.awake ? "cup.and.saucer.fill" : "moon.zzz.fill").font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(tools.awake ? Palette.amber : .gray)
+                    Text(tools.awake ? (tools.awakeUntil.map { "Menyala sampai \($0.formatted(date: .omitted, time: .shortened))" } ?? "Menyala sampai dimatikan")
+                         : "Mac boleh tidur seperti biasa").font(.system(size: 12.5, weight: .bold)).multilineTextAlignment(.center)
+                    if tools.awake { NButton(icon: "stop.fill", title: "Matikan", tint: Palette.red) { tools.awake = false } }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(width: 220)
+            NCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("CEGAH SLEEP SELAMA").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                    HStack(spacing: 6) {
+                        NButton(icon: "timer", title: "30 menit", tint: Palette.amber) { tools.keepAwake(minutes: 30) }
+                        NButton(icon: "timer", title: "1 jam", tint: Palette.amber) { tools.keepAwake(minutes: 60) }
+                        NButton(icon: "timer", title: "2 jam", tint: Palette.amber) { tools.keepAwake(minutes: 120) }
+                    }
+                    HStack(spacing: 6) {
+                        DatePicker("", selection: $until, displayedComponents: .hourAndMinute).labelsHidden().fixedSize()
+                        NButton(icon: "clock", title: "Sampai jam ini", tint: Palette.amber) {
+                            // A time already past today means tomorrow.
+                            let d = until > Date() ? until : until.addingTimeInterval(86400)
+                            tools.keepAwake(until: d)
+                        }
+                    }
+                    NButton(icon: "infinity", title: "Sampai dimatikan", tint: Palette.amber) { tools.keepAwake() }
+                    Spacer(minLength: 0)
+                    Text("Mati otomatis, jadi tidak lupa.").font(.system(size: 10)).foregroundStyle(.gray)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+    }
+
+    var downloadsPage: some View {
+        NCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Kabari saat download selesai", isOn: $downloadAlert).toggleStyle(.switch).controlSize(.small)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .onChange(of: downloadAlert) { on in on ? downloads.start() : downloads.stop() }
+                if downloads.recent.isEmpty {
+                    Text(downloadAlert ? "Download berikutnya muncul di sini." : "Nyalakan untuk memantau folder Downloads (macOS akan minta izin sekali).")
+                        .font(.system(size: 11)).foregroundStyle(.gray)
+                }
+                ForEach(downloads.recent, id: \.self) { url in
+                    HStack(spacing: 8) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 22, height: 22)
+                        Text(url.lastPathComponent).font(.system(size: 11.5)).lineLimit(1)
+                        Spacer()
+                        NButton(icon: "magnifyingglass", title: "Tampilkan") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    var drivesPage: some View {
+        NCard {
+            VStack(alignment: .leading, spacing: 8) {
+                if volumes.list.isEmpty {
+                    Placeholder(icon: "externaldrive.fill", title: "Tidak ada drive eksternal", subtitle: "Colok flashdisk atau hard disk, lalu eject dari sini", color: Palette.indigo)
+                }
+                ForEach(volumes.list, id: \.self) { url in
+                    HStack(spacing: 8) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 26, height: 26)
+                        Text(url.lastPathComponent).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
+                        Spacer()
+                        NButton(icon: "eject.fill", title: "Eject", tint: Palette.indigo, prominent: true) { volumes.eject(url) }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .onAppear { volumes.refresh() }
         }
     }
 
