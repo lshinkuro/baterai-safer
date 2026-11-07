@@ -2,11 +2,11 @@ import SwiftUI
 import Charts
 
 enum NTab: Int, CaseIterable {
-    case music, focus, ai, notes, dev, clipboard, shelf, git, stats, more
-    var icon: String { ["music.note", "timer", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "square.grid.2x2.fill"][rawValue] }
-    var title: String { ["Musik", "Fokus", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Lainnya"][rawValue] }
-    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green, Palette.slate][rawValue] }
-    var theme: Theme { [Theme.violet, .amber, .violet, .amber, .electric, .mint, .electric, .electric, .mint, .electric][rawValue] }
+    case music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, more
+    var icon: String { ["music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "square.grid.2x2.fill"][rawValue] }
+    var title: String { ["Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Lainnya"][rawValue] }
+    var color: Color { [Palette.pink, Palette.orange, Palette.sky, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green, Palette.slate][rawValue] }
+    var theme: Theme { [Theme.violet, .amber, .electric, .violet, .amber, .electric, .mint, .electric, .electric, .mint, .electric][rawValue] }
     var enabled: Bool { FeatureFlags.isOn("\(self)") }
 }
 
@@ -426,12 +426,15 @@ struct NotchView: View {
             // Top row sits beside the camera housing: tabs left, status right.
             HStack(spacing: 0) {
                 HStack(spacing: 1) {
-                    ForEach(NTab.allCases.filter(\.enabled), id: \.self) { t in
+                    let tabs = NTab.allCases.filter(\.enabled)
+                    // Narrow the buttons when many tabs are on, so none slide under the camera housing.
+                    let w = min(26, ((Self.open.width - n.width) / 2 - 26) / CGFloat(max(tabs.count, 1)) - 1)
+                    ForEach(tabs, id: \.self) { t in
                         let on = state.tab == t
                         Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { state.tab = t } } label: {
                             Image(systemName: t.icon).font(.system(size: 11.5, weight: .bold))
                                 .foregroundStyle(on ? Color.white : t.color.opacity(0.75))
-                                .frame(width: 26, height: 22)
+                                .frame(width: w, height: 22)
                                 .background {
                                     if on {
                                         Capsule().fill(t.theme.gradient).shadow(color: t.color.opacity(0.6), radius: 5)
@@ -463,6 +466,7 @@ struct NotchView: View {
                 switch state.tab {
                 case .music: MusicView(m: media)
                 case .focus: FocusView(f: focus, n: notes)
+                case .agenda: AgendaView()
                 case .ai: AIView(ai: ai)
                 case .notes: NotesView(n: notes, ai: ai)
                 case .dev: DevView()

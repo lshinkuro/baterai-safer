@@ -76,6 +76,7 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka, atau
 | Tab | Isi |
 |---|---|
 | Musik | Spotify / Apple Music: album art, kontrol, lirik berjalan (lrclib.net) |
+| Rapat | Kalender bulanan: tambah rapat di tanggal & jam tertentu, atur pengingat per acara (tanpa pengingat, 5/10/15/30 menit, 1 jam sebelum). Tersimpan ke Kalender macOS, jadi ikut sinkron iCloud dan notifikasinya tetap muncul walau aplikasi ditutup |
 | Fokus | Pomodoro 25/50/90 menit, niat sesi ("Mau mengerjakan apa?"), blokir aplikasi pengganggu selama fokus (Slack, WhatsApp, Discord, … bisa diatur), refleksi setelah sesi yang tersimpan ke catatan **Jurnal Fokus**, otomatis dijeda saat rapat di Kalender dimulai, niat sesi tampil di notch yang tertutup, streak, grafik 7 hari |
 | AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool. **Pemakaian AI (eksperimental):** halaman Pemakaian berisi token Claude Code hari ini, 7 hari, per model, dan berapa yang dipakai chat aplikasi ini. Bisa dimatikan di Tools → Fitur → Pemakaian AI β |
 | Catatan | Quick notes multi-halaman, tersimpan otomatis, "Rapikan dengan AI" |
@@ -86,7 +87,7 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka, atau
 | Stats | Baterai, CPU, memori, disk |
 | Lainnya | **Notif baterai penuh** ("boleh cabut charger" saat mencapai batas), **Mic Mute** untuk semua aplikasi (⌃⌥M), **Kamera cermin** sebelum rapat, **Color picker** (hex langsung tersalin) |
 
-Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, ⌃⌥S mulai/jeda fokus, ⌃⌥M bisukan mic, **⌃⌥T salin teks dari layar (OCR)**, Esc menutup.
+Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, ⌃⌥R Rapat, ⌃⌥S mulai/jeda fokus, ⌃⌥M bisukan mic, **⌃⌥T salin teks dari layar (OCR)**, Esc menutup.
 
 Rapat berikutnya dari Kalender muncul di samping kamera 10 menit sebelum mulai, dengan tombol **Join** untuk Zoom/Meet/Teams/Webex (perlu izin Kalender).
 

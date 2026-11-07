@@ -169,6 +169,18 @@ func selfTest() {
     assert(!fc.step(percent: 80, ac: false, target: 80) && fc.step(percent: 80, ac: true, target: 80), "re-arms after unplug")
     assert(ColorPick.hex(NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)) == "#FF8000" && Color(hexString: "#FF8000") != nil && Color(hexString: "red") == nil, "color hex")
     assert(newDownloads(old: ["a.pdf"], now: ["a.pdf", "b.zip", "c.zip.crdownload", ".DS_Store", "d.part", "e.download", "F.PNG"]) == ["b.zip", "F.PNG"], "new downloads")
+    var gc = Calendar(identifier: .gregorian); gc.firstWeekday = 2; gc.timeZone = TimeZone(identifier: "Asia/Jakarta")!
+    let nov = monthGrid(gc.date(from: DateComponents(year: 2026, month: 11, day: 15))!, gc)
+    assert(nov.count == 42 && nov.prefix(6).allSatisfy { $0 == nil } && gc.component(.day, from: nov[6]!) == 1 && gc.component(.day, from: nov[35]!) == 30, "month grid (Nov 2026 starts Sunday, Monday-first)")
+    let feb = monthGrid(gc.date(from: DateComponents(year: 2027, month: 2, day: 1))!, gc)
+    assert(feb.count == 28 && feb.compactMap { $0 }.count == 28, "month grid (Feb 2027 starts Monday, 4 weeks)")
+    let t0 = Date(timeIntervalSince1970: 1_000_000)
+    assert(eventStatus(start: t0, end: t0 + 3600, now: t0 + 60)! == ("berlangsung", true), "event live")
+    assert(eventStatus(start: t0 + 25 * 60, end: t0 + 3600, now: t0)! == ("25m lagi", false) && eventStatus(start: t0 + 3 * 3600, end: t0 + 4 * 3600, now: t0)! == ("3j lagi", false), "event soon")
+    assert(eventStatus(start: t0, end: t0 + 60, now: t0 + 120) == nil && eventStatus(start: t0 + 13 * 3600, end: t0 + 14 * 3600, now: t0) == nil, "event past / far")
+    assert(shortDuration(90) == "1j 30m" && shortDuration(30) == "30m" && shortReminder(60) == "1j", "short labels")
+    assert(durationLabel(45) == "45 menit" && durationLabel(120) == "2 jam" && durationLabel(90) == "1 jam 30 menit", "duration label")
+    assert(reminderLabel(nil) == "Tanpa pengingat" && reminderLabel(10) == "10 menit sebelum" && reminderLabel(60) == "1 jam sebelum", "reminder label")
     // Meeting pause
     var mp = MeetingPause(); let m1 = Date(timeIntervalSince1970: 1000), m2 = Date(timeIntervalSince1970: 5000)
     assert(mp.step(meeting: m1, focusing: true) == .pause, "pause when meeting starts")
