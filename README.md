@@ -71,13 +71,13 @@ Panel menu bar punya 4 tab: **Baterai** (fitur di atas + grafik riwayat), **Sist
 
 ## Notch
 
-Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka:
+Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka, atau pilih **Klik** di Tools → Fitur → Buka notch:
 
 | Tab | Isi |
 |---|---|
 | Musik | Spotify / Apple Music: album art, kontrol, lirik berjalan (lrclib.net) |
-| Fokus | Pomodoro 25/5, streak, grafik 7 hari |
-| AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool |
+| Fokus | Pomodoro 25/50/90 menit, niat sesi ("Mau mengerjakan apa?"), blokir aplikasi pengganggu selama fokus (Slack, WhatsApp, Discord, … bisa diatur), refleksi setelah sesi yang tersimpan ke catatan **Jurnal Fokus**, otomatis dijeda saat rapat di Kalender dimulai, niat sesi tampil di notch yang tertutup, streak, grafik 7 hari |
+| AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool. **Pemakaian AI (eksperimental):** halaman Pemakaian berisi token Claude Code hari ini, 7 hari, per model, dan berapa yang dipakai chat aplikasi ini. Bisa dimatikan di Tools → Fitur → Pemakaian AI β |
 | Catatan | Quick notes multi-halaman, tersimpan otomatis, "Rapikan dengan AI" |
 | Dev Utils | Tempel apa saja: JSON rapi/ringkas, decode JWT (+ cek kedaluwarsa), Base64, URL, timestamp, SHA-256/MD5, UUID — semua offline |
 | Clipboard | Riwayat copy, pin, OCR teks di gambar; isi dari password manager diabaikan |
@@ -85,7 +85,7 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka:
 | Git | Status repo, fetch/pull/push, commit dengan pesan dari AI; review PR GitHub (`gh`) dan Bitbucket Server (HTTP access token di Keychain) dengan AI, kirim review & merge |
 | Stats | Baterai, CPU, memori, disk |
 
-Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, **⌃⌥T salin teks dari layar (OCR)**, Esc menutup.
+Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, ⌃⌥S mulai/jeda fokus, **⌃⌥T salin teks dari layar (OCR)**, Esc menutup.
 
 Rapat berikutnya dari Kalender muncul di samping kamera 10 menit sebelum mulai, dengan tombol **Join** untuk Zoom/Meet/Teams/Webex (perlu izin Kalender).
 
@@ -96,6 +96,7 @@ Notch bisa dimatikan di tab Tools, begitu juga tiap fitur (tab notch, Rapat, tab
 ```
 baterai-safer                    # aplikasi menu bar
 baterai-safer status             # info baterai
+baterai-safer ai-usage           # pemakaian token Claude Code 7 hari
 baterai-safer selftest           # cek logika
 sudo baterai-safer install-daemon / uninstall-daemon
 ```

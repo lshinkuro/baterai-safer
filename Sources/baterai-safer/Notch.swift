@@ -33,6 +33,10 @@ final class Notch {
     private var monitors: [Any] = []
     private var heldOpen = false              // opened by shortcut: stay open until the mouse visits and leaves
     private var previous: NSRunningApplication? // gets keyboard focus back when the island closes
+    private var meetingTimer: Timer?
+    private var meetingPause = MeetingPause()
+    /// Open on click instead of hover (Tools → Fitur).
+    static var clickToOpen: Bool { UserDefaults.standard.bool(forKey: "notchClick") }
 
     func show() {
         guard panel == nil, let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main else { return }
@@ -59,6 +63,8 @@ final class Notch {
         // Mouse-move monitoring needs no Accessibility permission (only key monitoring does).
         let handle: (NSEvent) -> Void = { [weak self] e in self?.track(dragging: e.type == .leftMouseDragged) }
         monitors = [NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: handle),
+                    // While collapsed the panel ignores the mouse, so clicks reach other apps; watch them globally.
+                    NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in self?.click() },
                     NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { handle($0); return $0 },
                     NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
                         guard e.keyCode == 53, let self, self.state.expanded else { return e } // Esc closes
@@ -67,6 +73,7 @@ final class Notch {
                     }].compactMap { $0 }
         HotKeys.register()
         applyFeatures()
+        meetingTimer = .scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.checkMeeting() }
     }
 
     func hide() {
@@ -75,23 +82,59 @@ final class Notch {
         panel?.orderOut(nil)
         panel = nil
         HotKeys.unregister()
+        meetingTimer?.invalidate()
+        meetingTimer = nil
         meet.stop()
         media.stop()
         clips.stop()
     }
 
+    private var areas: (hot: NSRect, open: NSRect)? {
+        guard let panel else { return nil }
+        let f = panel.frame, n = state.notch, o = NotchView.open
+        return (NSRect(x: f.midX - n.width / 2 - 50, y: f.maxY - n.height - 4, width: n.width + 100, height: n.height + 4),
+                NSRect(x: f.midX - o.width / 2, y: f.maxY - o.height, width: o.width, height: o.height).insetBy(dx: -14, dy: -14))
+    }
+
     private func track(dragging: Bool) {
-        guard let panel else { return }
-        let p = NSEvent.mouseLocation, f = panel.frame, n = state.notch, o = NotchView.open
-        let hot = NSRect(x: f.midX - n.width / 2 - 50, y: f.maxY - n.height - 4, width: n.width + 100, height: n.height + 4)
-        let open = NSRect(x: f.midX - o.width / 2, y: f.maxY - o.height, width: o.width, height: o.height).insetBy(dx: -14, dy: -14)
-        if !state.expanded, hot.contains(p) {
-            if dragging && NTab.shelf.enabled { state.tab = .shelf } // dragging a file in → straight to the shelf
+        guard let (hot, open) = areas else { return }
+        let p = NSEvent.mouseLocation
+        // Dragging a file in opens straight to the shelf, in either mode.
+        if !state.expanded, hot.contains(p), dragging || !Self.clickToOpen {
+            if dragging && NTab.shelf.enabled { state.tab = .shelf }
             set(true)
         } else if state.expanded, open.contains(p) {
             heldOpen = false
-        } else if state.expanded, !heldOpen {
+        } else if state.expanded, !heldOpen, !Self.clickToOpen {
             set(false)
+        }
+    }
+
+    /// Click mode: a click on the notch opens it, a click anywhere outside the island closes it.
+    private func click() {
+        guard Self.clickToOpen, let (hot, open) = areas else { return }
+        let p = NSEvent.mouseLocation
+        if !state.expanded, hot.contains(p) { set(true) } else if state.expanded, !open.contains(p) { set(false) }
+    }
+
+    /// ⌃⌥S: start or pause a focus session without opening the island.
+    func toggleFocus() {
+        guard NTab.focus.enabled else { return }
+        focus.toggle()
+        let task = focus.intention.trimmingCharacters(in: .whitespaces)
+        flash(focus.running ? (focus.onBreak ? "Istirahat dimulai" : "Fokus dimulai" + (task.isEmpty ? "" : " · \(task)")) : "Dijeda · \(focus.clock)")
+    }
+
+    /// Pauses focus when a calendar meeting starts and, once it ends, points at ⌃⌥S to resume.
+    private func checkMeeting() {
+        let now = Date(), m = meet.next
+        let live = m.flatMap { $0.start <= now && now < $0.end ? $0.start : nil }
+        switch meetingPause.step(meeting: live, focusing: focus.running && !focus.onBreak) {
+        case .pause:
+            focus.toggle()
+            flash("Fokus dijeda · \(m?.title ?? "rapat") dimulai")
+        case .offerResume: flash("Rapat selesai · ⌃⌥S untuk lanjut fokus")
+        case .none: break
         }
     }
 
@@ -276,12 +319,17 @@ struct NotchView: View {
 
     var soon: Meeting? { meet.next.flatMap { $0.isSoon(Date()) ? $0 : nil } }
     var live: Bool { media.playing || focus.running || ai.running || soon != nil }
+    /// The focus intention, shown beside the camera while it's the live activity on display.
+    var task: String {
+        guard focus.running, !focus.onBreak, !ai.running, soon == nil else { return "" }
+        return focus.intention.trimmingCharacters(in: .whitespaces)
+    }
 
     var body: some View {
         let n = state.notch
         let size = state.expanded ? Self.open
             : state.toast != nil ? CGSize(width: n.width + 200, height: n.height + 30)
-            : CGSize(width: n.width + (live ? 96 : 0), height: n.height)
+            : CGSize(width: n.width + (live ? 96 : 0) + (task.isEmpty ? 0 : 160), height: n.height)
         ZStack(alignment: .top) {
             ZStack {
                 Color.black
@@ -325,7 +373,10 @@ struct NotchView: View {
                 } else if let m = soon {
                     Image(systemName: m.link == nil ? "calendar" : "video.fill").foregroundStyle(Color(nsColor: m.color ?? .systemBlue))
                 } else if focus.running {
-                    Image(systemName: "timer").foregroundStyle(.orange)
+                    HStack(spacing: 6) {
+                        Image(systemName: "timer").foregroundStyle(.orange)
+                        if !task.isEmpty { Text(task).lineLimit(1).foregroundStyle(.white.opacity(0.85)) }
+                    }
                 } else if let art = media.artwork {
                     Image(nsImage: art).resizable().aspectRatio(contentMode: .fill).frame(width: 20, height: 20)
                         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
@@ -333,7 +384,7 @@ struct NotchView: View {
                     Image(systemName: "music.note").foregroundStyle(.pink)
                 }
             }
-            .frame(width: 22)
+            .frame(width: task.isEmpty ? 22 : 110, alignment: .leading)
             Spacer()
             if ai.running {
                 ProgressView().controlSize(.mini).tint(.purple)
@@ -391,7 +442,7 @@ struct NotchView: View {
             Group {
                 switch state.tab {
                 case .music: MusicView(m: media)
-                case .focus: FocusView(f: focus)
+                case .focus: FocusView(f: focus, n: notes)
                 case .ai: AIView(ai: ai)
                 case .notes: NotesView(n: notes, ai: ai)
                 case .dev: DevView()
@@ -521,6 +572,8 @@ struct MusicView: View {
 
 struct FocusView: View {
     @ObservedObject var f: Focus
+    let n: NotesModel
+    @Local private var done = ""
 
     var body: some View {
         let color: Color = f.onBreak ? .green : .orange
@@ -538,51 +591,169 @@ struct FocusView: View {
             }
             .frame(width: 210)
 
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    stat("flame.fill", .orange, "\(f.streak)", "hari beruntun")
-                    stat("clock.fill", .blue, "\(f.today)", "menit hari ini")
+            if let task = f.reflecting {
+                reflection(task)
+            } else {
+                VStack(spacing: 8) {
+                    setup
+                    history
                 }
-                .frame(height: 64)
-                NCard {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("7 HARI TERAKHIR").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
-                        Chart(f.last7, id: \.day) { d in
-                            BarMark(x: .value("Hari", d.day), y: .value("Menit", d.minutes), width: .ratio(0.55))
-                                .foregroundStyle(Color.orange.gradient).cornerRadius(4)
+            }
+        }
+    }
+
+    // Intention, length and blocking: set before starting, read-only while a session runs.
+    var setup: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "scope").foregroundStyle(.orange)
+                    TextField("Mau mengerjakan apa?", text: $f.intention).textFieldStyle(.plain).disabled(f.running)
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .background(Color.white.opacity(0.09), in: Capsule())
+                HStack(spacing: 2) {
+                    ForEach(Focus.durations, id: \.self) { m in
+                        Button { f.minutes = m } label: {
+                            Text("\(m)m").font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(f.minutes == m ? Color.white : Color.gray)
+                                .padding(.horizontal, 8).padding(.vertical, 5)
+                                .background(f.minutes == m ? Color.orange.opacity(0.9) : Color.clear, in: Capsule())
+                                .contentShape(Capsule())
                         }
-                        .chartYAxis(.hidden)
-                        .chartXAxis { AxisMarks { _ in AxisValueLabel().font(.system(size: 9)).foregroundStyle(Color.gray) } }
-                        .overlay {
-                            if f.last7.allSatisfy({ $0.minutes == 0 }) {
-                                Text("Selesaikan 1 sesi fokus untuk mulai streak").font(.system(size: 11)).foregroundStyle(.gray)
+                        .buttonStyle(.plain)
+                    }
+                    if !Focus.durations.contains(f.minutes) {
+                        Text("\(f.minutes)m").font(.system(size: 11, weight: .bold))
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .background(Color.orange.opacity(0.9), in: Capsule())
+                    }
+                    // Custom length in 5-minute steps.
+                    Stepper("", value: $f.minutes, in: 5...180, step: 5).labelsHidden().controlSize(.mini)
+                        .help("Atur durasi sendiri")
+                }
+                .padding(2)
+                .background(Color.white.opacity(0.07), in: Capsule())
+                .disabled(f.running).opacity(f.running ? 0.5 : 1)
+            }
+            HStack(spacing: 8) {
+                Toggle("Blokir pengganggu", isOn: $f.blockOn).toggleStyle(.switch).controlSize(.mini)
+                    .font(.system(size: 11.5, weight: .semibold))
+                Menu {
+                    let running = NSWorkspace.shared.runningApplications
+                        .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
+                    ForEach(running, id: \.processIdentifier) { app in
+                        if let id = app.bundleIdentifier {
+                            Button { toggleBlock(id) } label: {
+                                if f.blockApps.contains(id) { Label(app.localizedName ?? id, systemImage: "checkmark") } else { Text(app.localizedName ?? id) }
                             }
                         }
+                    }
+                } label: {
+                    Text("\(f.blockApps.count) aplikasi").font(.system(size: 11))
+                }
+                .menuStyle(.borderlessButton).fixedSize()
+                Spacer()
+                if f.blocking { Chip(text: "aktif", icon: "hand.raised.fill", color: Palette.orange) }
+            }
+        }
+    }
+
+    var history: some View {
+        NCard(padding: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    Label("\(f.streak) hari", systemImage: "flame.fill").foregroundStyle(.orange)
+                    Label("\(f.today) menit hari ini", systemImage: "clock.fill").foregroundStyle(Palette.blue)
+                    Spacer()
+                    Text("7 HARI").foregroundStyle(.gray)
+                }
+                .font(.system(size: 10, weight: .bold))
+                Chart(f.last7, id: \.day) { d in
+                    BarMark(x: .value("Hari", d.day), y: .value("Menit", d.minutes), width: .ratio(0.55))
+                        .foregroundStyle(Color.orange.gradient).cornerRadius(4)
+                }
+                .chartYAxis(.hidden)
+                .chartXAxis { AxisMarks { _ in AxisValueLabel().font(.system(size: 9)).foregroundStyle(Color.gray) } }
+                .overlay {
+                    if f.last7.allSatisfy({ $0.minutes == 0 }) {
+                        Text("Selesaikan 1 sesi fokus untuk mulai streak").font(.system(size: 11)).foregroundStyle(.gray)
                     }
                 }
             }
         }
     }
 
-    func stat(_ icon: String, _ color: Color, _ value: String, _ label: String) -> some View {
-        NCard(padding: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: icon).font(.system(size: 14, weight: .bold)).foregroundStyle(color)
-                    .frame(width: 32, height: 32).background(color.opacity(0.18), in: Circle())
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(value).font(.system(size: 18, weight: .bold, design: .rounded)).monospacedDigit()
-                    Text(label).font(.system(size: 10)).foregroundStyle(.gray)
+    // After a session: one line of "what got done", saved to the Jurnal Fokus note.
+    func reflection(_ task: String) -> some View {
+        NCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Sesi selesai 🎉").font(.system(size: 15, weight: .bold))
+                Text(task.isEmpty ? "\(f.minutes) menit fokus" : "\(task) · \(f.minutes) menit").font(.system(size: 12)).foregroundStyle(.gray)
+                TextField("Apa yang selesai?", text: $done).textFieldStyle(.plain).onSubmit(saveReflection)
+                    .font(.system(size: 12.5))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Spacer(minLength: 0)
+                HStack(spacing: 8) {
+                    Text("Tersimpan di catatan Jurnal Fokus").font(.system(size: 10)).foregroundStyle(.gray)
+                    Spacer()
+                    NButton(icon: "xmark", title: "Lewati") { f.reflecting = nil; done = "" }
+                    NButton(icon: "checkmark", title: "Simpan", tint: .orange, prominent: true, run: saveReflection)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+    }
+
+    func saveReflection() {
+        n.journal(journalLine(f.reflecting ?? "", done, minutes: f.minutes, at: Date()))
+        f.reflecting = nil
+        done = ""
+    }
+
+    func toggleBlock(_ id: String) {
+        if let i = f.blockApps.firstIndex(of: id) { f.blockApps.remove(at: i) } else { f.blockApps.append(id) }
     }
 }
 
 struct AIView: View {
     @ObservedObject var ai: AIModel
     @FocusState private var focused: Bool
+    @AppStorage("aiPage") private var page = 0
+    @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when the usage page is toggled
 
+    // Pages swap the whole area instead of splitting it, so each keeps the full notch size.
     var body: some View {
+        if FeatureFlags.isOn("ailab") {
+            VStack(spacing: 10) {
+                HStack(spacing: 2) {
+                    ForEach(Array(["Chat", "Pemakaian"].enumerated()), id: \.offset) { i, title in
+                        Button { withAnimation(.easeInOut(duration: 0.2)) { page = i } } label: {
+                            Text(title).font(.system(size: 11.5, weight: .semibold))
+                                .foregroundStyle(page == i ? Color.white : Color.gray)
+                                .padding(.horizontal, 11).padding(.vertical, 5)
+                                .background(page == i ? Color.purple.opacity(0.9) : Color.clear, in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(2)
+                .background(Color.white.opacity(0.07), in: Capsule())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                switch page {
+                case 1: UsagePage(u: UsageModel.shared)
+                default: chat
+                }
+            }
+        } else {
+            chat
+        }
+    }
+
+    @ViewBuilder var chat: some View {
         if ai.clis.isEmpty {
             Placeholder(icon: "sparkles", title: "Belum ada CLI AI", subtitle: "Pasang Claude Code atau Kiro CLI", color: .purple)
         } else {

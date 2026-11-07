@@ -146,19 +146,46 @@ func focusStreak(_ log: [String: Int], today: Date) -> Int {
 }
 
 final class Focus: ObservableObject {
-    static let focusLen = 25 * 60.0, breakLen = 5 * 60.0
+    static let durations = [25, 50, 90]
+    static let defaultBlock = ["com.tinyspeck.slackmacgap", "net.whatsapp.WhatsApp", "com.hnc.Discord", "ru.keepcoder.Telegram", "com.apple.MobileSMS"]
+    @Published var minutes = UserDefaults.standard.object(forKey: "focusMinutes") as? Int ?? 25 {
+        didSet { UserDefaults.standard.set(minutes, forKey: "focusMinutes"); if !running { left = total } }
+    }
     @Published var onBreak = false
     @Published var endAt: Date? // set while running
-    @Published var left = Focus.focusLen
+    @Published var left = Double(UserDefaults.standard.object(forKey: "focusMinutes") as? Int ?? 25) * 60
     @Published var log = load(Paths.focus, [String: Int]()) // day → focus minutes
+    @Published var intention = ""
+    @Published var reflecting: String? // intention of a just-finished session, awaiting "what got done"
+    @Published var blockOn = UserDefaults.standard.bool(forKey: "focusBlockOn") {
+        didSet { UserDefaults.standard.set(blockOn, forKey: "focusBlockOn"); applyBlock() }
+    }
+    @Published var blockApps = UserDefaults.standard.stringArray(forKey: "focusBlock") ?? Focus.defaultBlock {
+        didSet { UserDefaults.standard.set(blockApps, forKey: "focusBlock"); applyBlock() }
+    }
     private var timer: Timer?
+    private var hidden: [NSRunningApplication] = []
+
+    init() {
+        // Blocked apps that get opened mid-session are hidden again right away.
+        let nc = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didActivateApplicationNotification, NSWorkspace.didLaunchApplicationNotification] {
+            nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] n in
+                guard let self, self.blocking, let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+                self.hide(app)
+            }
+        }
+    }
 
     var running: Bool { endAt != nil }
-    var total: Double { onBreak ? Self.breakLen : Self.focusLen }
+    var focusLen: Double { Double(minutes) * 60 }
+    var breakLen: Double { Double(breakMinutes(minutes)) * 60 }
+    var total: Double { onBreak ? breakLen : focusLen }
     var remaining: Double { endAt.map { max(0, $0.timeIntervalSinceNow) } ?? left }
     var clock: String { let r = Int(remaining.rounded(.up)); return String(format: "%02d:%02d", r / 60, r % 60) }
     var streak: Int { focusStreak(log, today: Date()) }
     var today: Int { log[dayKey(Date())] ?? 0 }
+    var blocking: Bool { blockOn && running && !onBreak }
     var last7: [(day: String, minutes: Int)] {
         let f = DateFormatter()
         f.locale = Locale(identifier: "id_ID")
@@ -175,6 +202,7 @@ final class Focus: ObservableObject {
             endAt = nil
             timer?.invalidate()
         } else {
+            reflecting = nil
             endAt = Date().addingTimeInterval(left)
             timer = .scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                 guard let self else { return }
@@ -182,21 +210,55 @@ final class Focus: ObservableObject {
                 if self.remaining <= 0 { self.next(completed: true) }
             }
         }
+        applyBlock()
     }
 
-    func reset() { timer?.invalidate(); endAt = nil; left = total }
+    func reset() { timer?.invalidate(); endAt = nil; left = total; applyBlock() }
 
     /// Switches focus ⇄ break; only a completed focus session counts toward the log.
     func next(completed: Bool = false) {
         timer?.invalidate()
         endAt = nil
         if completed {
-            if !onBreak { log[dayKey(Date()), default: 0] += Int(Self.focusLen / 60); save(log, Paths.focus) }
+            if !onBreak {
+                log[dayKey(Date()), default: 0] += minutes
+                save(log, Paths.focus)
+                reflecting = intention
+            }
             NSSound(named: "Glass")?.play()
         }
         onBreak.toggle()
         left = total
+        applyBlock()
     }
+
+    /// Hides blocked apps during focus and brings back the ones we hid once it ends.
+    private func applyBlock() {
+        if blocking {
+            NSWorkspace.shared.runningApplications.forEach(hide)
+        } else {
+            hidden.forEach { $0.unhide() }
+            hidden = []
+        }
+    }
+
+    private func hide(_ app: NSRunningApplication) {
+        guard let id = app.bundleIdentifier, blockApps.contains(id), !app.isHidden else { return }
+        app.hide()
+        if !hidden.contains(app) { hidden.append(app) }
+    }
+}
+
+/// Break grows with the session: 25 → 5, 50 → 10, 90 → 18 minutes.
+func breakMinutes(_ focus: Int) -> Int { max(5, focus / 5) }
+
+func journalLine(_ intention: String, _ done: String, minutes: Int, at date: Date) -> String {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "id_ID")
+    f.dateFormat = "d MMM HH.mm"
+    let task = intention.trimmingCharacters(in: .whitespaces).isEmpty ? "Sesi fokus" : intention.trimmingCharacters(in: .whitespaces)
+    let result = done.trimmingCharacters(in: .whitespacesAndNewlines)
+    return "- \(f.string(from: date)) · \(minutes)m · **\(task)**" + (result.isEmpty ? "" : " — \(result)")
 }
 
 // MARK: Clipboard history

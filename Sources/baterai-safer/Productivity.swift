@@ -42,6 +42,18 @@ final class NotesModel: ObservableObject {
         persist()
     }
 
+    /// Appends a line to the "Jurnal Fokus" note, creating it on first use; doesn't change the selection.
+    func journal(_ line: String) {
+        if let i = notes.firstIndex(where: { $0.title == "Jurnal Fokus" }) {
+            notes[i].text += "\n" + line
+            notes[i].updated = Date()
+        } else {
+            notes.insert(Note(text: "# Jurnal Fokus\n" + line), at: 0)
+            if selected == nil { selected = notes.first?.id }
+        }
+        persist()
+    }
+
     /// Tidies the note with AI and appends the result, so the original stays.
     func tidy(_ ai: AIModel) {
         guard let n = current, !n.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -146,6 +158,26 @@ final class MeetingModel: ObservableObject {
 
     func join() {
         if let l = next?.link { NSWorkspace.shared.open(l) } else { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app")) }
+    }
+}
+
+/// When to pause focus for a meeting. Each meeting pauses at most once, so resuming by hand
+/// mid-meeting sticks; the resume hint only shows if we were the ones who paused.
+struct MeetingPause {
+    enum Step { case pause, offerResume, none }
+    private var handled: Date?   // start of the meeting we already reacted to
+    private var paused = false
+
+    mutating func step(meeting start: Date?, focusing: Bool) -> Step {
+        if paused && focusing { paused = false }                      // user resumed on their own
+        if let start, start != handled {
+            handled = start
+            if focusing { paused = true; return .pause }
+        } else if start == nil, paused {
+            paused = false
+            return .offerResume
+        }
+        return .none
     }
 }
 

@@ -156,5 +156,33 @@ func selfTest() {
     FeatureFlags.set("music", true)
     assert(NTab.music.enabled && FeatureFlags.off() == ["panel.cleaner"], "feature flags on")
     UserDefaults.standard.set(savedFlags, forKey: FeatureFlags.key)
+    // Focus
+    assert(breakMinutes(25) == 5 && breakMinutes(50) == 10 && breakMinutes(90) == 18 && breakMinutes(10) == 5, "break length")
+    let jd = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 7, hour: 14, minute: 5))!
+    assert(journalLine(" Laporan Q3 ", "draft selesai\n", minutes: 50, at: jd) == "- 7 Nov 14.05 · 50m · **Laporan Q3** — draft selesai", "journal line")
+    assert(journalLine("", "", minutes: 25, at: jd) == "- 7 Nov 14.05 · 25m · **Sesi fokus**", "journal line: empty")
+    // Meeting pause
+    var mp = MeetingPause(); let m1 = Date(timeIntervalSince1970: 1000), m2 = Date(timeIntervalSince1970: 5000)
+    assert(mp.step(meeting: m1, focusing: true) == .pause, "pause when meeting starts")
+    assert(mp.step(meeting: m1, focusing: false) == .none, "stay paused during meeting")
+    assert(mp.step(meeting: nil, focusing: false) == .offerResume && mp.step(meeting: nil, focusing: false) == .none, "offer resume once")
+    assert(mp.step(meeting: m2, focusing: true) == .pause && mp.step(meeting: m2, focusing: true) == .none, "manual resume mid-meeting sticks")
+    assert(mp.step(meeting: nil, focusing: true) == .none, "no resume hint after manual resume")
+    assert(mp.step(meeting: m1, focusing: false) == .none, "not focusing: nothing")
+    // AI usage
+    let usageNow = isoDate("2026-11-07T10:00:00.000Z")!
+    let u = """
+    {"type":"assistant","timestamp":"2026-11-07T09:00:00.000Z","requestId":"r1","message":{"id":"m1","model":"claude-x","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20}}}
+    {"type":"assistant","timestamp":"2026-11-07T09:00:01.000Z","requestId":"r1","message":{"id":"m1","model":"claude-x","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20}}}
+    {"type":"assistant","timestamp":"2026-10-01T09:00:00.000Z","requestId":"r0","message":{"id":"m0","model":"claude-x","usage":{"input_tokens":999,"output_tokens":999}}}
+    {"type":"user","message":{"content":"no usage here"}}
+    not json "usage"
+    """
+    var ur = UsageReport(), seenU = Set<String>()
+    addClaudeUsage(u[...], since: usageNow.addingTimeInterval(-7 * 86400), today: dayKey(isoDate("2026-11-07T09:00:00.000Z")!), ours: true, into: &ur, seen: &seenU)
+    assert(ur.total == 135 && ur.models == ["claude-x": 135] && ur.ours == 135, "usage: dedupe + window")
+    assert(ur.today.input == 10 && ur.today.output == 5 && ur.today.cache == 120, "usage: today split")
+    assert(tokens(1_234_567) == "1.2M" && tokens(999) == "999", "token format")
+    assert(UsageModel.ourFolder.hasSuffix("-Library-Application-Support-BateraiSafer-ai"), "our claude folder")
     print("selftest ok")
 }

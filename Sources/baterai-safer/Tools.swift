@@ -43,6 +43,7 @@ final class ToolsModel: ObservableObject {
 struct ToolsTab: View {
     @ObservedObject var t: ToolsModel
     @AppStorage(FeatureFlags.key) private var featuresOff = ""
+    @AppStorage("notchClick") private var notchClick = false
 
     func feature(_ id: String) -> Binding<Bool> {
         Binding(get: { FeatureFlags.isOn(id) }, set: { FeatureFlags.set(id, $0); Notch.shared.applyFeatures() })
@@ -60,11 +61,18 @@ struct ToolsTab: View {
                 Text("Matikan yang tidak dipakai: tab-nya hilang dan proses latarnya berhenti.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Text("Notch").font(.system(size: 11.5, weight: .bold, design: .rounded))
+                HStack {
+                    Text("Buka notch").font(.system(size: 11.5))
+                    Spacer()
+                    Picker("", selection: $notchClick) { Text("Hover").tag(false); Text("Klik").tag(true) }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     ForEach(NTab.allCases, id: \.self) { tab in
                         FeatureChip(title: tab.title, icon: tab.icon, color: tab.color, on: feature("\(tab)"))
                     }
                     FeatureChip(title: "Rapat", icon: "video.fill", color: Palette.sky, on: feature("meeting"))
+                    FeatureChip(title: "Pemakaian AI β", icon: "chart.bar.fill", color: Palette.violet, on: feature("ailab"))
                 }
                 .disabled(!t.notch).opacity(t.notch ? 1 : 0.45)
                 Text("Menu bar").font(.system(size: 11.5, weight: .bold, design: .rounded))
