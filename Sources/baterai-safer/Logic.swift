@@ -205,6 +205,8 @@ func selfTest() {
                   Question(q: "The data ____ clear.", options: ["is", "are", "be", "been"], answer: 0, why: "Uncountable.")], "test questions")
     let oldLang = try! JSONDecoder().decode(LangState.self, from: Data(#"{"lang":"es","target":15,"cards":{"es:hola":{"box":2,"due":0}},"log":{"2026-11-07":3},"custom":{}}"#.utf8))
     assert(oldLang.lang == .es && oldLang.target == 15 && oldLang.cards["es:hola"]?.box == 2 && oldLang.engine == "apple" && oldLang.tests.isEmpty, "old lang.json keeps progress")
+    assert(isNewer("0.6.10", than: "0.6.9") && isNewer("v0.7.0", than: "0.6.9") && isNewer("1.0", than: "0.9.9"), "newer versions")
+    assert(!isNewer("0.6.9", than: "0.6.9") && !isNewer("0.6.8", than: "0.6.9") && !isNewer("0.6.9", than: "0.6.9-dev") && !isNewer("0.6", than: "0.6.0"), "not newer")
     // Meeting pause
     var mp = MeetingPause(); let m1 = Date(timeIntervalSince1970: 1000), m2 = Date(timeIntervalSince1970: 5000)
     assert(mp.step(meeting: m1, focusing: true) == .pause, "pause when meeting starts")

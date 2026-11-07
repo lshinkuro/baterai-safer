@@ -120,6 +120,7 @@ struct ToolsTab: View {
                 }
                 Text("Esc menutup notch").font(.system(size: 11)).foregroundStyle(.secondary)
             }
+            UpdateCard()
         }
     }
 }

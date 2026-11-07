@@ -84,6 +84,7 @@ struct BateraiApp: App {
             d.set(true, forKey: "loginItemRegistered")
         }
         DispatchQueue.main.async { if UserDefaults.standard.object(forKey: "notch") as? Bool ?? true { Notch.shared.show() } }
+        DispatchQueue.main.async { Updater.shared.start() }
     }
 
     var body: some Scene {

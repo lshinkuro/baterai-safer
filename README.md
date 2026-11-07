@@ -32,6 +32,10 @@ Membuat DMG sendiri: `scripts/dmg.sh <versi>` → `.build/BateraiSafer.dmg`.
 
 ## Update
 
+Aplikasi mengecek rilis baru saat dibuka dan setiap 6 jam, lalu memasangnya otomatis dan memulai ulang (bisa dimatikan di Tools → Update). Instalasi Homebrew diperbarui lewat `brew upgrade`; instalasi DMG mengunduh DMG dari GitHub Releases dan memverifikasi SHA-256-nya sebelum mengganti aplikasi. Update ditunda selama sesi Fokus berjalan.
+
+Manual:
+
 ```sh
 brew update                          # ambil versi terbaru dari tap
 brew upgrade baterai-safer
