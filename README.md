@@ -6,6 +6,7 @@ Aplikasi menu bar macOS (Apple Silicon) untuk menjaga kesehatan baterai: charge 
 
 ```sh
 brew tap lshinkuro/baterai-safer https://github.com/lshinkuro/baterai-safer
+brew trust lshinkuro/baterai-safer   # Homebrew baru wajib trust tap pihak ketiga
 brew install baterai-safer
 brew services start baterai-safer   # jalankan di menu bar + otomatis saat login
 ```
