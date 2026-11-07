@@ -34,6 +34,26 @@ Firmware macOS 27 mengunci key SMC untuk menghentikan pengisian (`CHTE`, `CH0B`,
 
 Top up dan kalibrasi di macOS 27 membutuhkan aplikasi menu bar tetap berjalan.
 
+## Menu bar
+
+Panel menu bar punya 4 tab: **Baterai** (fitur di atas + grafik riwayat), **Sistem** (memori, CPU, disk, proses terberat yang bisa ditutup), **Cleaner** (bersihkan cache/log/DerivedData/Trash, uninstall aplikasi beserta file sisanya ke Trash), dan **Tools** (cegah sleep, file tersembunyi, ikon desktop, dark mode, screenshot area).
+
+## Notch
+
+Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka:
+
+| Tab | Isi |
+|---|---|
+| Musik | Spotify / Apple Music: album art, kontrol, lirik berjalan (lrclib.net) |
+| Fokus | Pomodoro 25/5, streak, grafik 7 hari |
+| AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool |
+| Clipboard | Riwayat copy, pin, OCR teks di gambar; isi dari password manager diabaikan |
+| Shelf | Seret file ke notch, seret keluar, atau AirDrop |
+| Git | Status repo, fetch/pull/push; review PR GitHub dengan AI, kirim review & merge (via `gh`) |
+| Stats | Baterai, CPU, memori, disk |
+
+Notch bisa dimatikan di tab Tools. Now Playing butuh izin Automation untuk Spotify/Music.
+
 ## CLI
 
 ```

@@ -6,7 +6,12 @@ enum Paths {
     static let status = dir + "/status.json"
     static let label = "io.github.lshinkuro.baterai-safer"
     static let plist = "/Library/LaunchDaemons/\(label).plist"
-    static let history = NSHomeDirectory() + "/Library/Application Support/BateraiSafer/history.json"
+    // Per-user data (the app runs as the user; dir above is root-owned)
+    static let user = NSHomeDirectory() + "/Library/Application Support/BateraiSafer"
+    static let history = user + "/history.json"
+    static let clips = user + "/clips.json"
+    static let clipDir = user + "/clips"
+    static let focus = user + "/focus.json"
 }
 
 struct Config: Codable, Equatable {
@@ -92,5 +97,20 @@ func selfTest() {
     assert(nativeTarget(c, s) == 85)
     c.limit = 60; assert(nativeTarget(c, s) == 80)
     s.calibration = 1; assert(nativeTarget(c, s) == 100)
+    let ps = parsePS("  1   0.0  12000 root     launchd\n 512  12.5 204800 me       Google Chrome Helper\nbad line\n")
+    assert(ps.count == 2 && ps[1] == Proc(pid: 512, cpu: 12.5, mb: 200, user: "me", name: "Google Chrome Helper"), "ps parse")
+    assert(parsePS("3284   0.2 205792 a2267            WhatsApp\n").first?.name == "WhatsApp", "ps: no leading spaces in name")
+    assert(parseLRC("[00:12.50] Halo\n[01:02.00]\nbukan lirik\n") == [Lyric(t: 12.5, line: "Halo"), Lyric(t: 62, line: "")], "lrc")
+    let day = { (i: Int) in dayKey(Calendar.current.date(byAdding: .day, value: -i, to: Date())!) }
+    assert(focusStreak([day(0): 25, day(1): 50, day(3): 25], today: Date()) == 2, "streak counts back from today")
+    assert(focusStreak([day(1): 25, day(2): 25], today: Date()) == 2, "unfinished today keeps the streak")
+    assert(focusStreak([day(2): 25], today: Date()) == 0, "gap breaks the streak")
+    assert(parseGitStatus("# branch.oid abc\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -1\n1 .M N... 100644 100644 100644 a b README.md\n? new.txt\n")
+           == GitStatus(branch: "main", ahead: 2, behind: 1, changes: 2), "git status")
+    assert(stripANSI("\u{1B}[1;32mJakarta\u{1B}[0m") == "Jakarta", "ansi")
+    assert(checkSummary([]) == "none" && checkSummary(["SUCCESS", "SKIPPED"]) == "pass")
+    assert(checkSummary(["SUCCESS", "FAILURE"]) == "fail" && checkSummary(["SUCCESS", "PENDING"]) == "pending", "checks")
+    let pr = try! JSONDecoder().decode(PR.self, from: Data(#"{"number":7,"title":"t","url":"https://github.com/acme/app/pull/7","author":{"login":"x"},"isDraft":false}"#.utf8))
+    assert(pr.repo == "acme/app", "pr repo from url")
     print("selftest ok")
 }

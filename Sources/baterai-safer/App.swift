@@ -63,12 +63,18 @@ final class Model: ObservableObject {
 
 struct BateraiApp: App {
     @StateObject private var m = Model()
+    @StateObject private var sys = SystemModel()
+    @StateObject private var cleaner = CleanerModel()
+    @StateObject private var tools = ToolsModel()
 
-    init() { NSApplication.shared.setActivationPolicy(.accessory) }
+    init() {
+        NSApplication.shared.setActivationPolicy(.accessory)
+        DispatchQueue.main.async { if UserDefaults.standard.object(forKey: "notch") as? Bool ?? true { Notch.shared.show() } }
+    }
 
     var body: some Scene {
         MenuBarExtra {
-            Panel(m: m)
+            Panel(m: m, sys: sys, cleaner: cleaner, tools: tools)
         } label: {
             Image(systemName: m.status.charging && m.battery.ac ? "battery.100percent.bolt"
                   : m.battery.ac ? "powerplug" : "battery.\(min(100, (m.battery.percent + 12) / 25 * 25))percent")
@@ -79,6 +85,48 @@ struct BateraiApp: App {
 }
 
 struct Panel: View {
+    @ObservedObject var m: Model
+    let sys: SystemModel, cleaner: CleanerModel, tools: ToolsModel
+    @AppStorage("tab") private var tab = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                IconBadge(icon: "bolt.shield.fill", color: .green, size: 26)
+                Text("Baterai Safer").font(.system(size: 14, weight: .bold))
+                Spacer()
+                Button { NSApp.terminate(nil) } label: {
+                    Image(systemName: "power").font(.system(size: 11, weight: .bold))
+                        .frame(width: 24, height: 24)
+                        .background(Color.primary.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain).help("Keluar")
+            }
+            .padding(.horizontal, 16).padding(.top, 14)
+
+            TabBar(tab: $tab).padding(.horizontal, 16).padding(.vertical, 12)
+            Divider()
+
+            // Fixed panel size: the menu bar window doesn't resize cleanly between tabs of different heights.
+            ScrollView {
+                Group {
+                    switch Tab(rawValue: tab) ?? .battery {
+                    case .battery: BatteryTab(m: m)
+                    case .system: SystemTab(s: sys)
+                    case .cleaner: CleanerTab(c: cleaner)
+                    case .tools: ToolsTab(t: tools)
+                    }
+                }
+                .padding(16)
+            }
+            .id(tab) // each tab opens scrolled to the top
+            .transition(.opacity)
+        }
+        .frame(width: 400, height: 620)
+    }
+}
+
+struct BatteryTab: View {
     @ObservedObject var m: Model
 
     var stateText: String {
@@ -91,8 +139,8 @@ struct Panel: View {
         default: break
         }
         if !b.ac { return "Pakai baterai" }
-        if !s.adapter { return "Discharge (charger diabaikan)" }
-        return s.charging ? "Mengisi" : "Ditahan — pakai daya charger"
+        if !s.adapter { return "Discharge" }
+        return s.charging ? "Mengisi" : "Ditahan di batas"
     }
 
     var tint: Color {
@@ -102,73 +150,88 @@ struct Panel: View {
         return b.ac ? .blue : .orange
     }
 
-    var timeText: String? {
-        guard let t = m.battery.minutesLeft else { return nil }
-        let d = "\(t / 60)j \(t % 60)m"
-        return m.battery.charging ? "Penuh dalam \(d)" : "Sisa \(d)"
-    }
+    var limit: Int? { m.helperInstalled && m.config.enabled ? m.config.limit : nil }
 
     var body: some View {
         let b = m.battery
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 14) {
-                Ring(percent: b.percent, limit: m.helperInstalled && m.config.enabled ? m.config.limit : nil, color: tint)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Baterai Safer").font(.headline)
-                    Label(stateText, systemImage: "circle.fill")
-                        .font(.callout).foregroundStyle(tint).labelStyle(Dot())
-                    if let t = timeText { Text(t).font(.caption).foregroundStyle(.secondary) }
-                    if let a = b.adapterName { Label(a, systemImage: "powerplug").font(.caption).foregroundStyle(.secondary) }
+        VStack(spacing: 12) {
+            Card {
+                HStack(spacing: 16) {
+                    Ring(value: Double(b.percent) / 100, color: tint, label: "\(b.percent)%", caption: limit.map { "batas \($0)%" },
+                         size: 96, line: 10, marker: limit.map { Double($0) / 100 })
+                    VStack(alignment: .leading, spacing: 6) {
+                        StatusPill(text: stateText, color: tint)
+                        if let t = b.minutesLeft {
+                            Text("\(t / 60)j \(t % 60)m").font(.system(size: 22, weight: .bold, design: .rounded)).monospacedDigit()
+                            Text(b.charging ? "sampai penuh" : "tersisa").font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            Text("\(b.maxCapacity * b.percent / 100) mAh").font(.system(size: 22, weight: .bold, design: .rounded)).monospacedDigit()
+                            Text("kapasitas saat ini").font(.caption).foregroundStyle(.secondary)
+                        }
+                        if let a = b.adapterName {
+                            Label(a, systemImage: "powerplug.fill").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
             }
 
             HStack(spacing: 8) {
-                Tile(icon: "heart", title: "Kondisi", value: "\(b.health)%", help: "\(b.maxCapacity)/\(b.designCapacity) mAh")
-                Tile(icon: "arrow.triangle.2.circlepath", title: "Siklus", value: "\(b.cycles)")
-                Tile(icon: "thermometer.medium", title: "Suhu", value: b.temp.map { String(format: "%.1f°", $0) } ?? "–")
-                Tile(icon: "bolt", title: "Daya", value: String(format: "%+.1fW", b.watts))
+                Tile(icon: "heart.fill", title: "Kondisi", value: "\(b.health)%", color: .pink, help: "\(b.maxCapacity)/\(b.designCapacity) mAh")
+                Tile(icon: "arrow.triangle.2.circlepath", title: "Siklus", value: "\(b.cycles)", color: .blue)
+                Tile(icon: "thermometer.medium", title: "Suhu", value: b.temp.map { String(format: "%.1f°", $0) } ?? "–", color: .orange)
+                Tile(icon: "bolt.fill", title: "Daya", value: String(format: "%+.1fW", b.watts), color: .yellow)
             }
 
-            Card(title: "Riwayat") {
-                HistoryChart(samples: m.history, limit: m.helperInstalled && m.config.enabled ? m.config.limit : nil)
+            Card(title: "Riwayat", icon: "chart.xyaxis.line") {
+                HistoryChart(samples: m.history, limit: limit)
             }
 
             if !m.helperInstalled {
-                Card(title: "Helper") {
-                    Text("Helper (root) diperlukan untuk mengontrol pengisian.").font(.caption).foregroundStyle(.secondary)
+                Card(title: "Helper", icon: "lock.shield") {
+                    Text("Helper (root) diperlukan untuk mengontrol pengisian.").font(.callout).foregroundStyle(.secondary)
                     Button("Install helper…") { m.admin("install-daemon") }.buttonStyle(.borderedProminent)
                 }
             } else {
-                Card(title: "Pengisian") {
-                    Switch("Aktifkan limiter", "battery.100percent", $m.config.enabled)
-                    HStack {
+                Card(title: "Pengisian", icon: "bolt.batteryblock") {
+                    Switch("Aktifkan limiter", "battery.100percent", $m.config.enabled, color: .green)
+                    HStack(spacing: 10) {
+                        IconBadge(icon: "slider.horizontal.3", color: .blue)
                         Text("Batas")
                         Slider(value: Binding(get: { Double(m.config.limit) }, set: { m.config.limit = Int($0) }),
                                in: SMC.canInhibit ? 50...100 : 80...100, step: 5)
-                        Text("\(m.config.limit)%").monospacedDigit().frame(width: 38, alignment: .trailing)
+                            .controlSize(.small)
+                        Text("\(m.config.limit)%").font(.system(.body, design: .rounded).weight(.semibold)).monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
                     }
                     if SMC.canInhibit {
-                        Stepper("Sailing: \(m.config.limit - m.config.sailing)–\(m.config.limit)%", value: $m.config.sailing, in: 0...20)
+                        HStack(spacing: 10) {
+                            IconBadge(icon: "water.waves", color: .teal)
+                            Stepper("Sailing \(m.config.limit - m.config.sailing)–\(m.config.limit)%", value: $m.config.sailing, in: 0...20)
+                        }
                     } else {
-                        Text("macOS 27: pakai Charge Limit bawaan (80–100%)").font(.caption).foregroundStyle(.secondary)
+                        Text("macOS 27: memakai Charge Limit bawaan (80–100%)").font(.caption).foregroundStyle(.secondary)
                     }
-                    Switch("Top up ke 100% (sementara)", "arrow.up.to.line", $m.config.topUp)
-                    Switch("Auto discharge ke batas", "arrow.down.to.line", $m.config.autoDischarge)
+                    Switch("Top up ke 100% (sementara)", "arrow.up.to.line", $m.config.topUp, color: .mint)
+                    Switch("Auto discharge ke batas", "arrow.down.to.line", $m.config.autoDischarge, color: .purple)
                 }
-                Card(title: "Proteksi") {
-                    Switch(SMC.canInhibit ? "Heat protection" : "Heat protection (putus charger)", "flame", $m.config.heatProtection)
+                Card(title: "Proteksi", icon: "shield.lefthalf.filled") {
+                    Switch(SMC.canInhibit ? "Heat protection" : "Heat protection (putus charger)", "flame.fill", $m.config.heatProtection, color: .red)
                     if m.config.heatProtection {
-                        Stepper(String(format: "Berhenti di ≥ %.0f °C", m.config.maxTemp), value: $m.config.maxTemp, in: 30...45)
+                        HStack(spacing: 10) {
+                            IconBadge(icon: "thermometer.high", color: .orange)
+                            Stepper(String(format: "Berhenti di ≥ %.0f °C", m.config.maxTemp), value: $m.config.maxTemp, in: 30...45)
+                        }
                     }
-                    Switch("Hentikan pengisian saat sleep", "moon", $m.config.stopOnSleep)
-                    HStack {
-                        Label("Kalibrasi 100 → 10 → 100%", systemImage: "gauge.with.needle")
+                    Switch("Hentikan pengisian saat sleep", "moon.fill", $m.config.stopOnSleep, color: .indigo)
+                    HStack(spacing: 10) {
+                        IconBadge(icon: "gauge.with.needle", color: .gray)
+                        Text("Kalibrasi 100 → 10 → 100%")
                         Spacer()
                         if m.status.calibration == 0 {
-                            Button("Mulai") { m.config.calibrateAt = Date().timeIntervalSince1970 }
+                            Button("Mulai") { m.config.calibrateAt = Date().timeIntervalSince1970 }.controlSize(.small)
                         } else {
-                            Button("Batalkan") { m.config.calibrateAt = 0 }
+                            Button("Batalkan") { m.config.calibrateAt = 0 }.controlSize(.small)
                         }
                     }
                 }
@@ -176,90 +239,13 @@ struct Panel: View {
 
             if !m.error.isEmpty { Text(m.error).font(.caption).foregroundStyle(.red) }
 
-            HStack {
-                if m.helperInstalled { Button("Uninstall helper") { m.admin("uninstall-daemon") } }
-                Spacer()
-                Button("Keluar") { NSApp.terminate(nil) }
+            if m.helperInstalled {
+                Button("Uninstall helper") { m.admin("uninstall-daemon") }
+                    .buttonStyle(.borderless).font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .buttonStyle(.borderless).font(.caption).foregroundStyle(.secondary)
         }
-        .padding(14)
-        .frame(width: 380)
         .onAppear { m.refresh() }
-    }
-}
-
-struct Ring: View {
-    let percent: Int
-    let limit: Int?
-    let color: Color
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(Color.primary.opacity(0.1), lineWidth: 9)
-            Circle().trim(from: 0, to: Double(percent) / 100)
-                .stroke(color.gradient, style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            if let limit {
-                // tick at the charge limit
-                Capsule().fill(.primary).frame(width: 3, height: 13)
-                    .offset(y: -38).rotationEffect(.degrees(Double(limit) * 3.6))
-            }
-            Text("\(percent)%").font(.system(size: 20, weight: .bold, design: .rounded)).monospacedDigit()
-        }
-        .frame(width: 76, height: 76)
-        .animation(.easeInOut, value: percent)
-    }
-}
-
-struct Tile: View {
-    let icon: String, title: String, value: String
-    var help = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Label(title, systemImage: icon).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-            Text(value).font(.system(.body, design: .rounded).weight(.semibold)).monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(8)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-        .help(help)
-    }
-}
-
-struct Card<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-            content
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
-    }
-}
-
-struct Switch: View {
-    let title: String, icon: String
-    @Binding var on: Bool
-    init(_ title: String, _ icon: String, _ on: Binding<Bool>) { self.title = title; self.icon = icon; _on = on }
-
-    var body: some View {
-        HStack {
-            Label(title, systemImage: icon)
-            Spacer()
-            Toggle(title, isOn: $on).labelsHidden().toggleStyle(.switch).controlSize(.small)
-        }
-    }
-}
-
-struct Dot: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 5) { configuration.icon.font(.system(size: 7)); configuration.title.foregroundStyle(.primary) }
     }
 }
 
@@ -269,7 +255,7 @@ struct HistoryChart: View {
     @State private var metric = 0
     @State private var hours = 6
 
-    let metrics = [("Baterai", "%", Color.green), ("Suhu", "°C", Color.orange), ("Daya", "W", Color.blue)]
+    let metrics = [("Baterai", "%", Color.green), ("Suhu", "°", Color.orange), ("Daya", "W", Color.blue)]
 
     func value(_ s: Sample) -> Double? { [Double(s.percent), s.temp, s.watts][metric] }
 
@@ -284,24 +270,22 @@ struct HistoryChart: View {
             : metric == 2 ? min(vs.min() ?? 0, 0) - 1...max(vs.max() ?? 0, 0) + 1
             : (vs.min() ?? 25) - 2...(vs.max() ?? 40) + 2
 
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             HStack {
                 Picker("", selection: $metric) { ForEach(0..<3, id: \.self) { Text(metrics[$0].0).tag($0) } }
                 Picker("", selection: $hours) { Text("1j").tag(1); Text("6j").tag(6); Text("24j").tag(24) }
-                    .frame(width: 120)
+                    .frame(width: 110)
             }
-            .pickerStyle(.segmented).labelsHidden()
+            .pickerStyle(.segmented).labelsHidden().controlSize(.small)
 
             Chart {
                 ForEach(pts, id: \.date) { p in
-                    if metric == 0 {
-                        AreaMark(x: .value("Waktu", p.date), y: .value(name, p.v))
-                            .foregroundStyle(LinearGradient(colors: [color.opacity(0.35), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
-                            .interpolationMethod(.monotone)
-                    }
+                    AreaMark(x: .value("Waktu", p.date), yStart: .value(name, domain.lowerBound), yEnd: .value(name, p.v))
+                        .foregroundStyle(LinearGradient(colors: [color.opacity(0.3), color.opacity(0.0)], startPoint: .top, endPoint: .bottom))
+                        .interpolationMethod(.monotone)
                     LineMark(x: .value("Waktu", p.date), y: .value(name, p.v))
                         .foregroundStyle(color).interpolationMethod(.monotone)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
                 }
                 if metric == 0, let limit {
                     RuleMark(y: .value("Batas", limit))
@@ -312,9 +296,14 @@ struct HistoryChart: View {
             .chartXScale(domain: from...Date())
             .chartYScale(domain: domain)
             .chartYAxis {
-                AxisMarks(position: .trailing) { value in
-                    AxisGridLine()
-                    AxisValueLabel { Text("\(Int(value.as(Double.self) ?? 0))\(unit)") }
+                AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                    AxisValueLabel { Text("\(Int(value.as(Double.self) ?? 0))\(unit)").font(.system(size: 9)) }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                    AxisValueLabel(format: .dateTime.hour().minute()).font(.system(size: 9))
                 }
             }
             .frame(height: 130)
