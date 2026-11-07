@@ -849,13 +849,13 @@ struct GitView: View {
                                 help: "Buat HTTP access token di Bitbucket: avatar → Manage account → HTTP access tokens, izin Repository: Write (komentar, approve, merge). Token disimpan di Keychain.",
                                 placeholder: "https://bitbucket.perusahaan.com", connect: Bitbucket.connect,
                                 done: { connecting = nil; pr.bitbucketConnected = Bitbucket.connected; pr.refresh(repos: g.repos.map(\.path)) },
-                                url: Bitbucket.base ?? "https://bitbucket.bri.co.id")
+                                url: Bitbucket.base ?? "")
                 } else if connecting == "sonar" {
                     ConnectForm(title: "Hubungkan SonarQube",
                                 help: "Buat user token di SonarQube: avatar → My Account → Security → Generate Token (tipe User). Dipakai hanya untuk membaca temuan & aturan. Token disimpan di Keychain.",
                                 placeholder: "https://sonarqube.perusahaan.com", connect: Sonar.connect,
                                 done: { connecting = nil; pr.sonarConnected = Sonar.connected },
-                                url: Sonar.base ?? "https://sonarqube-enterprise.bri.co.id")
+                                url: Sonar.base ?? "")
                 } else {
                     PRPane(pr: pr, ai: ai, repos: g.repos.map(\.path)) { connecting = "sonar" }
                 }

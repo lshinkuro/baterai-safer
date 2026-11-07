@@ -113,9 +113,9 @@ func selfTest() {
     assert(checkSummary(["SUCCESS", "FAILURE"]) == "fail" && checkSummary(["SUCCESS", "PENDING"]) == "pending", "checks")
     let pr = try! JSONDecoder().decode(GHPR.self, from: Data(#"{"number":7,"title":"t","url":"https://github.com/acme/app/pull/7","author":{"login":"x"},"isDraft":false}"#.utf8)).pr
     assert(pr.repo == "acme/app" && pr.author == "x", "pr repo from url")
-    let bb = parseBitbucketPRs(Data(#"{"values":[{"id":42,"version":3,"title":"Fix login","author":{"user":{"name":"budi"}},"toRef":{"displayId":"main","repository":{"slug":"brimo-ios","project":{"key":"MOB"}}},"links":{"self":[{"href":"https://bb.example/projects/MOB/repos/brimo-ios/pull-requests/42"}]}},{"id":"bad"}]}"#.utf8), reviewer: true)
-    assert(bb.count == 1 && bb[0].repo == "MOB/brimo-ios" && bb[0].number == 42 && bb[0].version == 3 && bb[0].host == .bitbucket && bb[0].reviewRequested, "bitbucket parse")
-    assert(Bitbucket.repoPath(bb[0]) == "/rest/api/1.0/projects/MOB/repos/brimo-ios/pull-requests/42")
+    let bb = parseBitbucketPRs(Data(#"{"values":[{"id":42,"version":3,"title":"Fix login","author":{"user":{"name":"budi"}},"toRef":{"displayId":"main","repository":{"slug":"mobile-app","project":{"key":"MOB"}}},"links":{"self":[{"href":"https://bb.example/projects/MOB/repos/mobile-app/pull-requests/42"}]}},{"id":"bad"}]}"#.utf8), reviewer: true)
+    assert(bb.count == 1 && bb[0].repo == "MOB/mobile-app" && bb[0].number == 42 && bb[0].version == 3 && bb[0].host == .bitbucket && bb[0].reviewRequested, "bitbucket parse")
+    assert(Bitbucket.repoPath(bb[0]) == "/rest/api/1.0/projects/MOB/repos/mobile-app/pull-requests/42")
     assert(checkSummary(["SUCCESSFUL"]) == "pass" && checkSummary(["SUCCESSFUL", "FAILED"]) == "fail" && checkSummary(["INPROGRESS"]) == "pending", "bitbucket checks")
     assert(diffStats("diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1,2 @@\n-old\n+new\n+more\ndiff --git a/y b/y\n") == (2, 1, 2), "diff stats")
     assert(cleanCommitMessage("```\nAdd login\n\n- detail\n```") == "Add login\n\n- detail", "commit msg fences")
@@ -143,7 +143,7 @@ func selfTest() {
     assert(conversions("abc").contains(Conversion(title: "MD5", output: "900150983cd24fb0d6963f7d28e17f72")), "md5")
     assert(conversions("   ").isEmpty && !conversions("hello world").contains { $0.title == "Base64 decode" }, "no false base64")
     // Meetings
-    assert(meetingLink([nil, "Ruang 3", "Join: https://bri.zoom.us/j/123456?pwd=x\nPasscode"])?.absoluteString == "https://bri.zoom.us/j/123456?pwd=x", "zoom link")
+    assert(meetingLink([nil, "Ruang 3", "Join: https://acme.zoom.us/j/123456?pwd=x\nPasscode"])?.absoluteString == "https://acme.zoom.us/j/123456?pwd=x", "zoom link")
     assert(meetingLink(["https://meet.google.com/abc-defg-hij"])?.host == "meet.google.com" && meetingLink(["https://example.com"]) == nil, "meet link")
     let now = Date(), mt = Meeting(title: "Standup", start: now.addingTimeInterval(299), end: now.addingTimeInterval(1200), link: nil, color: nil)
     assert(mt.when(now) == "5m lagi" && mt.isSoon(now) && !Meeting(title: "x", start: now.addingTimeInterval(3600), end: now.addingTimeInterval(4000), link: nil, color: nil).isSoon(now), "meeting timing")
