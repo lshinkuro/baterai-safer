@@ -250,9 +250,9 @@ final class AIModel: ObservableObject {
     func stop() { proc?.terminate() }
     func reset() { stop(); chat = [] }
 
-    /// Single question outside the chat; prefers Claude, whose tool isolation is verified.
-    func oneShot(_ prompt: String, done: @escaping (Bool, String) -> Void) {
-        guard let cli = clis.first(where: { $0.name == "Claude" }) ?? clis.first else { done(false, "Tidak ada CLI AI"); return }
+    /// Single question outside the chat; defaults to Claude, whose tool isolation is verified.
+    func oneShot(_ prompt: String, cli name: String = "Claude", done: @escaping (Bool, String) -> Void) {
+        guard let cli = clis.first(where: { $0.name == name }) ?? clis.first(where: { $0.name == "Claude" }) ?? clis.first else { done(false, "Tidak ada CLI AI"); return }
         try? FileManager.default.createDirectory(atPath: Self.cwd, withIntermediateDirectories: true)
         runAsync(cli.exe, cli.args(prompt, false), cwd: Self.cwd) { code, out, err in
             let answer = stripANSI(out).trimmingCharacters(in: .whitespacesAndNewlines)

@@ -122,5 +122,12 @@ func selfTest() {
     let du = parseDu("100\t/h/a\n300\t/h/b c\n400\t/h\n", parent: "/h")
     assert(du.map(\.url.path) == ["/h/b c", "/h/a"] && du[0].size == 300 * 1024, "du parse")
     assert(isProtected(NSHomeDirectory() + "/Library/Caches") && isProtected(NSHomeDirectory()) && !isProtected(NSHomeDirectory() + "/Library/Caches/x"), "protected paths")
+    assert(changedFiles("diff --git a/x.swift b/x.swift\n+a\ndiff --git a/old b/src/new.ts\n") == ["x.swift", "src/new.ts"], "changed files")
+    let sq = sonarIssues(Data(#"{"issues":[{"rule":"swift:S1172","severity":"MAJOR","component":"p:ios/App/Login.swift","line":12,"message":"Remove unused"},{"rule":"ts:S1","severity":"MINOR","component":"p:web/a.ts","message":"m"}]}"#.utf8), files: ["App/Login.swift"])
+    assert(sq == ["- [MAJOR] swift:S1172 ios/App/Login.swift:12 — Remove unused"], "sonar issues filtered to changed files")
+    assert(sonarLanguage("TSX") == "ts" && sonarLanguage("swift") == "swift" && sonarLanguage("png") == nil)
+    let rp = reviewPrompt(pr, PRDetail(), diff: "d", guides: "=== api-guide.md ===\nx", sonar: "Temuan SonarQube: y")
+    assert(rp.contains("PANDUAN TIM") && rp.contains("SONARQUBE") && rp.contains("[sonar]"), "prompt includes context")
+    assert(!reviewPrompt(pr, PRDetail(), diff: "d").contains("PANDUAN TIM"), "no empty sections")
     print("selftest ok")
 }

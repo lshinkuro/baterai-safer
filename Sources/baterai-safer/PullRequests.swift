@@ -70,7 +70,7 @@ func diffStats(_ diff: String) -> (Int, Int, Int) {
     return (a, d, f)
 }
 
-func reviewPrompt(_ pr: PR, _ d: PRDetail, diff: String) -> String {
+func reviewPrompt(_ pr: PR, _ d: PRDetail, diff: String, guides: String = "", sonar: String = "") -> String {
     let limit = 60_000
     let cut = diff.count > limit
     return """
@@ -82,12 +82,16 @@ func reviewPrompt(_ pr: PR, _ d: PRDetail, diff: String) -> String {
     **Masalah** — daftar bug, risiko keamanan, atau logika salah; sebut file dan baris, beri label [penting]/[minor]. Tulis "Tidak ada" bila bersih.
     **Saran** — perbaikan opsional yang benar-benar berguna.
     **Kesimpulan** — Approve / Perlu perubahan, satu kalimat alasannya.
+    \(guides.isEmpty ? "" : "\nPanduan tim di bawah adalah standar wajib: nilai PR terhadapnya dan sebut nama file panduan saat ada pelanggaran.")
+    \(sonar.isEmpty ? "" : "Masukkan temuan SonarQube yang relevan ke bagian Masalah dengan label [sonar] beserta kunci aturannya; cek juga aturan aktif yang dilanggar diff.")
 
     PR #\(pr.number) di \(pr.repo): \(pr.title)
     Branch: \(d.head) → \(d.base), +\(d.additions) −\(d.deletions), \(d.changedFiles) file
     Deskripsi:
     \(d.body.isEmpty ? "(kosong)" : d.body)
 
+    \(guides.isEmpty ? "" : "PANDUAN TIM:\n\(guides)")
+    \(sonar.isEmpty ? "" : "SONARQUBE:\n\(sonar)")
     Diff\(cut ? " (DIPOTONG: hanya \(limit) karakter pertama dari \(diff.count); sebutkan bahwa review tidak lengkap)" : ""):
     \(diff.prefix(limit))
     """
@@ -212,6 +216,11 @@ final class PRModel: ObservableObject {
     @Published var reviewing = false
     @Published var message = ""
     @Published var bitbucketConnected = Bitbucket.connected
+    @Published var sonarConnected = Sonar.connected
+    @Published var reviewCLI = UserDefaults.standard.string(forKey: "reviewCLI") ?? "Claude" {
+        didSet { UserDefaults.standard.set(reviewCLI, forKey: "reviewCLI") }
+    }
+    @Published var contextNote = ""   // what went into the last review
     private var diff = ""             // Bitbucket diff fetched with the detail
     let gh = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"].first(where: FileManager.default.isExecutableFile)
 
@@ -316,15 +325,30 @@ final class PRModel: ObservableObject {
         }
     }
 
-    func aiReview(_ ai: AIModel) {
+    func aiReview(_ ai: AIModel, repos: [String]) {
         guard let pr = selected, let d = detail else { return }
         reviewing = true
         review = ""
+        contextNote = ""
+        let cli = reviewCLI
         let run = { (diff: String) in
-            ai.oneShot(reviewPrompt(pr, d, diff: diff)) { ok, text in
-                guard self.selected == pr else { return }
-                self.reviewing = false
-                if ok { self.review = text } else { self.message = text }
+            let guides = Guides.text(pr.repo)
+            let ask = { (sonar: String, note: String) in
+                let n = Guides.files(pr.repo).count
+                self.contextNote = ([cli] + (n > 0 ? ["\(n) panduan"] : []) + (note.isEmpty ? [] : [note])).joined(separator: " · ")
+                ai.oneShot(reviewPrompt(pr, d, diff: diff, guides: guides, sonar: sonar), cli: cli) { ok, text in
+                    guard self.selected == pr else { return }
+                    self.reviewing = false
+                    if ok { self.review = text } else { self.message = text }
+                }
+            }
+            if Sonar.connected, let key = Sonar.projectKey(pr, repos: repos) {
+                Sonar.context(key: key, pr: pr, head: d.head, files: changedFiles(diff)) { text, note in
+                    guard self.selected == pr else { return }
+                    ask(text, note)
+                }
+            } else {
+                ask("", Sonar.connected ? "Sonar: project key belum diatur" : "")
             }
         }
         if pr.host == .bitbucket { run(diff); return }

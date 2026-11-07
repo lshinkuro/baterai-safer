@@ -754,7 +754,7 @@ struct GitView: View {
     let ai: AIModel
     @AppStorage("gitPane") private var showPR = false
     @State private var composing: Repo?
-    @State private var connecting = false
+    @State private var connecting: String? // "bitbucket" / "sonar"
 
     var body: some View {
         VStack(spacing: 10) {
@@ -774,7 +774,7 @@ struct GitView: View {
                         } label: { Label("Bitbucket", systemImage: "checkmark.circle.fill") }
                             .menuStyle(.borderlessButton).fixedSize().font(.system(size: 11, weight: .semibold))
                     } else {
-                        NButton(icon: "link", title: "Bitbucket") { connecting.toggle() }
+                        NButton(icon: "link", title: "Bitbucket") { connecting = "bitbucket" }
                     }
                     NButton(icon: "arrow.clockwise") { pr.refresh(repos: g.repos.map(\.path)) }.help("Muat ulang PR")
                 } else {
@@ -783,10 +783,20 @@ struct GitView: View {
                 }
             }
             if showPR {
-                if connecting {
-                    BitbucketConnect { connecting = false; pr.bitbucketConnected = true; pr.refresh(repos: g.repos.map(\.path)) }
+                if connecting == "bitbucket" {
+                    ConnectForm(title: "Hubungkan Bitbucket Server",
+                                help: "Buat HTTP access token di Bitbucket: avatar → Manage account → HTTP access tokens, izin Repository: Write (komentar, approve, merge). Token disimpan di Keychain.",
+                                placeholder: "https://bitbucket.perusahaan.com", connect: Bitbucket.connect,
+                                done: { connecting = nil; pr.bitbucketConnected = Bitbucket.connected; pr.refresh(repos: g.repos.map(\.path)) },
+                                url: Bitbucket.base ?? "https://bitbucket.bri.co.id")
+                } else if connecting == "sonar" {
+                    ConnectForm(title: "Hubungkan SonarQube",
+                                help: "Buat user token di SonarQube: avatar → My Account → Security → Generate Token (tipe User). Dipakai hanya untuk membaca temuan & aturan. Token disimpan di Keychain.",
+                                placeholder: "https://sonarqube.perusahaan.com", connect: Sonar.connect,
+                                done: { connecting = nil; pr.sonarConnected = Sonar.connected },
+                                url: Sonar.base ?? "https://sonarqube-enterprise.bri.co.id")
                 } else {
-                    PRPane(pr: pr, ai: ai)
+                    PRPane(pr: pr, ai: ai, repos: g.repos.map(\.path)) { connecting = "sonar" }
                 }
             } else if let r = composing {
                 CommitPane(g: g, ai: ai, repo: r) { composing = nil }
@@ -871,6 +881,8 @@ struct GitView: View {
 struct PRPane: View {
     @ObservedObject var pr: PRModel
     let ai: AIModel
+    let repos: [String]
+    let connectSonar: () -> Void
     @State private var editing = false
 
     var body: some View {
@@ -964,8 +976,10 @@ struct PRPane: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if pr.review.isEmpty {
             VStack(spacing: 8) {
-                NButton(icon: "sparkles", title: "Review dengan AI", tint: .purple, prominent: true) { pr.aiReview(ai) }
-                Text("Diff dikirim ke AI tanpa akses tool apa pun").font(.system(size: 9.5)).foregroundStyle(.gray)
+                contextBar(p)
+                NButton(icon: "sparkles", title: "Review dengan \(pr.reviewCLI)", tint: .purple, prominent: true) { pr.aiReview(ai, repos: repos) }
+                Text(pr.reviewCLI == "Claude" ? "Diff dikirim ke Claude tanpa akses tool apa pun" : "Kiro tidak diberi izin tool, tapi isolasinya belum dicek seketat Claude")
+                    .font(.system(size: 9.5)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -992,6 +1006,7 @@ struct PRPane: View {
                     .menuStyle(.borderlessButton).fixedSize()
                     .font(.system(size: 11, weight: .semibold))
                 Spacer()
+                if !pr.contextNote.isEmpty { Text(pr.contextNote).font(.system(size: 9.5)).foregroundStyle(.gray).lineLimit(1) }
                 NButton(icon: editing ? "checkmark" : "pencil") { editing.toggle() }.help(editing ? "Selesai mengedit" : "Edit review")
                 NButton(icon: "doc.on.doc") { copyText(pr.review) }.help("Salin review")
                 Menu {
@@ -1008,6 +1023,49 @@ struct PRPane: View {
                     .help(!d.canMerge ? "PR belum bisa di-merge" : d.checks == "fail" ? "CI gagal" : "Merge PR")
             }
         }
+    }
+
+    /// What goes into the review: which AI, team guides, SonarQube.
+    func contextBar(_ p: PR) -> some View {
+        let guides = Guides.files(p.repo)
+        let key = Sonar.projectKey(p, repos: repos)
+        return HStack(spacing: 6) {
+            Menu {
+                ForEach(ai.clis, id: \.name) { c in
+                    Button { pr.reviewCLI = c.name } label: { Label(c.name, systemImage: pr.reviewCLI == c.name ? "checkmark" : "") }
+                }
+            } label: { Label(pr.reviewCLI, systemImage: "sparkles") }
+                .menuStyle(.borderlessButton).fixedSize()
+            Menu {
+                ForEach(guides, id: \.self) { f in
+                    Button { Guides.set(p.repo, guides.filter { $0 != f }); pr.objectWillChange.send() } label: { Label((f as NSString).lastPathComponent, systemImage: "xmark") }
+                }
+                if !guides.isEmpty { Divider() }
+                Button("Tambah file panduan / aturan…") {
+                    let slug = (p.repo.components(separatedBy: "/").last ?? "").lowercased()
+                    Guides.add(p.repo, near: repos.first { ($0 as NSString).lastPathComponent.lowercased() == slug })
+                    pr.objectWillChange.send()
+                }
+            } label: { Label(guides.isEmpty ? "Panduan" : "Panduan (\(guides.count))", systemImage: "books.vertical") }
+                .menuStyle(.borderlessButton).fixedSize()
+            if pr.sonarConnected {
+                Menu {
+                    Text(key.map { "Project: \($0)" } ?? "Project key belum diatur")
+                    Button("Ubah project key…") {
+                        if let k = ask("Project key SonarQube", "Untuk \(p.repo). Lihat sonar.projectKey di sonar-project.properties.", key ?? "") {
+                            Sonar.setProjectKey(p, k.isEmpty ? nil : k); pr.objectWillChange.send()
+                        }
+                    }
+                    Divider()
+                    Button("Putuskan SonarQube") { Sonar.disconnect(); pr.sonarConnected = false }
+                } label: { Label(key == nil ? "Sonar ?" : "Sonar", systemImage: key == nil ? "exclamationmark.circle" : "checkmark.shield") }
+                    .menuStyle(.borderlessButton).fixedSize()
+            } else {
+                Button { connectSonar() } label: { Label("Sonar", systemImage: "link") }.buttonStyle(.plain)
+            }
+        }
+        .font(.system(size: 10.5, weight: .semibold))
+        .foregroundStyle(.white.opacity(0.85))
     }
 
     func send(_ p: PR, _ event: String, _ label: String) {
@@ -1102,9 +1160,12 @@ struct CommitPane: View {
     }
 }
 
-struct BitbucketConnect: View {
+/// URL + token form; `connect` verifies before anything is stored.
+struct ConnectForm: View {
+    let title: String, help: String, placeholder: String
+    let connect: (String, String, @escaping (Bool, String) -> Void) -> Void
     let done: () -> Void
-    @State private var url = Bitbucket.base ?? "https://bitbucket.bri.co.id"
+    @State var url: String
     @State private var token = ""
     @State private var status = ""
     @State private var busy = false
@@ -1112,19 +1173,19 @@ struct BitbucketConnect: View {
     var body: some View {
         NCard {
             VStack(alignment: .leading, spacing: 9) {
-                Label("Hubungkan Bitbucket Server", systemImage: "link").font(.system(size: 13, weight: .bold))
-                Text("Buat HTTP access token di Bitbucket: avatar → Manage account → HTTP access tokens, izin Repository: Write (untuk komentar, approve, merge). Token disimpan di Keychain.")
-                    .font(.system(size: 10.5)).foregroundStyle(.gray).fixedSize(horizontal: false, vertical: true)
-                field("globe", TextField("https://bitbucket.perusahaan.com", text: $url))
-                field("key.fill", SecureField("HTTP access token", text: $token))
+                Label(title, systemImage: "link").font(.system(size: 13, weight: .bold))
+                Text(help).font(.system(size: 10.5)).foregroundStyle(.gray).fixedSize(horizontal: false, vertical: true)
+                field("globe", TextField(placeholder, text: $url))
+                field("key.fill", SecureField("Token", text: $token))
                 HStack {
                     if !status.isEmpty { Text(status).font(.system(size: 10.5)).foregroundStyle(status.hasPrefix("Terhubung") ? .green : .red).lineLimit(2) }
                     Spacer()
                     if busy { ProgressView().controlSize(.small) }
+                    NButton(icon: "xmark", title: "Batal") { done() }
                     NButton(icon: "checkmark", title: "Simpan & tes", tint: .blue, prominent: true) {
                         busy = true
                         status = ""
-                        Bitbucket.connect(base: url, token: token.trimmingCharacters(in: .whitespacesAndNewlines)) { ok, msg in
+                        connect(url, token.trimmingCharacters(in: .whitespacesAndNewlines)) { ok, msg in
                             busy = false
                             status = msg
                             if ok { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { done() } }
