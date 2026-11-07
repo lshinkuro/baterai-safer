@@ -64,12 +64,12 @@ func confirm(_ title: String, _ info: String, _ button: String) -> Bool {
 final class CleanerModel: ObservableObject {
     @Published var junk: [Junk] = {
         let h = NSHomeDirectory()
-        return [Junk(title: "Cache aplikasi", icon: "shippingbox.fill", color: .blue, path: h + "/Library/Caches"),
-                Junk(title: "Log", icon: "doc.text.fill", color: .gray, path: h + "/Library/Logs"),
-                Junk(title: "Xcode DerivedData", icon: "hammer.fill", color: .cyan, path: h + "/Library/Developer/Xcode/DerivedData"),
-                Junk(title: "iOS DeviceSupport", icon: "iphone", color: .indigo, path: h + "/Library/Developer/Xcode/iOS DeviceSupport"),
-                Junk(title: "Cache npm", icon: "shippingbox.circle.fill", color: .red, path: h + "/.npm/_cacache"),
-                Junk(title: "Sampah (Trash)", icon: "trash.fill", color: .red, path: h + "/.Trash")]
+        return [Junk(title: "Cache aplikasi", icon: "shippingbox.fill", color: Palette.blue, path: h + "/Library/Caches"),
+                Junk(title: "Log", icon: "doc.text.fill", color: Palette.slate, path: h + "/Library/Logs"),
+                Junk(title: "Xcode DerivedData", icon: "hammer.fill", color: Palette.sky, path: h + "/Library/Developer/Xcode/DerivedData"),
+                Junk(title: "iOS DeviceSupport", icon: "iphone", color: Palette.indigo, path: h + "/Library/Developer/Xcode/iOS DeviceSupport"),
+                Junk(title: "Cache npm", icon: "shippingbox.circle.fill", color: Palette.red, path: h + "/.npm/_cacache"),
+                Junk(title: "Sampah (Trash)", icon: "trash.fill", color: Palette.red, path: h + "/.Trash")]
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }()
     @Published var apps: [AppItem] = []
@@ -201,18 +201,20 @@ struct CleanerTab: View {
     var body: some View {
         let total = c.junk.compactMap(\.size).reduce(0, +), scanning = c.junk.contains { $0.size == nil }
         VStack(spacing: 12) {
-            Card {
-                HStack(spacing: 14) {
-                    Image(systemName: "sparkles").font(.system(size: 24, weight: .semibold)).foregroundStyle(.white)
-                        .frame(width: 52, height: 52)
-                        .background(LinearGradient(colors: [.purple, .pink], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            Hero {
+                HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(scanning ? "Memindai…" : bytes(total)).font(.system(size: 24, weight: .bold, design: .rounded)).monospacedDigit()
-                        Text("file sampah bisa dibersihkan").font(.caption).foregroundStyle(.secondary)
+                        Label("Bisa dibersihkan", systemImage: "sparkles").font(.system(size: 12, weight: .bold, design: .rounded)).opacity(0.85)
+                        Text(scanning ? "Memindai…" : bytes(total)).font(.system(size: 40, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .contentTransition(.numericText())
+                        Text("cache, log, dan sisa build").font(.system(size: 12, weight: .semibold)).opacity(0.8)
                     }
                     Spacer()
-                    Button { c.scan() } label: { Image(systemName: "arrow.clockwise") }
-                        .help("Pindai ulang").disabled(scanning)
+                    Button { c.scan() } label: {
+                        Image(systemName: "arrow.clockwise").font(.system(size: 15, weight: .heavy))
+                            .frame(width: 42, height: 42).background(.white.opacity(0.22), in: Circle())
+                    }
+                    .buttonStyle(.plain).help("Pindai ulang").disabled(scanning)
                 }
             }
 
@@ -237,7 +239,7 @@ struct CleanerTab: View {
 
             Card(title: "Simulator iOS", icon: "iphone.gen3") {
                 HStack(spacing: 10) {
-                    IconBadge(icon: "iphone.gen3", color: .teal)
+                    IconBadge(icon: "iphone.gen3", color: Palette.teal)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Simulator tak terpakai")
                         Text("Simulator yang runtime-nya sudah tidak terpasang").font(.caption2).foregroundStyle(.secondary)
@@ -312,16 +314,18 @@ struct DiskAnalyzer: View {
                 Text("Menghitung ukuran folder… (folder rumah bisa sekitar 1 menit)").font(.caption).foregroundStyle(.secondary)
             }
             VStack(spacing: 0) {
-                ForEach(c.folders.prefix(12)) { item in
-                    SizedRow(item: item, fraction: item.size / top, drill: { c.analyze(item.url.path) }, trash: trashAction(item))
+                ForEach(Array(c.folders.prefix(12).enumerated()), id: \.element.id) { i, item in
+                    SizedRow(item: item, fraction: item.size / top, color: Palette.cycle[i % Palette.cycle.count],
+                             drill: { c.analyze(item.url.path) }, trash: trashAction(item))
                 }
             }
             if !c.bigFiles.isEmpty {
                 Divider()
-                Text("FILE > 200 MB (SPOTLIGHT)").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(.secondary)
+                Text("File di atas 200 MB").font(.system(size: 12, weight: .bold, design: .rounded))
                 VStack(spacing: 0) {
-                    ForEach(c.bigFiles) { item in
-                        SizedRow(item: item, fraction: item.size / (c.bigFiles.first?.size ?? 1), drill: nil, trash: trashAction(item))
+                    ForEach(Array(c.bigFiles.enumerated()), id: \.element.id) { i, item in
+                        SizedRow(item: item, fraction: item.size / (c.bigFiles.first?.size ?? 1), color: Palette.cycle[(i + 3) % Palette.cycle.count],
+                                 drill: nil, trash: trashAction(item))
                     }
                 }
             }
@@ -339,6 +343,7 @@ struct DiskAnalyzer: View {
 struct SizedRow: View {
     let item: Sized
     let fraction: Double
+    let color: Color
     let drill: (() -> Void)?
     let trash: (() -> Void)?
 
@@ -350,9 +355,13 @@ struct SizedRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.url.lastPathComponent).lineLimit(1).truncationMode(.middle)
                     GeometryReader { g in
-                        Capsule().fill(level(fraction * 0.9).gradient).frame(width: max(3, g.size.width * fraction))
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(color.opacity(0.15))
+                            Capsule().fill(LinearGradient(colors: [color.opacity(0.7), color], startPoint: .leading, endPoint: .trailing))
+                                .frame(width: max(6, g.size.width * fraction))
+                        }
                     }
-                    .frame(height: 4)
+                    .frame(height: 6)
                 }
                 Text(bytes(item.size)).font(.system(.caption, design: .rounded).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
                     .frame(width: 64, alignment: .trailing)

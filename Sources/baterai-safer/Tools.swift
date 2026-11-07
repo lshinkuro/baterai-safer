@@ -45,36 +45,47 @@ struct ToolsTab: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Card(title: "Mode", icon: "switch.2") {
-                HStack(spacing: 8) {
-                    ToggleTile(title: "Notch", icon: "rectangle.topthird.inset.filled", color: .purple, on: $t.notch)
-                    ToggleTile(title: "Tetap menyala", icon: "cup.and.saucer.fill", color: .orange, on: $t.awake)
-                    ToggleTile(title: "File tersembunyi", icon: "eye.fill", color: .blue, on: $t.hiddenFiles)
-                    ToggleTile(title: "Ikon desktop", icon: "menubar.dock.rectangle", color: .green, on: $t.desktopIcons)
-                }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ToggleTile(title: "Notch", icon: "rectangle.topthird.inset.filled", theme: .violet, on: $t.notch)
+                ToggleTile(title: "Tetap menyala", icon: "cup.and.saucer.fill", theme: .amber, on: $t.awake)
+                ToggleTile(title: "File tersembunyi", icon: "eye.fill", theme: .electric, on: $t.hiddenFiles)
+                ToggleTile(title: "Ikon desktop", icon: "menubar.dock.rectangle", theme: .mint, on: $t.desktopIcons)
             }
-            Card(title: "Shortcut notch", icon: "keyboard") {
-                ForEach(HotKeys.bindings, id: \.1) { b in
-                    HStack {
-                        Text(b.2?.title ?? "Buka / tutup notch")
-                        Spacer()
-                        Text(b.1).font(.system(.callout, design: .rounded).weight(.semibold))
-                            .padding(.horizontal, 8).padding(.vertical, 2)
-                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
-                    }
-                }
-                Text("Esc menutup notch.").font(.caption).foregroundStyle(.secondary)
-            }
-            Card(title: "Aksi cepat", icon: "bolt") {
+            Card(title: "Aksi cepat", icon: "bolt.fill") {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    Action(title: "Dark / Light", icon: "circle.lefthalf.filled", color: .indigo) { t.toggleDarkMode() }
-                    Action(title: "Matikan layar", icon: "display", color: .gray) { t.sleepDisplay() }
-                    Action(title: "Screenshot area", icon: "camera.viewfinder", color: .pink) { t.screenshot() }
-                    Action(title: "Activity Monitor", icon: "waveform.path.ecg", color: .green) {
+                    Action(title: "Dark / Light", icon: "circle.lefthalf.filled", color: Palette.indigo) { t.toggleDarkMode() }
+                    Action(title: "Matikan layar", icon: "display", color: Palette.slate) { t.sleepDisplay() }
+                    Action(title: "Screenshot", icon: "camera.viewfinder", color: Palette.pink) { t.screenshot() }
+                    Action(title: "Activity Monitor", icon: "waveform.path.ecg", color: Palette.green) {
                         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
                     }
                 }
             }
+            Card(title: "Shortcut notch", icon: "command") {
+                ForEach(Array(HotKeys.bindings.enumerated()), id: \.offset) { i, b in
+                    HStack {
+                        Circle().fill(Palette.cycle[i % Palette.cycle.count]).frame(width: 7, height: 7)
+                        Text(b.2?.title ?? "Buka / tutup notch").font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Keycap(b.1)
+                    }
+                }
+                Text("Esc menutup notch").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
         }
+    }
+}
+
+struct Keycap: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text).font(.system(size: 12, weight: .bold, design: .rounded))
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.12)).frame(height: 2).padding(.horizontal, 1)
+            }
     }
 }

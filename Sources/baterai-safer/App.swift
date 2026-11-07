@@ -90,22 +90,25 @@ struct Panel: View {
     @AppStorage("tab") private var tab = 0
 
     var body: some View {
+        let theme = (Tab(rawValue: tab) ?? .battery).theme
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                IconBadge(icon: "bolt.shield.fill", color: .green, size: 26)
-                Text("Baterai Safer").font(.system(size: 14, weight: .bold))
+            HStack(spacing: 10) {
+                IconBadge(icon: "bolt.shield.fill", color: Palette.green, size: 30)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Baterai Safer").font(.system(size: 15, weight: .heavy, design: .rounded))
+                    Text("\(m.battery.percent)% · \(m.battery.ac ? "dicas" : "pakai baterai")").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button { NSApp.terminate(nil) } label: {
-                    Image(systemName: "power").font(.system(size: 11, weight: .bold))
-                        .frame(width: 24, height: 24)
-                        .background(Color.primary.opacity(0.08), in: Circle())
+                    Image(systemName: "power").font(.system(size: 11, weight: .heavy))
+                        .frame(width: 28, height: 28)
+                        .background(Color.primary.opacity(0.07), in: Circle())
                 }
                 .buttonStyle(.plain).help("Keluar")
             }
             .padding(.horizontal, 16).padding(.top, 14)
 
-            TabBar(tab: $tab).padding(.horizontal, 16).padding(.vertical, 12)
-            Divider()
+            TabBar(tab: $tab).padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
 
             // Fixed panel size: the menu bar window doesn't resize cleanly between tabs of different heights.
             ScrollView {
@@ -123,6 +126,14 @@ struct Panel: View {
             .transition(.opacity)
         }
         .frame(width: 400, height: 620)
+        .background(alignment: .top) {
+            // The active tab's color glows behind the header.
+            RadialGradient(colors: [theme.a.opacity(0.4), theme.b.opacity(0.12), .clear], center: .top, startRadius: 0, endRadius: 330)
+                .frame(height: 330)
+                .allowsHitTesting(false)
+                .animation(.easeInOut(duration: 0.4), value: tab)
+        }
+        .environment(\.accent, theme)
     }
 }
 
@@ -143,11 +154,11 @@ struct BatteryTab: View {
         return s.charging ? "Mengisi" : "Ditahan di batas"
     }
 
-    var tint: Color {
+    var heroTheme: Theme {
         let b = m.battery
-        if b.percent <= 20 && !b.ac { return .red }
-        if m.status.charging && b.ac { return .green }
-        return b.ac ? .blue : .orange
+        if b.percent <= 20 && !b.ac { return .rose }
+        if m.status.charging && b.ac { return .mint }
+        return b.ac ? .electric : .amber
     }
 
     var limit: Int? { m.helperInstalled && m.config.enabled ? m.config.limit : nil }
@@ -155,32 +166,38 @@ struct BatteryTab: View {
     var body: some View {
         let b = m.battery
         VStack(spacing: 12) {
-            Card {
-                HStack(spacing: 16) {
-                    Ring(value: Double(b.percent) / 100, color: tint, label: "\(b.percent)%", caption: limit.map { "batas \($0)%" },
-                         size: 96, line: 10, marker: limit.map { Double($0) / 100 })
-                    VStack(alignment: .leading, spacing: 6) {
-                        StatusPill(text: stateText, color: tint)
-                        if let t = b.minutesLeft {
-                            Text("\(t / 60)j \(t % 60)m").font(.system(size: 22, weight: .bold, design: .rounded)).monospacedDigit()
-                            Text(b.charging ? "sampai penuh" : "tersisa").font(.caption).foregroundStyle(.secondary)
-                        } else {
-                            Text("\(b.maxCapacity * b.percent / 100) mAh").font(.system(size: 22, weight: .bold, design: .rounded)).monospacedDigit()
-                            Text("kapasitas saat ini").font(.caption).foregroundStyle(.secondary)
+            Hero(theme: heroTheme) {
+                HStack(alignment: .center, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        StatusPill(text: stateText)
+                        HStack(alignment: .firstTextBaseline, spacing: 1) {
+                            Text("\(b.percent)").font(.system(size: 62, weight: .heavy, design: .rounded)).monospacedDigit()
+                            Text("%").font(.system(size: 26, weight: .heavy, design: .rounded)).opacity(0.75)
                         }
+                        .contentTransition(.numericText())
+                        Group {
+                            if let t = b.minutesLeft {
+                                Text("\(t / 60)j \(t % 60)m \(b.charging ? "sampai penuh" : "tersisa")")
+                            } else {
+                                Text("\(b.maxCapacity * b.percent / 100) mAh tersimpan")
+                            }
+                        }
+                        .font(.system(size: 13, weight: .bold, design: .rounded)).opacity(0.9)
                         if let a = b.adapterName {
-                            Label(a, systemImage: "powerplug.fill").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            Label(a, systemImage: "powerplug.fill").font(.system(size: 11, weight: .semibold)).opacity(0.75).lineLimit(1)
                         }
                     }
                     Spacer(minLength: 0)
+                    BatteryGlyph(level: Double(b.percent) / 100, limit: limit.map { Double($0) / 100 }, charging: m.status.charging && b.ac)
+                        .padding(.trailing, 10)
                 }
             }
 
             HStack(spacing: 8) {
-                Tile(icon: "heart.fill", title: "Kondisi", value: "\(b.health)%", color: .pink, help: "\(b.maxCapacity)/\(b.designCapacity) mAh")
-                Tile(icon: "arrow.triangle.2.circlepath", title: "Siklus", value: "\(b.cycles)", color: .blue)
-                Tile(icon: "thermometer.medium", title: "Suhu", value: b.temp.map { String(format: "%.1f°", $0) } ?? "–", color: .orange)
-                Tile(icon: "bolt.fill", title: "Daya", value: String(format: "%+.1fW", b.watts), color: .yellow)
+                Tile(icon: "heart.fill", title: "Kondisi", value: "\(b.health)%", color: Palette.pink, help: "\(b.maxCapacity)/\(b.designCapacity) mAh")
+                Tile(icon: "arrow.triangle.2.circlepath", title: "Siklus", value: "\(b.cycles)", color: Palette.blue)
+                Tile(icon: "thermometer.medium", title: "Suhu", value: b.temp.map { String(format: "%.1f°", $0) } ?? "–", color: Palette.orange)
+                Tile(icon: "bolt.fill", title: "Daya", value: String(format: "%+.1fW", b.watts), color: Palette.amber)
             }
 
             Card(title: "Riwayat", icon: "chart.xyaxis.line") {
@@ -194,9 +211,9 @@ struct BatteryTab: View {
                 }
             } else {
                 Card(title: "Pengisian", icon: "bolt.batteryblock") {
-                    Switch("Aktifkan limiter", "battery.100percent", $m.config.enabled, color: .green)
+                    Switch("Aktifkan limiter", "battery.100percent", $m.config.enabled, color: Palette.green)
                     HStack(spacing: 10) {
-                        IconBadge(icon: "slider.horizontal.3", color: .blue)
+                        IconBadge(icon: "slider.horizontal.3", color: Palette.blue)
                         Text("Batas")
                         Slider(value: Binding(get: { Double(m.config.limit) }, set: { m.config.limit = Int($0) }),
                                in: SMC.canInhibit ? 50...100 : 80...100, step: 5)
@@ -206,26 +223,26 @@ struct BatteryTab: View {
                     }
                     if SMC.canInhibit {
                         HStack(spacing: 10) {
-                            IconBadge(icon: "water.waves", color: .teal)
+                            IconBadge(icon: "water.waves", color: Palette.teal)
                             Stepper("Sailing \(m.config.limit - m.config.sailing)–\(m.config.limit)%", value: $m.config.sailing, in: 0...20)
                         }
                     } else {
                         Text("macOS 27: memakai Charge Limit bawaan (80–100%)").font(.caption).foregroundStyle(.secondary)
                     }
-                    Switch("Top up ke 100% (sementara)", "arrow.up.to.line", $m.config.topUp, color: .mint)
-                    Switch("Auto discharge ke batas", "arrow.down.to.line", $m.config.autoDischarge, color: .purple)
+                    Switch("Top up ke 100% (sementara)", "arrow.up.to.line", $m.config.topUp, color: Palette.teal)
+                    Switch("Auto discharge ke batas", "arrow.down.to.line", $m.config.autoDischarge, color: Palette.violet)
                 }
                 Card(title: "Proteksi", icon: "shield.lefthalf.filled") {
-                    Switch(SMC.canInhibit ? "Heat protection" : "Heat protection (putus charger)", "flame.fill", $m.config.heatProtection, color: .red)
+                    Switch(SMC.canInhibit ? "Heat protection" : "Heat protection (putus charger)", "flame.fill", $m.config.heatProtection, color: Palette.red)
                     if m.config.heatProtection {
                         HStack(spacing: 10) {
-                            IconBadge(icon: "thermometer.high", color: .orange)
+                            IconBadge(icon: "thermometer.high", color: Palette.orange)
                             Stepper(String(format: "Berhenti di ≥ %.0f °C", m.config.maxTemp), value: $m.config.maxTemp, in: 30...45)
                         }
                     }
-                    Switch("Hentikan pengisian saat sleep", "moon.fill", $m.config.stopOnSleep, color: .indigo)
+                    Switch("Hentikan pengisian saat sleep", "moon.fill", $m.config.stopOnSleep, color: Palette.indigo)
                     HStack(spacing: 10) {
-                        IconBadge(icon: "gauge.with.needle", color: .gray)
+                        IconBadge(icon: "gauge.with.needle", color: Palette.slate)
                         Text("Kalibrasi 100 → 10 → 100%")
                         Spacer()
                         if m.status.calibration == 0 {
@@ -255,7 +272,7 @@ struct HistoryChart: View {
     @Local private var metric = 0
     @Local private var hours = 6
 
-    let metrics = [("Baterai", "%", Color.green), ("Suhu", "°", Color.orange), ("Daya", "W", Color.blue)]
+    let metrics = [("Baterai", "%", Palette.green), ("Suhu", "°", Palette.orange), ("Daya", "W", Palette.blue)]
 
     func value(_ s: Sample) -> Double? { [Double(s.percent), s.temp, s.watts][metric] }
 

@@ -5,7 +5,8 @@ enum NTab: Int, CaseIterable {
     case music, focus, ai, clipboard, shelf, git, stats
     var icon: String { ["music.note", "timer", "sparkles", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium"][rawValue] }
     var title: String { ["Musik", "Fokus", "AI", "Clipboard", "Shelf", "Git", "Stats"][rawValue] }
-    var color: Color { [Color.pink, .orange, .purple, .teal, .blue, .indigo, .green][rawValue] }
+    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.teal, Palette.blue, Palette.indigo, Palette.green][rawValue] }
+    var theme: Theme { [Theme.violet, .amber, .violet, .mint, .electric, .electric, .mint][rawValue] }
 }
 
 final class NotchState: ObservableObject {
@@ -143,6 +144,7 @@ struct NotchShape: Shape {
 // MARK: Island building blocks (always dark)
 
 struct NCard<Content: View>: View {
+    @Environment(\.accent) private var accent
     var padding: CGFloat = 12
     @ViewBuilder let content: Content
 
@@ -150,8 +152,8 @@ struct NCard<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(0.07)))
+            .background(LinearGradient(colors: [accent.a.opacity(0.16), accent.b.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -313,11 +315,14 @@ struct NotchView: View {
                     ForEach(NTab.allCases, id: \.self) { t in
                         let on = state.tab == t
                         Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { state.tab = t } } label: {
-                            Image(systemName: t.icon).font(.system(size: 11.5, weight: .semibold))
-                                .foregroundStyle(on ? Color.white : Color.white.opacity(0.45))
+                            Image(systemName: t.icon).font(.system(size: 11.5, weight: .bold))
+                                .foregroundStyle(on ? Color.white : t.color.opacity(0.75))
                                 .frame(width: 26, height: 22)
                                 .background {
-                                    if on { Capsule().fill(t.color.gradient).matchedGeometryEffect(id: "tab", in: ns) }
+                                    if on {
+                                        Capsule().fill(t.theme.gradient).shadow(color: t.color.opacity(0.6), radius: 5)
+                                            .matchedGeometryEffect(id: "tab", in: ns)
+                                    }
                                 }
                                 .contentShape(Rectangle())
                         }
@@ -353,6 +358,13 @@ struct NotchView: View {
             .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16)
         }
         .foregroundStyle(.white)
+        .environment(\.accent, state.tab.theme)
+        .background(alignment: .top) {
+            // Same colored glow as the menu bar panel, keyed to the tab.
+            RadialGradient(colors: [state.tab.color.opacity(0.28), .clear], center: .top, startRadius: 0, endRadius: 300)
+                .allowsHitTesting(false)
+                .animation(.easeInOut(duration: 0.4), value: state.tab)
+        }
     }
 }
 
@@ -727,10 +739,10 @@ struct StatsView: View {
     var body: some View {
         let b = Battery.read(), mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0
         HStack(spacing: 10) {
-            stat("Baterai", "battery.75percent", Double(b.percent) / 100, b.percent <= 20 ? .red : .green, b.ac ? "dicas" : "tidak dicas")
-            stat("CPU", "cpu", s.cpu, level(s.cpu), "\(ProcessInfo.processInfo.activeProcessorCount) core")
-            stat("Memori", "memorychip", mem, level(mem), "\(bytes(s.memTotal - s.memUsed)) sisa")
-            stat("Disk", "internaldrive", disk, level(disk), "\(bytes(s.diskFree)) bebas")
+            stat("Baterai", "battery.75percent", Double(b.percent) / 100, b.percent <= 20 ? Palette.red : Palette.green, b.ac ? "dicas" : "tidak dicas")
+            stat("CPU", "cpu", s.cpu, s.cpu > 0.85 ? Palette.red : Palette.blue, "\(ProcessInfo.processInfo.activeProcessorCount) core")
+            stat("Memori", "memorychip", mem, mem > 0.85 ? Palette.red : Palette.violet, "\(bytes(s.memTotal - s.memUsed)) sisa")
+            stat("Disk", "internaldrive", disk, disk > 0.85 ? Palette.red : Palette.pink, "\(bytes(s.diskFree)) bebas")
         }
         .onAppear { s.start() }
         .onDisappear { s.stop() }
