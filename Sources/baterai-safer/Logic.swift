@@ -198,6 +198,8 @@ func selfTest() {
     assert(pw == [Word(word: "abundant", meaning: "berlimpah", example: "Water is abundant."), Word(word: "precise", meaning: "tepat", example: "Be precise.")], "ai word lines")
     assert(Lang.allCases.allSatisfy { Set($0.starter.map(\.word)).count == $0.starter.count }, "starter decks have no duplicates")
     assert(spokenPart("✏️ I went home. — lampau\nNice! Where?") == "Nice! Where?" && spokenPart("Hola") == "Hola", "spoken part skips correction")
+    assert(spokenPart("✏️ x — y\nいいですね！\n(Ii desu ne!)") == "いいですね！", "spoken part skips romaji line")
+    assert(Lang.allCases.allSatisfy { !$0.title.isEmpty && !$0.testName.isEmpty && !$0.sample.isEmpty }, "every language has its strings")
     let pq = parseQuestions("Here you go:\n\nQ: She ____ to work yesterday.\nA) go\nB) **went**\nC) goes\nD) going\nANSWER: B\nWHY: Lampau.\n\nQ: broken\nA) x\nANSWER: A\n\nq: The data ____ clear.\nA) is\nB) are\nC) be\nD) been\nAnswer: a\nWhy: Uncountable.")
     assert(pq == [Question(q: "She ____ to work yesterday.", options: ["go", "went", "goes", "going"], answer: 1, why: "Lampau."),
                   Question(q: "The data ____ clear.", options: ["is", "are", "be", "been"], answer: 0, why: "Uncountable.")], "test questions")

@@ -250,7 +250,7 @@ struct MoreView: View {
         ("awake", "cup.and.saucer.fill", "Tetap menyala", "30 menit, 1 jam, atau sampai jam tertentu", Palette.amber),
         ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.blue),
         ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.indigo),
-        ("lang", "character.book.closed.fill", "Belajar Bahasa", "Inggris & Spanyol, kuis, ngobrol dengan AI", Palette.teal),
+        ("lang", "character.book.closed.fill", "Belajar Bahasa", "Inggris, Spanyol, Jepang · kuis, ngobrol dengan AI", Palette.teal),
     ]
 
     var body: some View {

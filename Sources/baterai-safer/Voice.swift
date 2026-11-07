@@ -127,7 +127,8 @@ final class VoiceChat: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
 /// The reply minus the Indonesian "✏️" correction line, which the target-language voice would mangle.
 func spokenPart(_ reply: String) -> String {
-    reply.split(separator: "\n").filter { !$0.hasPrefix("✏️") }.joined(separator: " ").replacingOccurrences(of: "*", with: "")
+    // Also skips the "(romaji)" line Japanese replies end with.
+    reply.split(separator: "\n").filter { !$0.hasPrefix("✏️") && !$0.hasPrefix("(") }.joined(separator: " ").replacingOccurrences(of: "*", with: "")
 }
 
 struct Orb: View {
