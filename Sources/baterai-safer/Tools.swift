@@ -53,6 +53,18 @@ struct ToolsTab: View {
                     ToggleTile(title: "Ikon desktop", icon: "menubar.dock.rectangle", color: .green, on: $t.desktopIcons)
                 }
             }
+            Card(title: "Shortcut notch", icon: "keyboard") {
+                ForEach(HotKeys.bindings, id: \.1) { b in
+                    HStack {
+                        Text(b.2?.title ?? "Buka / tutup notch")
+                        Spacer()
+                        Text(b.1).font(.system(.callout, design: .rounded).weight(.semibold))
+                            .padding(.horizontal, 8).padding(.vertical, 2)
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+                    }
+                }
+                Text("Esc menutup notch.").font(.caption).foregroundStyle(.secondary)
+            }
             Card(title: "Aksi cepat", icon: "bolt") {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     Action(title: "Dark / Light", icon: "circle.lefthalf.filled", color: .indigo) { t.toggleDarkMode() }

@@ -9,6 +9,7 @@ brew tap lshinkuro/baterai-safer https://github.com/lshinkuro/baterai-safer
 brew trust lshinkuro/baterai-safer   # Homebrew baru wajib trust tap pihak ketiga
 brew install baterai-safer
 brew services start baterai-safer   # jalankan di menu bar + otomatis saat login
+ln -sf "$(brew --prefix)/opt/baterai-safer/Baterai Safer.app" /Applications/   # opsional: Launchpad/Spotlight
 ```
 
 Klik ikon baterai di menu bar → **Install helper…** (minta password admin sekali). Helper adalah daemon root yang menulis ke SMC, jadi batas tetap berlaku saat aplikasi ditutup.
@@ -36,7 +37,7 @@ Top up dan kalibrasi di macOS 27 membutuhkan aplikasi menu bar tetap berjalan.
 
 ## Menu bar
 
-Panel menu bar punya 4 tab: **Baterai** (fitur di atas + grafik riwayat), **Sistem** (memori, CPU, disk, proses terberat yang bisa ditutup), **Cleaner** (bersihkan cache/log/DerivedData/Trash, uninstall aplikasi beserta file sisanya ke Trash), dan **Tools** (cegah sleep, file tersembunyi, ikon desktop, dark mode, screenshot area).
+Panel menu bar punya 4 tab: **Baterai** (fitur di atas + grafik riwayat), **Sistem** (memori, CPU, disk, proses terberat yang bisa ditutup), **Cleaner** (bersihkan cache/log/DerivedData/DeviceSupport/npm/Trash, simulator tak terpakai, analisis disk per folder, file > 200 MB, uninstall aplikasi beserta file sisanya ke Trash), dan **Tools** (cegah sleep, file tersembunyi, ikon desktop, dark mode, screenshot area).
 
 ## Notch
 
@@ -49,8 +50,10 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka:
 | AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool |
 | Clipboard | Riwayat copy, pin, OCR teks di gambar; isi dari password manager diabaikan |
 | Shelf | Seret file ke notch, seret keluar, atau AirDrop |
-| Git | Status repo, fetch/pull/push; review PR GitHub dengan AI, kirim review & merge (via `gh`) |
+| Git | Status repo, fetch/pull/push, commit dengan pesan dari AI; review PR GitHub (`gh`) dan Bitbucket Server (HTTP access token di Keychain) dengan AI, kirim review & merge |
 | Stats | Baterai, CPU, memori, disk |
+
+Shortcut: ⌃⌥Space buka/tutup, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, Esc menutup.
 
 Notch bisa dimatikan di tab Tools. Now Playing butuh izin Automation untuk Spotify/Music.
 

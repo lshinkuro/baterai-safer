@@ -11,11 +11,21 @@ class BateraiSafer < Formula
 
   def install
     system "swift", "build", "--disable-sandbox", "-c", "release"
-    bin.install ".build/release/baterai-safer"
+    system "scripts/bundle.sh", version.to_s
+    prefix.install ".build/Baterai Safer.app"
+    bin.install_symlink prefix/"Baterai Safer.app/Contents/MacOS/baterai-safer"
+  end
+
+  def caveats
+    <<~EOS
+      Supaya muncul di Launchpad/Spotlight:
+        ln -sf "#{opt_prefix}/Baterai Safer.app" /Applications/
+    EOS
   end
 
   service do
-    run [opt_bin/"baterai-safer"]
+    # Run from inside the bundle so macOS shows "Baterai Safer" (and its icon) in permission prompts.
+    run [opt_prefix/"Baterai Safer.app/Contents/MacOS/baterai-safer"]
     keep_alive false
   end
 

@@ -28,6 +28,8 @@ final class Notch {
     let git = GitModel(), ai = AIModel(), pr = PRModel()
     private var panel: NotchPanel?
     private var monitors: [Any] = []
+    private var heldOpen = false              // opened by shortcut: stay open until the mouse visits and leaves
+    private var previous: NSRunningApplication? // gets keyboard focus back when the island closes
 
     func show() {
         guard panel == nil, let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main else { return }
@@ -54,7 +56,13 @@ final class Notch {
         // Mouse-move monitoring needs no Accessibility permission (only key monitoring does).
         let handle: (NSEvent) -> Void = { [weak self] e in self?.track(dragging: e.type == .leftMouseDragged) }
         monitors = [NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: handle),
-                    NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { handle($0); return $0 }].compactMap { $0 }
+                    NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { handle($0); return $0 },
+                    NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+                        guard e.keyCode == 53, let self, self.state.expanded else { return e } // Esc closes
+                        self.set(false)
+                        return nil
+                    }].compactMap { $0 }
+        HotKeys.register()
         media.start()
         clips.start()
     }
@@ -64,6 +72,7 @@ final class Notch {
         monitors = []
         panel?.orderOut(nil)
         panel = nil
+        HotKeys.unregister()
         media.stop()
         clips.stop()
     }
@@ -76,14 +85,37 @@ final class Notch {
         if !state.expanded, hot.contains(p) {
             if dragging { state.tab = .shelf } // dragging a file in → straight to the shelf
             set(true)
-        } else if state.expanded, !open.contains(p) {
+        } else if state.expanded, open.contains(p) {
+            heldOpen = false
+        } else if state.expanded, !heldOpen {
             set(false)
         }
+    }
+
+    /// Shortcut: open on `tab` (nil keeps the current one), or close if already showing it.
+    func toggle(_ tab: NTab?) {
+        guard panel != nil else { return }
+        if state.expanded && (tab == nil || state.tab == tab) { set(false); return }
+        if let tab { state.tab = tab }
+        if !state.expanded { set(true) }
+        heldOpen = true
+        // Take keyboard focus so the AI / clipboard fields can be typed into right away.
+        if let front = NSWorkspace.shared.frontmostApplication, front != .current { previous = front }
+        NSApp.activate(ignoringOtherApps: true)
+        panel?.makeKeyAndOrderFront(nil)
     }
 
     private func set(_ open: Bool) {
         withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) { state.expanded = open }
         panel?.ignoresMouseEvents = !open
+        if open {
+            if let front = NSWorkspace.shared.frontmostApplication, front != .current { previous = front }
+        } else {
+            heldOpen = false
+            // Typing went to the island; hand focus back to the app the user was in.
+            if NSApp.isActive || panel?.isKeyWindow == true { previous?.activate() }
+            previous = nil
+        }
     }
 }
 
@@ -487,6 +519,7 @@ struct FocusView: View {
 
 struct AIView: View {
     @ObservedObject var ai: AIModel
+    @FocusState private var focused: Bool
 
     var body: some View {
         if ai.clis.isEmpty {
@@ -534,6 +567,7 @@ struct AIView: View {
                         .labelsHidden().fixedSize().controlSize(.small)
                     HStack(spacing: 6) {
                         TextField("Tanya \(ai.selected)…", text: $ai.prompt).textFieldStyle(.plain).onSubmit { ai.ask() }
+                            .focused($focused).onAppear { focused = true }
                         if ai.running {
                             Button { ai.stop() } label: { Image(systemName: "stop.circle.fill").font(.system(size: 20)) }.buttonStyle(.plain).help("Hentikan")
                         } else {
@@ -560,6 +594,7 @@ struct ClipView: View {
     @ObservedObject var c: ClipboardModel
     @State private var query = ""
     @State private var copied: UUID?
+    @FocusState private var focused: Bool
 
     var body: some View {
         let shown = c.items.filter { query.isEmpty || ($0.text ?? $0.ocr ?? "").localizedCaseInsensitiveContains(query) }
@@ -568,6 +603,7 @@ struct ClipView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.gray)
                     TextField("Cari, termasuk teks di dalam gambar", text: $query).textFieldStyle(.plain)
+                        .focused($focused).onAppear { focused = true }
                 }
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(Color.white.opacity(0.09), in: Capsule())
@@ -717,6 +753,8 @@ struct GitView: View {
     @ObservedObject var pr: PRModel
     let ai: AIModel
     @AppStorage("gitPane") private var showPR = false
+    @State private var composing: Repo?
+    @State private var connecting = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -730,13 +768,31 @@ struct GitView: View {
                 Spacer()
                 if showPR {
                     if pr.loading { ProgressView().controlSize(.small) }
+                    if pr.bitbucketConnected {
+                        Menu {
+                            Button("Putuskan Bitbucket") { Bitbucket.disconnect(); pr.bitbucketConnected = false; pr.refresh(repos: g.repos.map(\.path)) }
+                        } label: { Label("Bitbucket", systemImage: "checkmark.circle.fill") }
+                            .menuStyle(.borderlessButton).fixedSize().font(.system(size: 11, weight: .semibold))
+                    } else {
+                        NButton(icon: "link", title: "Bitbucket") { connecting.toggle() }
+                    }
                     NButton(icon: "arrow.clockwise") { pr.refresh(repos: g.repos.map(\.path)) }.help("Muat ulang PR")
                 } else {
                     NButton(icon: "arrow.clockwise") { g.refresh() }.help("Segarkan status")
                     NButton(icon: "plus", title: "Tambah repo") { g.add() }
                 }
             }
-            if showPR { PRPane(pr: pr, ai: ai) } else { repoList }
+            if showPR {
+                if connecting {
+                    BitbucketConnect { connecting = false; pr.bitbucketConnected = true; pr.refresh(repos: g.repos.map(\.path)) }
+                } else {
+                    PRPane(pr: pr, ai: ai)
+                }
+            } else if let r = composing {
+                CommitPane(g: g, ai: ai, repo: r) { composing = nil }
+            } else {
+                repoList
+            }
         }
         .onAppear { g.refresh() }
     }
@@ -791,6 +847,9 @@ struct GitView: View {
             if r.busy {
                 ProgressView().controlSize(.small)
             } else {
+                if r.status.changes > 0 {
+                    NButton(icon: "checkmark.circle", title: "Commit", tint: .green) { composing = r }
+                }
                 NButton(icon: "arrow.triangle.2.circlepath") { g.run(r, "fetch") }.help("Fetch")
                 NButton(icon: "arrow.down") { g.run(r, "pull") }.help("Pull (fast-forward)")
                 NButton(icon: "arrow.up") { g.run(r, "push") }.help("Push")
@@ -840,6 +899,7 @@ struct PRPane: View {
                 Text(p.title).font(.system(size: 11.5, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
                 HStack(spacing: 4) {
                     Text(verbatim: "\(p.repo.components(separatedBy: "/").last ?? "")#\(p.number)").foregroundStyle(.gray)
+                    if p.host == .bitbucket { Chip(text: "bitbucket", color: .blue) }
                     if p.reviewRequested { Chip(text: "review", color: .purple) }
                     if p.isDraft { Chip(text: "draft") }
                 }
@@ -861,7 +921,7 @@ struct PRPane: View {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(p.title).font(.system(size: 12.5, weight: .bold)).lineLimit(1)
-                            Text(verbatim: "\(p.repo)#\(p.number) · @\(p.author.login)").font(.system(size: 10)).foregroundStyle(.gray)
+                            Text(verbatim: "\(p.repo)#\(p.number) · @\(p.author)").font(.system(size: 10)).foregroundStyle(.gray)
                         }
                         Spacer()
                         NButton(icon: "safari") { NSWorkspace.shared.open(URL(string: p.url)!) }.help("Buka di browser")
@@ -877,7 +937,7 @@ struct PRPane: View {
                             Chip(text: "+\(d.additions)", color: .green)
                             Chip(text: "−\(d.deletions)", color: .red)
                             Chip(text: "\(d.changedFiles) file")
-                            if d.mergeable == "CONFLICTING" { Chip(text: "konflik", icon: "exclamationmark.triangle.fill", color: .orange) }
+                            if d.conflicted { Chip(text: "konflik", icon: "exclamationmark.triangle.fill", color: .orange) }
                         }
                         reviewArea(p, d)
                     } else {
@@ -905,7 +965,7 @@ struct PRPane: View {
         } else if pr.review.isEmpty {
             VStack(spacing: 8) {
                 NButton(icon: "sparkles", title: "Review dengan AI", tint: .purple, prominent: true) { pr.aiReview(ai) }
-                Text("Diff dikirim ke Claude tanpa akses tool apa pun").font(.system(size: 9.5)).foregroundStyle(.gray)
+                Text("Diff dikirim ke AI tanpa akses tool apa pun").font(.system(size: 9.5)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -935,7 +995,8 @@ struct PRPane: View {
                 NButton(icon: editing ? "checkmark" : "pencil") { editing.toggle() }.help(editing ? "Selesai mengedit" : "Edit review")
                 NButton(icon: "doc.on.doc") { copyText(pr.review) }.help("Salin review")
                 Menu {
-                    ForEach([("merge", "Merge commit"), ("squash", "Squash & merge"), ("rebase", "Rebase & merge")], id: \.0) { m in
+                    ForEach(p.host == .github ? [("merge", "Merge commit"), ("squash", "Squash & merge"), ("rebase", "Rebase & merge")]
+                                              : [("merge", "Merge (strategi repo)")], id: \.0) { m in
                         Button(m.1) {
                             if confirm("Merge PR #\(p.number)?", "\(p.repo): \(p.title)\nMetode: \(m.1). Ini tidak bisa dibatalkan dari sini.", "Merge") { pr.merge(m.0) }
                         }
@@ -943,13 +1004,144 @@ struct PRPane: View {
                 } label: { Label("Merge", systemImage: "arrow.triangle.merge") }
                     .menuStyle(.borderlessButton).fixedSize()
                     .font(.system(size: 11, weight: .semibold))
-                    .disabled(d.mergeable != "MERGEABLE" || d.checks == "fail")
-                    .help(d.mergeable != "MERGEABLE" ? "PR belum bisa di-merge" : d.checks == "fail" ? "CI gagal" : "Merge PR")
+                    .disabled(!d.canMerge || d.checks == "fail")
+                    .help(!d.canMerge ? "PR belum bisa di-merge" : d.checks == "fail" ? "CI gagal" : "Merge PR")
             }
         }
     }
 
     func send(_ p: PR, _ event: String, _ label: String) {
         if confirm("Kirim \(label) ke PR #\(p.number)?", "Review ini akan terlihat publik di \(p.repo) atas nama akun GitHub-mu.", "Kirim") { pr.post(event) }
+    }
+}
+
+struct CommitPane: View {
+    @ObservedObject var g: GitModel
+    let ai: AIModel
+    let repo: Repo
+    let close: () -> Void
+    @State private var files: [String] = []
+    @State private var message = ""
+    @State private var push = false
+    @State private var thinking = false
+    @State private var busy = false
+    @State private var result = ""
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                NButton(icon: "chevron.left") { close() }.help("Kembali")
+                Text(repo.name).font(.system(size: 13, weight: .bold))
+                Chip(text: repo.status.branch, icon: "arrow.triangle.branch", color: .purple)
+                Spacer()
+                Text("\(files.count) file akan di-commit").font(.system(size: 10.5)).foregroundStyle(.gray)
+            }
+            HStack(spacing: 10) {
+                NCard(padding: 8) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 3) {
+                            ForEach(files, id: \.self) { f in
+                                let code = String(f.prefix(2)).trimmingCharacters(in: .whitespaces)
+                                HStack(spacing: 6) {
+                                    Text(code == "??" ? "A" : String(code.prefix(1)))
+                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(code == "??" || code.hasPrefix("A") ? .green : code.hasPrefix("D") ? .red : .orange)
+                                        .frame(width: 14)
+                                    Text(String(f.dropFirst(3))).font(.system(size: 10.5, design: .monospaced)).lineLimit(1).truncationMode(.head)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .frame(width: 220)
+                VStack(spacing: 8) {
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $message).font(.system(size: 11.5)).scrollContentBackground(.hidden)
+                        if message.isEmpty {
+                            Text(thinking ? "AI sedang membaca diff…" : "Pesan commit").font(.system(size: 11.5)).foregroundStyle(.gray)
+                                .padding(.leading, 5).allowsHitTesting(false)
+                        }
+                    }
+                    .padding(6)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    HStack(spacing: 8) {
+                        if thinking {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            NButton(icon: "sparkles", title: "Tulis dengan AI", tint: .purple) {
+                                thinking = true
+                                g.aiMessage(repo, ai: ai) { ok, text in thinking = false; if ok { message = text } else { result = text } }
+                            }
+                        }
+                        Toggle("Push", isOn: $push).toggleStyle(.switch).controlSize(.mini).font(.system(size: 11))
+                        Spacer()
+                        if busy {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            NButton(icon: "checkmark", title: push ? "Commit & Push" : "Commit", tint: .green, prominent: true) {
+                                busy = true
+                                g.commit(repo, message: message, push: push) { ok, text in
+                                    busy = false
+                                    result = text
+                                    if ok { message = ""; g.changes(repo) { files = $0 } }
+                                }
+                            }
+                            .disabled(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || files.isEmpty)
+                            .opacity(message.isEmpty || files.isEmpty ? 0.5 : 1)
+                        }
+                    }
+                    if !result.isEmpty {
+                        Text(result).font(.system(size: 10.5)).foregroundStyle(result.contains("✓") ? .green : .red).lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+        .onAppear { g.changes(repo) { files = $0 } }
+    }
+}
+
+struct BitbucketConnect: View {
+    let done: () -> Void
+    @State private var url = Bitbucket.base ?? "https://bitbucket.bri.co.id"
+    @State private var token = ""
+    @State private var status = ""
+    @State private var busy = false
+
+    var body: some View {
+        NCard {
+            VStack(alignment: .leading, spacing: 9) {
+                Label("Hubungkan Bitbucket Server", systemImage: "link").font(.system(size: 13, weight: .bold))
+                Text("Buat HTTP access token di Bitbucket: avatar → Manage account → HTTP access tokens, izin Repository: Write (untuk komentar, approve, merge). Token disimpan di Keychain.")
+                    .font(.system(size: 10.5)).foregroundStyle(.gray).fixedSize(horizontal: false, vertical: true)
+                field("globe", TextField("https://bitbucket.perusahaan.com", text: $url))
+                field("key.fill", SecureField("HTTP access token", text: $token))
+                HStack {
+                    if !status.isEmpty { Text(status).font(.system(size: 10.5)).foregroundStyle(status.hasPrefix("Terhubung") ? .green : .red).lineLimit(2) }
+                    Spacer()
+                    if busy { ProgressView().controlSize(.small) }
+                    NButton(icon: "checkmark", title: "Simpan & tes", tint: .blue, prominent: true) {
+                        busy = true
+                        status = ""
+                        Bitbucket.connect(base: url, token: token.trimmingCharacters(in: .whitespacesAndNewlines)) { ok, msg in
+                            busy = false
+                            status = msg
+                            if ok { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { done() } }
+                        }
+                    }
+                    .disabled(token.isEmpty || url.isEmpty || busy)
+                }
+            }
+        }
+    }
+
+    func field<F: View>(_ icon: String, _ f: F) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon).foregroundStyle(.gray).frame(width: 14)
+            f.textFieldStyle(.plain)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(Color.white.opacity(0.09), in: Capsule())
     }
 }

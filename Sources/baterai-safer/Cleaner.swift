@@ -6,6 +6,29 @@ struct Junk: Identifiable {
     var id: String { path }
 }
 
+struct Sized: Identifiable {
+    let url: URL
+    var size: Double
+    var id: String { url.path }
+}
+
+/// Parses `du -d 1 -k <parent>` into children (largest first), dropping the parent's own total.
+func parseDu(_ s: String, parent: String) -> [Sized] {
+    s.split(separator: "\n").compactMap { line -> Sized? in
+        let f = line.split(separator: "\t", maxSplits: 1)
+        guard f.count == 2, let kb = Double(f[0]), String(f[1]) != parent else { return nil }
+        return Sized(url: URL(fileURLWithPath: String(f[1])), size: kb * 1024)
+    }
+    .sorted { $0.size > $1.size }
+}
+
+/// Folders that must never be offered for the Trash from the analyzer.
+func isProtected(_ path: String) -> Bool {
+    let h = NSHomeDirectory()
+    if [h, h + "/Library", h + "/Documents", h + "/Desktop", h + "/Downloads", h + "/Movies", h + "/Music", h + "/Pictures", h + "/Applications"].contains(path) { return true }
+    return (path as NSString).deletingLastPathComponent == h + "/Library" // Library's direct children
+}
+
 struct AppItem: Identifiable {
     let url: URL, name: String, bundleID: String
     var size: Double?
@@ -44,11 +67,19 @@ final class CleanerModel: ObservableObject {
         return [Junk(title: "Cache aplikasi", icon: "shippingbox.fill", color: .blue, path: h + "/Library/Caches"),
                 Junk(title: "Log", icon: "doc.text.fill", color: .gray, path: h + "/Library/Logs"),
                 Junk(title: "Xcode DerivedData", icon: "hammer.fill", color: .cyan, path: h + "/Library/Developer/Xcode/DerivedData"),
+                Junk(title: "iOS DeviceSupport", icon: "iphone", color: .indigo, path: h + "/Library/Developer/Xcode/iOS DeviceSupport"),
+                Junk(title: "Cache npm", icon: "shippingbox.circle.fill", color: .red, path: h + "/.npm/_cacache"),
                 Junk(title: "Sampah (Trash)", icon: "trash.fill", color: .red, path: h + "/.Trash")]
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }()
     @Published var apps: [AppItem] = []
     @Published var message = ""
+    @Published var bigFiles: [Sized] = []
+    @Published var folders: [Sized] = []     // children of `folder`, largest first
+    @Published var folder = NSHomeDirectory()
+    @Published var analyzing = false
+    @Published var simulatorsBusy = false
+    private var duCache: [String: [Sized]] = [:]
     private var scanned = false
 
     func scanOnce() { if !scanned { scanned = true; scan() } }
@@ -73,6 +104,61 @@ final class CleanerModel: ObservableObject {
                 DispatchQueue.main.async {
                     if let i = self.apps.firstIndex(where: { $0.url == u }) { self.apps[i].size = s }
                     self.apps.sort { ($0.size ?? -1) > ($1.size ?? -1) }
+                }
+            }
+        }
+    }
+
+    /// Files over 200 MB that Spotlight knows about (instant, but misses unindexed folders).
+    func findBigFiles() {
+        runAsync("/usr/bin/mdfind", ["-onlyin", NSHomeDirectory(), "kMDItemFSSize > 209715200"]) { _, out, _ in
+            let fm = FileManager.default
+            self.bigFiles = out.split(separator: "\n").compactMap { p -> Sized? in
+                guard let a = try? fm.attributesOfItem(atPath: String(p)), a[.type] as? FileAttributeType == .typeRegular else { return nil }
+                return Sized(url: URL(fileURLWithPath: String(p)), size: Double(a[.size] as? Int ?? 0))
+            }
+            .sorted { $0.size > $1.size }.prefix(15).map { $0 }
+        }
+    }
+
+    /// One `du -d 1` per folder, cached; walking the whole home takes about a minute.
+    func analyze(_ path: String, force: Bool = false) {
+        folder = path
+        if !force, let c = duCache[path] { folders = c; return }
+        folders = []
+        analyzing = true
+        runAsync("/usr/bin/du", ["-d", "1", "-k", path]) { _, out, _ in
+            let list = parseDu(out, parent: path)
+            self.duCache[path] = list
+            if self.folder == path { self.folders = list; self.analyzing = false }
+        }
+    }
+
+    func trash(_ item: Sized) {
+        NSWorkspace.shared.recycle([item.url]) { _, err in
+            DispatchQueue.main.async {
+                if let err { self.message = "Gagal: \(err.localizedDescription)"; return }
+                self.message = "\(item.url.lastPathComponent) dipindah ke Trash (\(bytes(item.size)))"
+                self.folders.removeAll { $0.id == item.id }
+                self.bigFiles.removeAll { $0.id == item.id }
+                self.duCache = [:] // parent sizes changed
+            }
+        }
+    }
+
+    /// `simctl delete unavailable` only removes simulators whose runtime is gone — safe.
+    func deleteUnavailableSimulators() {
+        let devices = URL(fileURLWithPath: NSHomeDirectory() + "/Library/Developer/CoreSimulator/Devices")
+        simulatorsBusy = true
+        DispatchQueue.global().async {
+            let before = dirSize(devices)
+            runAsync("/usr/bin/xcrun", ["simctl", "delete", "unavailable"]) { code, _, err in
+                DispatchQueue.global().async {
+                    let after = dirSize(devices)
+                    DispatchQueue.main.async {
+                        self.simulatorsBusy = false
+                        self.message = code == 0 ? "Simulator tak terpakai dihapus: \(bytes(max(0, before - after))) dibebaskan" : "Gagal: \(lastLine(err))"
+                    }
                 }
             }
         }
@@ -149,6 +235,21 @@ struct CleanerTab: View {
                 }
             }
 
+            Card(title: "Simulator iOS", icon: "iphone.gen3") {
+                HStack(spacing: 10) {
+                    IconBadge(icon: "iphone.gen3", color: .teal)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Simulator tak terpakai")
+                        Text("Simulator yang runtime-nya sudah tidak terpasang").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if c.simulatorsBusy { ProgressView().controlSize(.small) }
+                    Button("Hapus") { c.deleteUnavailableSimulators() }.controlSize(.small).disabled(c.simulatorsBusy)
+                }
+            }
+
+            DiskAnalyzer(c: c)
+
             Card(title: "Uninstall aplikasi", icon: "xmark.app") {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -183,6 +284,87 @@ struct CleanerTab: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .onAppear { c.scanOnce() }
+        .onAppear { c.scanOnce(); if c.bigFiles.isEmpty { c.findBigFiles() } }
+    }
+}
+
+struct DiskAnalyzer: View {
+    @ObservedObject var c: CleanerModel
+
+    var body: some View {
+        let home = NSHomeDirectory()
+        let top = c.folders.first?.size ?? 1
+        Card(title: "Analisis disk", icon: "chart.bar.doc.horizontal") {
+            HStack(spacing: 6) {
+                if c.folder != home {
+                    Button { c.analyze((c.folder as NSString).deletingLastPathComponent) } label: { Image(systemName: "chevron.left") }
+                        .buttonStyle(.borderless)
+                }
+                Text(c.folder.replacingOccurrences(of: home, with: "~")).font(.caption.weight(.semibold)).lineLimit(1).truncationMode(.head)
+                Spacer()
+                if c.analyzing {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button(c.folders.isEmpty ? "Analisis" : "Ulang") { c.analyze(c.folder, force: true) }.controlSize(.small)
+                }
+            }
+            if c.analyzing && c.folders.isEmpty {
+                Text("Menghitung ukuran folder… (folder rumah bisa sekitar 1 menit)").font(.caption).foregroundStyle(.secondary)
+            }
+            VStack(spacing: 0) {
+                ForEach(c.folders.prefix(12)) { item in
+                    SizedRow(item: item, fraction: item.size / top, drill: { c.analyze(item.url.path) }, trash: trashAction(item))
+                }
+            }
+            if !c.bigFiles.isEmpty {
+                Divider()
+                Text("FILE > 200 MB (SPOTLIGHT)").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(.secondary)
+                VStack(spacing: 0) {
+                    ForEach(c.bigFiles) { item in
+                        SizedRow(item: item, fraction: item.size / (c.bigFiles.first?.size ?? 1), drill: nil, trash: trashAction(item))
+                    }
+                }
+            }
+        }
+    }
+
+    func trashAction(_ item: Sized) -> (() -> Void)? {
+        guard !isProtected(item.url.path) else { return nil }
+        return {
+            if confirm("Pindahkan \(item.url.lastPathComponent) ke Trash?", "\(item.url.path)\n\(bytes(item.size)). Masih bisa dikembalikan dari Trash.", "Pindah ke Trash") { c.trash(item) }
+        }
+    }
+}
+
+struct SizedRow: View {
+    let item: Sized
+    let fraction: Double
+    let drill: (() -> Void)?
+    let trash: (() -> Void)?
+
+    var body: some View {
+        let isDir = (try? item.url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        HoverRow { hover in
+            HStack(spacing: 8) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 18, height: 18)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.url.lastPathComponent).lineLimit(1).truncationMode(.middle)
+                    GeometryReader { g in
+                        Capsule().fill(level(fraction * 0.9).gradient).frame(width: max(3, g.size.width * fraction))
+                    }
+                    .frame(height: 4)
+                }
+                Text(bytes(item.size)).font(.system(.caption, design: .rounded).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
+                    .frame(width: 64, alignment: .trailing)
+                HStack(spacing: 6) {
+                    Button { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } label: { Image(systemName: "magnifyingglass") }
+                        .help("Tampilkan di Finder")
+                    if let trash { Button(action: trash) { Image(systemName: "trash") }.foregroundStyle(.red).help("Pindah ke Trash") }
+                }
+                .buttonStyle(.borderless).opacity(hover ? 1 : 0)
+            }
+            .font(.callout)
+        }
+        .onTapGesture { if isDir { drill?() } }
     }
 }
