@@ -3,10 +3,10 @@ import Charts
 
 enum NTab: Int, CaseIterable {
     case music, focus, ai, notes, dev, clipboard, shelf, git, stats
-    var icon: String { ["music.note", "timer", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium"][rawValue] }
-    var title: String { ["Musik", "Fokus", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats"][rawValue] }
-    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green][rawValue] }
-    var theme: Theme { [Theme.violet, .amber, .violet, .amber, .electric, .mint, .electric, .electric, .mint][rawValue] }
+    var icon: String { ["music.note", "timer", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "cloud.sun.fill"][rawValue] }
+    var title: String { ["Musik", "Fokus", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Widget"][rawValue] }
+    var color: Color { [Palette.pink, Palette.orange, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.sky][rawValue] }
+    var theme: Theme { [Theme.violet, .amber, .violet, .amber, .electric, .mint, .electric, .electric, .electric][rawValue] }
     var enabled: Bool { FeatureFlags.isOn("\(self)") }
 }
 
@@ -29,6 +29,7 @@ final class Notch {
     let state = NotchState()
     let media = NowPlaying(), focus = Focus(), clips = ClipboardModel(), shelf = Shelf(), sys = SystemModel()
     let git = GitModel(), ai = AIModel(), pr = PRModel(), notes = NotesModel(), meet = MeetingModel()
+    let weather = WeatherModel(), calc = CalcModel()
     private var panel: NotchPanel?
     private var monitors: [Any] = []
     private var heldOpen = false              // opened by shortcut: stay open until the mouse visits and leaves
@@ -52,7 +53,8 @@ final class Notch {
         p.ignoresMouseEvents = true
         p.acceptsMouseMovedEvents = true
         p.contentView = NSHostingView(rootView: NotchView(state: state, media: media, focus: focus, ai: ai, meet: meet,
-                                                          clips: clips, shelf: shelf, sys: sys, git: git, pr: pr, notes: notes))
+                                                          clips: clips, shelf: shelf, sys: sys, git: git, pr: pr, notes: notes,
+                                                          weather: weather, calc: calc))
         p.orderFrontRegardless()
         panel = p
 
@@ -270,6 +272,7 @@ struct NotchView: View {
     @ObservedObject var ai: AIModel
     @ObservedObject var meet: MeetingModel
     let clips: ClipboardModel, shelf: Shelf, sys: SystemModel, git: GitModel, pr: PRModel, notes: NotesModel
+    let weather: WeatherModel, calc: CalcModel
     @Local private var dropping = false
     @Namespace private var ns
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
@@ -398,7 +401,7 @@ struct NotchView: View {
                 case .clipboard: ClipView(c: clips)
                 case .shelf: ShelfView(s: shelf, dropping: dropping)
                 case .git: GitView(g: git, pr: pr, ai: ai)
-                case .stats: StatsView(s: sys)
+                case .stats: WidgetView(w: weather, calc: calc, s: sys, bt: .shared)
                 }
             }
             .id(state.tab)
@@ -782,30 +785,151 @@ struct ShelfView: View {
     }
 }
 
-struct StatsView: View {
+struct WidgetView: View {
+    @ObservedObject var w: WeatherModel
+    @ObservedObject var calc: CalcModel
     @ObservedObject var s: SystemModel
+    @ObservedObject var bt: BluetoothModel
+    @Local private var editingCity = false
+    @Local private var cityInput = ""
+    @FocusState private var calcFocused: Bool
 
     var body: some View {
-        let b = Battery.read(), mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0
         HStack(spacing: 10) {
-            stat("Baterai", "battery.75percent", Double(b.percent) / 100, b.percent <= 20 ? Palette.red : Palette.green, b.ac ? "dicas" : "tidak dicas")
-            stat("CPU", "cpu", s.cpu, s.cpu > 0.85 ? Palette.red : Palette.blue, "\(ProcessInfo.processInfo.activeProcessorCount) core")
-            stat("Memori", "memorychip", mem, mem > 0.85 ? Palette.red : Palette.violet, "\(bytes(s.memTotal - s.memUsed)) sisa")
-            stat("Disk", "internaldrive", disk, disk > 0.85 ? Palette.red : Palette.pink, "\(bytes(s.diskFree)) bebas")
+            weatherCard.frame(width: 300)
+            VStack(spacing: 10) {
+                calcCard
+                HStack(spacing: 6) {
+                    let mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0
+                    mini("cpu", "\(Int(s.cpu * 100))%", s.cpu > 0.85 ? Palette.red : Palette.blue)
+                    mini("memorychip", "\(Int(mem * 100))%", mem > 0.85 ? Palette.red : Palette.violet)
+                    mini("internaldrive", bytes(s.diskFree), disk > 0.9 ? Palette.red : Palette.pink)
+                    ForEach(bt.devices.filter { $0.connected && !$0.batteries.isEmpty }.prefix(2)) { d in
+                        mini(d.icon, "\(d.batteries.map(\.1).min() ?? 0)%", (d.batteries.map(\.1).min() ?? 100) <= 20 ? Palette.red : Palette.green)
+                            .help(d.name + ": " + d.batteries.map { "\($0.0.isEmpty ? "" : $0.0 + " ")\($0.1)%" }.joined(separator: ", "))
+                    }
+                }
+            }
         }
-        .onAppear { s.start() }
-        .onDisappear { s.stop() }
+        .onAppear { w.refresh(); s.start(); bt.start() }
+        .onDisappear { s.stop(); bt.stop() }
     }
 
-    func stat(_ title: String, _ icon: String, _ v: Double, _ color: Color, _ caption: String) -> some View {
-        NCard {
-            VStack(spacing: 8) {
-                Label(title, systemImage: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(.gray)
-                Ring(value: v, color: color, label: "\(Int(v * 100))%", size: 92, line: 9)
-                Text(caption).font(.system(size: 10.5, weight: .medium)).foregroundStyle(.white.opacity(0.7)).lineLimit(1).minimumScaleFactor(0.8)
+    @ViewBuilder var weatherCard: some View {
+        let theme = Theme(a: Color(hex: 0x38BDF8), b: Color(hex: 0x6366F1))
+        VStack(alignment: .leading, spacing: 6) {
+            if w.city.isEmpty || editingCity {
+                Label("Cuaca", systemImage: "cloud.sun.fill").font(.system(size: 13, weight: .heavy, design: .rounded))
+                Text("Ketik nama kota. Data dari Open-Meteo, tanpa izin lokasi.").font(.system(size: 11)).opacity(0.8)
+                HStack(spacing: 6) {
+                    TextField("mis. Jakarta", text: $cityInput).textFieldStyle(.plain)
+                        .padding(.horizontal, 10).padding(.vertical, 6).background(.white.opacity(0.2), in: Capsule())
+                        .onSubmit { save() }
+                    NButton(icon: "checkmark") { save() }
+                }
+            } else if let x = w.weather {
+                let (icon, label) = weatherInfo(x.code, night: !x.isDay)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button { cityInput = w.city; editingCity = true } label: {
+                            Label(x.city, systemImage: "location.fill").font(.system(size: 12, weight: .bold, design: .rounded))
+                        }
+                        .buttonStyle(.plain).help("Ganti kota")
+                        Text("\(Int(x.temp.rounded()))°").font(.system(size: 46, weight: .heavy, design: .rounded))
+                        Text("\(label) · terasa \(Int(x.feels.rounded()))°").font(.system(size: 11.5, weight: .semibold)).opacity(0.85)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Image(systemName: icon).symbolRenderingMode(.multicolor).font(.system(size: 34))
+                        Text("↑\(Int(x.high.rounded()))°  ↓\(Int(x.low.rounded()))°").font(.system(size: 11, weight: .bold, design: .rounded))
+                        Text("💧\(x.humidity)%  💨\(Int(x.wind)) km/j").font(.system(size: 10, weight: .semibold)).opacity(0.8)
+                    }
+                }
+                Spacer(minLength: 0)
+                HStack(spacing: 0) {
+                    ForEach(x.hours.prefix(6)) { h in
+                        VStack(spacing: 3) {
+                            Text(h.time, format: .dateTime.hour(.twoDigits(amPM: .omitted))).font(.system(size: 10, weight: .semibold)).opacity(0.75)
+                            Image(systemName: weatherInfo(h.code).0).symbolRenderingMode(.multicolor).font(.system(size: 14))
+                            Text("\(Int(h.temp.rounded()))°").font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            Text("\(h.rain)%").font(.system(size: 9, weight: .bold)).foregroundStyle(Color(hex: 0xBAE6FD)).opacity(h.rain >= 30 ? 1 : 0)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.vertical, 6)
+                .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+                Label(w.city, systemImage: "location.fill").font(.system(size: 12, weight: .bold, design: .rounded))
+                Spacer()
+                if w.error.isEmpty {
+                    ProgressView().controlSize(.small).frame(maxWidth: .infinity)
+                } else {
+                    Text(w.error).font(.system(size: 12, weight: .semibold))
+                    HStack {
+                        NButton(icon: "arrow.clockwise", title: "Coba lagi") { w.refresh(force: true) }
+                        NButton(icon: "pencil", title: "Ganti kota") { cityInput = w.city; editingCity = true }
+                    }
+                }
+                Spacer()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .foregroundStyle(.white)
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(theme.gradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    func save() {
+        guard !cityInput.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        editingCity = false
+        w.setCity(cityInput)
+    }
+
+    var calcCard: some View {
+        NCard(padding: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "equal.circle.fill").foregroundStyle(Palette.amber)
+                    TextField("150rb × 12 · 5 km ke mil · 100 usd ke idr", text: $calc.input)
+                        .textFieldStyle(.plain).font(.system(size: 13, weight: .medium, design: .rounded))
+                        .focused($calcFocused)
+                        .onChange(of: calc.input) { _ in calc.evaluate() }
+                        .onSubmit { calc.commit() }
+                }
+                Text(calc.result.isEmpty ? " " : calc.result)
+                    .font(.system(size: 26, weight: .heavy, design: .rounded)).monospacedDigit()
+                    .foregroundStyle(calc.result == "?" ? Color.white.opacity(0.4) : Color.white)
+                    .lineLimit(1).minimumScaleFactor(0.5)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .textSelection(.enabled)
+                if calc.history.isEmpty {
+                    Text("Enter untuk menyimpan & menyalin hasil").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                }
+                ForEach(Array(calc.history.prefix(3).enumerated()), id: \.offset) { _, h in
+                    Button { copyText(h.1.components(separatedBy: " ").first ?? h.1) } label: {
+                        HStack {
+                            Text(h.0).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
+                            Spacer()
+                            Text(h.1).font(.system(size: 11, weight: .bold, design: .rounded)).lineLimit(1)
+                        }
+                        .font(.system(size: 11))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).help("Salin hasil")
+                }
+            }
+        }
+    }
+
+    func mini(_ icon: String, _ value: String, _ color: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 10, weight: .bold)).foregroundStyle(color)
+            Text(value).font(.system(size: 11, weight: .heavy, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

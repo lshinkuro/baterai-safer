@@ -53,7 +53,7 @@ Top up dan kalibrasi di macOS 27 membutuhkan aplikasi menu bar tetap berjalan.
 
 ## Menu bar
 
-Panel menu bar punya 4 tab: **Baterai** (fitur di atas + grafik riwayat), **Sistem** (memori, CPU, disk, proses terberat yang bisa ditutup), **Cleaner** (bersihkan cache/log/DerivedData/DeviceSupport/npm/Trash, simulator tak terpakai, analisis disk per folder, file > 200 MB, uninstall aplikasi beserta file sisanya ke Trash), dan **Tools** (cegah sleep, file tersembunyi, ikon desktop, dark mode, screenshot area).
+Panel menu bar punya 4 tab: **Baterai** (fitur di atas, grafik riwayat, baterai AirPods/mouse/keyboard Bluetooth + sambung cepat), **Sistem** (memori, CPU, disk, proses terberat yang bisa ditutup), **Cleaner** (bersihkan cache/log/DerivedData/DeviceSupport/npm/Trash, simulator tak terpakai, analisis disk per folder, file > 200 MB, uninstall aplikasi beserta file sisanya ke Trash), dan **Tools** (cegah sleep, file tersembunyi, ikon desktop, dark mode, screenshot area).
 
 ## Notch
 
@@ -64,12 +64,12 @@ Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka:
 | Musik | Spotify / Apple Music: album art, kontrol, lirik berjalan (lrclib.net) |
 | Fokus | Pomodoro 25/5, streak, grafik 7 hari |
 | AI | Chat dengan CLI AI yang terpasang (Claude Code, Kiro), tanpa akses tool |
+| Widget | Cuaca (Open-Meteo, cukup isi nama kota), kalkulator & konversi (`150rb x 12`, `15% dari 200rb`, `5 km ke mil`, `100 usd ke idr`), stats ringkas, baterai perangkat Bluetooth |
 | Catatan | Quick notes multi-halaman, tersimpan otomatis, "Rapikan dengan AI" |
 | Dev Utils | Tempel apa saja: JSON rapi/ringkas, decode JWT (+ cek kedaluwarsa), Base64, URL, timestamp, SHA-256/MD5, UUID — semua offline |
 | Clipboard | Riwayat copy, pin, OCR teks di gambar; isi dari password manager diabaikan |
 | Shelf | Seret file ke notch, seret keluar, atau AirDrop |
 | Git | Status repo, fetch/pull/push, commit dengan pesan dari AI; review PR GitHub (`gh`) dan Bitbucket Server (HTTP access token di Keychain) dengan AI, kirim review & merge |
-| Stats | Baterai, CPU, memori, disk |
 
 Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Clipboard, ⌃⌥A AI, ⌃⌥F Fokus, ⌃⌥G Git, **⌃⌥T salin teks dari layar (OCR)**, Esc menutup.
 

@@ -71,6 +71,7 @@ struct ToolsTab: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     FeatureChip(title: "Sistem", icon: Tab.system.icon, color: Palette.blue, on: feature("panel.system"))
                     FeatureChip(title: "Cleaner", icon: Tab.cleaner.icon, color: Palette.orange, on: feature("panel.cleaner"))
+                    FeatureChip(title: "Bluetooth", icon: "airpods", color: Palette.teal, on: feature("bluetooth"))
                 }
             }
             Card(title: "Aksi cepat", icon: "bolt.fill") {

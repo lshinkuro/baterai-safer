@@ -208,6 +208,8 @@ struct BatteryTab: View {
                 Tile(icon: "bolt.fill", title: "Daya", value: String(format: "%+.1fW", b.watts), color: Palette.amber)
             }
 
+            if FeatureFlags.isOn("bluetooth") { DevicesCard(bt: .shared) }
+
             Card(title: "Riwayat", icon: "chart.xyaxis.line") {
                 HistoryChart(samples: m.history, limit: limit)
             }
