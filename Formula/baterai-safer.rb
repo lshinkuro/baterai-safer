@@ -1,7 +1,7 @@
 class BateraiSafer < Formula
   desc "Menu bar battery charge limiter for Apple Silicon Macs"
   homepage "https://github.com/lshinkuro/baterai-safer"
-  url "https://github.com/lshinkuro/baterai-safer.git", tag: "v0.5.1", revision: "376011aa8a073b99426375302338e2df4abcabb6"
+  url "https://github.com/lshinkuro/baterai-safer.git", tag: "v0.5.2", revision: "839add949d589cbebe81683add8dc105b528b5e5"
   license "MIT"
   head "https://github.com/lshinkuro/baterai-safer.git", branch: "main"
 
