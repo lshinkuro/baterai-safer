@@ -49,9 +49,10 @@ final class Model: ObservableObject {
     var helperInstalled: Bool { FileManager.default.fileExists(atPath: Paths.plist) }
     var helperRunning: Bool { Date().timeIntervalSince1970 - status.updated < 30 }
     /// The binary launchd starts for the helper (the plist is world-readable).
-    var helperBinary: String? { (NSDictionary(contentsOfFile: Paths.plist)?["ProgramArguments"] as? [String])?.first }
+    static var helperBinary: String? { (NSDictionary(contentsOfFile: Paths.plist)?["ProgramArguments"] as? [String])?.first }
     /// Installed but pointing at a binary that's gone, e.g. an old Homebrew "Baterai Safer" after moving to the DMG.
-    var helperBroken: Bool { helperInstalled && helperBinary.map { !FileManager.default.fileExists(atPath: $0) } == true }
+    static var helperBroken: Bool { FileManager.default.fileExists(atPath: Paths.plist) && helperBinary.map { !FileManager.default.fileExists(atPath: $0) } == true }
+    var helperBroken: Bool { Self.helperBroken }
 
     func refresh() {
         battery = Battery.read()
@@ -84,14 +85,18 @@ final class Model: ObservableObject {
     }
 
     func admin(_ cmd: String) {
-        let bin = Daemon.stableBinary()
-        let src = "do shell script \"'\(bin)' \(cmd) '\(NSUserName())'\" with administrator privileges"
-        var err: NSDictionary?
-        NSAppleScript(source: src)?.executeAndReturnError(&err)
-        error = err?[NSAppleScript.errorMessage] as? String ?? ""
+        error = runAsAdmin(cmd)
         config = load(Paths.config, Config())
         refresh()
     }
+}
+
+/// Runs `poni <cmd> <user>` as root through the macOS admin prompt; returns the error, or "".
+func runAsAdmin(_ cmd: String) -> String {
+    let src = "do shell script \"'\(Daemon.stableBinary())' \(cmd) '\(NSUserName())'\" with administrator privileges"
+    var err: NSDictionary?
+    NSAppleScript(source: src)?.executeAndReturnError(&err)
+    return err?[NSAppleScript.errorMessage] as? String ?? ""
 }
 
 struct BateraiApp: App {
@@ -116,6 +121,7 @@ struct BateraiApp: App {
             d.set(true, forKey: "loginItemRegistered")
         }
         DispatchQueue.main.async { if UserDefaults.standard.object(forKey: "notch") as? Bool ?? true { Notch.shared.show() } }
+        DispatchQueue.main.async { Onboarding.showIfNeeded() }
         DispatchQueue.main.async { Updater.shared.start() }
     }
 

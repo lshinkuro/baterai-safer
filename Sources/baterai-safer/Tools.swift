@@ -105,6 +105,7 @@ struct ToolsTab: View {
                     Action(title: "Matikan layar", icon: "display") { t.sleepDisplay() }
                     Action(title: "Screenshot", icon: "camera.viewfinder") { t.screenshot() }
                     Action(title: "Teks dari layar", icon: "text.viewfinder") { Notch.shared.ocr() }
+                    Action(title: "Panduan awal", icon: "sparkles") { Onboarding.show() }
                     Action(title: "Activity Monitor", icon: "waveform.path.ecg") {
                         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
                     }

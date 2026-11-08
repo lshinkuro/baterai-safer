@@ -159,10 +159,13 @@ final class Notch {
     /// Starts or stops each feature's background work to match the user's switches.
     func applyFeatures() {
         guard panel != nil else { return }
-        if NTab.music.enabled { media.start() } else { media.stop() }       // AppleScript poll every second
         if NTab.clipboard.enabled { clips.start() } else { clips.stop() }   // pasteboard check every 0.5 s
-        if FeatureFlags.isOn("meeting") { meet.start() } else { meet.stop() }
-        if NTab.ibadah.enabled { Ibadah.shared.start() } else { Ibadah.shared.stop() } // reminders
+        // These ask for permissions (Automation, Calendar, Location, Notifications): wait for the welcome screen.
+        if Onboarding.done {
+            if NTab.music.enabled { media.start() } else { media.stop() }   // AppleScript poll every second
+            if FeatureFlags.isOn("meeting") { meet.start() } else { meet.stop() }
+            if NTab.ibadah.enabled { Ibadah.shared.start() } else { Ibadah.shared.stop() } // reminders
+        }
         if !state.tab.enabled, let first = NTab.allCases.first(where: \.enabled) { state.tab = first }
     }
 
@@ -924,6 +927,8 @@ struct AIHistory: View {
 /// Created once per id and kept, so its state survives closing; the green button makes it full screen.
 enum AppWindow {
     private static var windows: [String: NSWindow] = [:]
+
+    static func close(_ id: String) { windows[id]?.close() }
 
     static func show<V: View>(_ id: String, title: String, size: NSSize, @ViewBuilder content: () -> V) {
         if Notch.shared.state.expanded { Notch.shared.toggle(nil) } // close the island first
