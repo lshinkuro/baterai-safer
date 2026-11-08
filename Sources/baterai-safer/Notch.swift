@@ -504,8 +504,18 @@ struct MusicView: View {
 
     var body: some View {
         if m.app == nil || m.title.isEmpty {
-            Placeholder(icon: "music.note", title: m.app == nil ? "Tidak ada musik" : "\(m.app!) dijeda",
-                        subtitle: "Putar lagu di Spotify atau Apple Music")
+            let players = NowPlaying.installed
+            VStack(spacing: 14) {
+                Placeholder(icon: "music.note", title: m.app == nil ? "Tidak ada musik" : "\(m.app!) dijeda",
+                            subtitle: players.isEmpty ? "Pasang Spotify atau Apple Music" : "Lanjutkan lagu terakhir langsung dari sini")
+                    .frame(height: 140)
+                HStack(spacing: 8) {
+                    ForEach(players, id: \.id) { p in
+                        NButton(icon: "play.fill", title: String(format: tr("Putar di %@"), p.name), tint: Palette.accent, prominent: p.id == players.first?.id) { m.play(p.id) }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
                 let pos = m.now(ctx.date)

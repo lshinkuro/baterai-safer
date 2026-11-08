@@ -645,3 +645,6 @@
 "istirahat" = "break";
 "%@m" = "%@m";
 "%lldm" = "%lldm";
+"Pasang Spotify atau Apple Music" = "Install Spotify or Apple Music";
+"Lanjutkan lagu terakhir langsung dari sini" = "Resume your last track right from here";
+"Putar di %@" = "Play in %@";

@@ -118,6 +118,15 @@ final class NowPlaying: ObservableObject {
         }.resume()
     }
 
+    /// Players installed on this Mac, for the empty state's play buttons.
+    static var installed: [(id: String, name: String)] {
+        players.filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.0) != nil }
+            .map { ($0.0, $0.0 == "com.apple.Music" ? "Apple Music" : $0.1) }
+    }
+
+    /// Resumes the last track in a player, launching it first if needed.
+    func play(_ id: String) { bundleID = id; send("play") }
+
     func send(_ cmd: String) {
         let id = bundleID
         q.async {
