@@ -258,6 +258,7 @@ struct MoreView: View {
         ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.accent),
         ("lang", "character.book.closed.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
         ("games", "gamecontroller.fill", "Gabut", "Ular, kartu kembar, X-O", Palette.accent),
+        ("selfcare", "heart.circle", "Self-care", "Minum air, istirahat mata, kebiasaan", Palette.accent),
     ]
 
     var body: some View {
@@ -277,6 +278,7 @@ struct MoreView: View {
                     case "drives": drivesPage
                     case "lang": LangPage()
                     case "games": GamesPage()
+                    case "selfcare": SelfCareView()
                     default: colorPage
                     }
                 }

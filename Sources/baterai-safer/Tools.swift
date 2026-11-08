@@ -61,6 +61,7 @@ struct ToolsTab: View {
     @ObservedObject var t: ToolsModel
     @AppStorage(FeatureFlags.key) private var featuresOff = ""
     @AppStorage("notchClick") private var notchClick = false
+    @AppStorage("accent") private var accentID = "mint"
 
     func feature(_ id: String) -> Binding<Bool> {
         Binding(get: { FeatureFlags.isOn(id) }, set: { FeatureFlags.set(id, $0); Notch.shared.applyFeatures() })
@@ -73,6 +74,21 @@ struct ToolsTab: View {
                 ToggleTile(title: "Tetap menyala", icon: "cup.and.saucer.fill", on: $t.awake)
                 ToggleTile(title: "File tersembunyi", icon: "eye.fill", on: $t.hiddenFiles)
                 ToggleTile(title: "Ikon desktop", icon: "menubar.dock.rectangle", on: $t.desktopIcons)
+            }
+            Card(title: "Tampilan", icon: "paintpalette") {
+                HStack(spacing: 10) {
+                    ForEach(Palette.accents, id: \.id) { a in
+                        Button { Palette.setAccent(a.id); accentID = a.id } label: {
+                            Circle().fill(a.color).frame(width: 26, height: 26)
+                                .overlay { if a.id == accentID { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.onAccent) } }
+                                .padding(3)
+                                .overlay(Circle().strokeBorder(a.id == accentID ? Color.primary.opacity(0.5) : .clear, lineWidth: 1.5))
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain).tip(a.name)
+                    }
+                }
+                Text("Warna aksen untuk tab aktif, tombol, toggle, dan grafik.").font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Card(title: "Fitur", icon: "switch.2") {
                 Text("Matikan yang tidak dipakai: tab-nya hilang dan proses latarnya berhenti.")

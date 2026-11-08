@@ -12,6 +12,7 @@ final class NotchState: ObservableObject {
     @Published var expanded = false
     @Published var tab = NTab.music
     @Published var toast: String?           // short message dropped below the notch
+    var toastIcon = "checkmark.circle.fill"
     var notch = CGSize(width: 185, height: 32)
 }
 
@@ -177,9 +178,10 @@ final class Notch {
         }
     }
 
-    func flash(_ message: String) {
+    func flash(_ message: String, icon: String = "checkmark.circle.fill", seconds: Double = 2.5) {
+        state.toastIcon = icon
         withAnimation(Motion.snap) { state.toast = message }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
             if self.state.toast == message { withAnimation(Motion.ease) { self.state.toast = nil } }
         }
     }
@@ -337,6 +339,7 @@ struct NotchView: View {
     @Local private var dropping = false
     @Namespace private var ns
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
+    @AppStorage("accent") private var accentID = "mint"
 
     var soon: Meeting? { meet.next.flatMap { $0.isSoon(Date()) ? $0 : nil } }
     var live: Bool { media.playing || focus.running || ai.running || soon != nil }
@@ -367,14 +370,16 @@ struct NotchView: View {
 
             if state.expanded {
                 expanded(n)
+                    .id(accentID)
                     .frame(width: Self.open.width, height: Self.open.height)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             } else {
                 VStack(spacing: 0) {
                     if live { collapsed.frame(width: size.width, height: n.height) } else if state.toast != nil { Color.clear.frame(height: n.height) }
                     if let t = state.toast {
-                        Label(tr(t), systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Palette.green).lineLimit(1).frame(height: 26)
+                        // A check means "done" (green); anything else is a nudge, in the accent.
+                        Label(tr(t), systemImage: state.toastIcon).font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(state.toastIcon == "checkmark.circle.fill" ? Palette.green : Palette.accent).lineLimit(1).frame(height: 26)
                     }
                 }
                 .transition(.opacity)
@@ -925,6 +930,13 @@ struct AIHistory: View {
 
 /// A resizable dark window around a notch feature that needs more room (AI chat, Al-Qur'an).
 /// Created once per id and kept, so its state survives closing; the green button makes it full screen.
+/// Rebuilds its content when the accent changes (the accent is a static, not observable state).
+struct AccentScope<C: View>: View {
+    @AppStorage("accent") private var accentID = "mint"
+    @ViewBuilder let content: C
+    var body: some View { content.id(accentID) }
+}
+
 enum AppWindow {
     private static var windows: [String: NSWindow] = [:]
 
@@ -941,7 +953,7 @@ enum AppWindow {
             w.isReleasedWhenClosed = false
             w.collectionBehavior.insert(.fullScreenPrimary)
             w.minSize = NSSize(width: 560, height: 420)
-            w.contentView = NSHostingView(rootView: content()
+            w.contentView = NSHostingView(rootView: AccentScope { content() }
                 .padding(.horizontal, 20).padding(.top, 36).padding(.bottom, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .foregroundStyle(.white).background(Color.black)

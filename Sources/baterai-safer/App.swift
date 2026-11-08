@@ -69,8 +69,7 @@ final class Model: ObservableObject {
         try? FileManager.default.createDirectory(atPath: (Paths.history as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         save(history, Paths.history)
         // Once a day: health, cycles and capacity, for the long-term chart.
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date()) // local day, not UTC
-        let today = String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
+        let today = dayKey(Date())
         if battery.designCapacity > 0, healthLog.last?.day != today {
             healthLog.append(HealthDay(day: today, maxCapacity: battery.maxCapacity, designCapacity: battery.designCapacity, cycles: battery.cycles))
             save(healthLog, Model.healthFile)
@@ -122,6 +121,7 @@ struct BateraiApp: App {
         }
         DispatchQueue.main.async { if UserDefaults.standard.object(forKey: "notch") as? Bool ?? true { Notch.shared.show() } }
         DispatchQueue.main.async { Onboarding.showIfNeeded() }
+        DispatchQueue.main.async { SelfCare.shared.start() } // idle until a reminder is switched on
         DispatchQueue.main.async { Updater.shared.start() }
     }
 
@@ -150,6 +150,7 @@ struct Panel: View {
     let sys: SystemModel, cleaner: CleanerModel, tools: ToolsModel
     @AppStorage("tab") private var tab = 0
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
+    @AppStorage("accent") private var accentID = "mint"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -186,6 +187,7 @@ struct Panel: View {
             .id(tab) // each tab opens scrolled to the top
             .transition(.opacity)
         }
+        .id(accentID) // rebuild everything in the new accent
         .frame(width: 400, height: 620)
         .background(alignment: .top) {
             // A faint accent wash behind the header.

@@ -291,5 +291,9 @@ func selfTest() {
     let hl = [HealthDay(day: "2026-01-01", maxCapacity: 4500, designCapacity: 5000, cycles: 100), HealthDay(day: "2026-01-31", maxCapacity: 4450, designCapacity: 5000, cycles: 130)]
     let ht = healthTrend(hl)
     assert(ht?.days == 30 && abs((ht?.change ?? 0) + 1) < 0.001 && healthTrend(Array(hl.prefix(1))) == nil, "health: trend over days")
+    let today = Date(), cal = Calendar.current
+    let ago = { (n: Int) in dayKey(cal.date(byAdding: .day, value: -n, to: today)!) }
+    assert(streak([ago(0), ago(1), ago(2), ago(4)], today: today) == 3, "habit: streak counts back from today")
+    assert(streak([ago(1), ago(2)], today: today) == 2 && streak([ago(2)], today: today) == 0, "habit: today not done yet keeps yesterday's streak")
     print("selftest ok")
 }

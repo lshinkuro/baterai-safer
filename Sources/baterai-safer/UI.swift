@@ -20,16 +20,12 @@ extension Color {
     }
 }
 
-/// Two-stop color; heroes use it for a faint glow, everything else takes the mint accent.
+/// Two-stop color; heroes use it for a faint glow, everything else takes the accent.
 struct Theme {
     let a: Color, b: Color
     var gradient: LinearGradient { LinearGradient(colors: [a, b], startPoint: .topLeading, endPoint: .bottomTrailing) }
 
-    static let mint = Theme(a: Color(hex: 0x34D399), b: Color(hex: 0x0EA5A4))
-    static let electric = Theme(a: Color(hex: 0x60A5FA), b: Color(hex: 0x6366F1))
-    static let coral = Theme(a: Color(hex: 0xFB7185), b: Color(hex: 0xF97316))
-    static let violet = Theme(a: Color(hex: 0xC084FC), b: Color(hex: 0xEC4899))
-    static let amber = Theme(a: Color(hex: 0xFBBF24), b: Color(hex: 0xF97316))
+    static var accent: Theme { Theme(a: Palette.accent, b: Palette.accent) }
     static let rose = Theme(a: Color(hex: 0xF43F5E), b: Color(hex: 0xE11D48))
 }
 
@@ -40,8 +36,16 @@ enum Palette {
     static let red = Color(hex: 0xF43F5E), orange = Color(hex: 0xF97316), amber = Color(hex: 0xF59E0B)
     static let yellow = Color(hex: 0xEAB308), sky = Color(hex: 0x0EA5E9), slate = Color(hex: 0x64748B)
     static let cycle = [blue, pink, amber, teal, violet, orange, green, sky, red, indigo]
-    /// The one brand color; everything else stays neutral.
-    static let accent = Color(hex: 0x34D399)
+    /// Accent choices (Tools → Tampilan). All light enough for dark text on top yet visible on a light
+    /// background (so no white/gray), and none close to the amber/red that mean "warning"/"error".
+    static let accents: [(id: String, name: String, color: Color)] = [
+        ("mint", "Mint", Color(hex: 0x34D399)), ("sky", "Langit", Color(hex: 0x38BDF8)), ("violet", "Ungu", Color(hex: 0xA78BFA)),
+        ("pink", "Pink", Color(hex: 0xF472B6)), ("lime", "Lime", Color(hex: 0xA3E635)),
+    ]
+    /// The one brand color; everything else stays neutral. Views rebuild on change via `.id(accentID)`.
+    private(set) static var accent = color(UserDefaults.standard.string(forKey: "accent"))
+    static func color(_ id: String?) -> Color { accents.first { $0.id == id }?.color ?? accents[0].color }
+    static func setAccent(_ id: String) { accent = color(id); UserDefaults.standard.set(id, forKey: "accent") }
     static let onAccent = Color.black.opacity(0.85) // text and icons on an accent fill
     static let hairline = Color.primary.opacity(0.08)
 }
@@ -83,7 +87,7 @@ enum Motion {
     static var ease: Animation? { reduced ? nil : .easeInOut(duration: 0.2) }                    // fades, value changes
 }
 
-private struct AccentKey: EnvironmentKey { static let defaultValue = Theme.mint }
+private struct AccentKey: EnvironmentKey { static var defaultValue: Theme { .accent } }
 extension EnvironmentValues {
     var accent: Theme {
         get { self[AccentKey.self] }

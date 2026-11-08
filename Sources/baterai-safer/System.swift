@@ -96,7 +96,7 @@ struct SystemTab: View {
         let mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0
         let top = (byMemory ? s.procs.sorted { $0.mb > $1.mb } : s.procs.sorted { $0.cpu > $1.cpu }).prefix(8)
         VStack(spacing: 12) {
-            Hero(theme: mem > 0.85 ? .rose : .mint) {
+            Hero(theme: mem > 0.85 ? .rose : .accent) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Label("Memori", systemImage: "memorychip.fill").font(.system(size: 12, weight: .bold)).opacity(0.85)
