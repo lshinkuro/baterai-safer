@@ -20,7 +20,7 @@ extension Color {
     }
 }
 
-/// Each tab owns a two-stop gradient; everything in the tab takes its accent from it.
+/// Two-stop color; heroes use it for a faint glow, everything else takes the mint accent.
 struct Theme {
     let a: Color, b: Color
     var gradient: LinearGradient { LinearGradient(colors: [a, b], startPoint: .topLeading, endPoint: .bottomTrailing) }
@@ -40,6 +40,41 @@ enum Palette {
     static let red = Color(hex: 0xF43F5E), orange = Color(hex: 0xF97316), amber = Color(hex: 0xF59E0B)
     static let yellow = Color(hex: 0xEAB308), sky = Color(hex: 0x0EA5E9), slate = Color(hex: 0x64748B)
     static let cycle = [blue, pink, amber, teal, violet, orange, green, sky, red, indigo]
+    /// The one brand color; everything else stays neutral.
+    static let accent = Color(hex: 0x34D399)
+    static let onAccent = Color.black.opacity(0.85) // text and icons on an accent fill
+    static let hairline = Color.primary.opacity(0.08)
+}
+
+extension NSImage {
+    /// Poni's face (the notch is the bangs) as a template glyph, so the menu bar tints it like an SF Symbol.
+    static let poni: NSImage = {
+        let img = NSImage(size: NSSize(width: 18, height: 16), flipped: false) { _ in
+            NSColor.black.set()
+            let body = NSBezierPath(roundedRect: NSRect(x: 1.7, y: 1.7, width: 14.6, height: 12.6), xRadius: 4, yRadius: 4)
+            body.lineWidth = 1.4; body.stroke()
+            NSBezierPath(roundedRect: NSRect(x: 5.5, y: 11.2, width: 7, height: 3.6), xRadius: 1.4, yRadius: 1.4).fill()
+            for x in [6.2, 11.8] { NSBezierPath(ovalIn: NSRect(x: x - 0.95, y: 6.6, width: 1.9, height: 2.5)).fill() }
+            let smile = NSBezierPath()
+            smile.appendArc(withCenter: NSPoint(x: 9, y: 6.4), radius: 2.5, startAngle: 215, endAngle: 325)
+            smile.lineWidth = 1.2; smile.lineCapStyle = .round; smile.stroke()
+            return true
+        }
+        img.isTemplate = true
+        return img
+    }()
+}
+
+extension View {
+    /// Tooltip that is also the VoiceOver name; for buttons that show only an icon.
+    func tip(_ text: String) -> some View { help(text).accessibilityLabel(text) }
+}
+
+/// The app's two animation curves; nil (instant) when Reduce Motion is on.
+enum Motion {
+    static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    static var snap: Animation? { reduced ? nil : .spring(response: 0.32, dampingFraction: 0.8) } // taps, open/close
+    static var ease: Animation? { reduced ? nil : .easeInOut(duration: 0.2) }                    // fades, value changes
 }
 
 private struct AccentKey: EnvironmentKey { static let defaultValue = Theme.mint }
@@ -66,8 +101,7 @@ enum Tab: Int, CaseIterable {
     case battery, system, cleaner, tools
     var title: String { ["Baterai", "Sistem", "Cleaner", "Tools"][rawValue] }
     var icon: String { ["bolt.fill", "cpu.fill", "sparkles", "square.grid.2x2.fill"][rawValue] }
-    var theme: Theme { [Theme.mint, .electric, .coral, .violet][rawValue] }
-    /// Baterai and Tools (where features are switched back on) can't be turned off.
+        /// Baterai and Tools (where features are switched back on) can't be turned off.
     var enabled: Bool { self == .battery || self == .tools || FeatureFlags.isOn("panel.\(self)") }
 }
 
@@ -77,61 +111,56 @@ struct TabBar: View {
     @Namespace private var ns
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             ForEach(tabs, id: \.self) { t in
                 let on = tab == t.rawValue
-                Button { withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) { tab = t.rawValue } } label: {
+                Button { withAnimation(Motion.snap) { tab = t.rawValue } } label: {
                     HStack(spacing: 5) {
-                        Image(systemName: t.icon).font(.system(size: 11, weight: .bold))
-                        Text(t.title).font(.system(size: 12, weight: .bold, design: .rounded))
+                        Image(systemName: t.icon).font(.system(size: 10, weight: .semibold))
+                        Text(t.title).font(.system(size: 12, weight: .medium))
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .foregroundStyle(on ? Color.white : Color.secondary)
+                    .padding(.vertical, 6)
+                    .foregroundStyle(on ? Palette.onAccent : Color.secondary)
                     .background {
-                        if on {
-                            Capsule().fill(t.theme.gradient)
-                                .shadow(color: t.theme.b.opacity(0.45), radius: 6, y: 2)
-                                .matchedGeometryEffect(id: "sel", in: ns)
-                        }
+                        if on { Capsule().fill(Palette.accent).matchedGeometryEffect(id: "sel", in: ns) }
                     }
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(4)
-        .background(Color.primary.opacity(0.06), in: Capsule())
+        .padding(3)
+        .background(Color.primary.opacity(0.05), in: Capsule())
+        .overlay(Capsule().strokeBorder(Palette.hairline, lineWidth: 1))
     }
 }
 
-/// Full-color card for the headline of a tab.
+/// Headline card: near-black in both appearances, with a faint glow in the theme's color.
 struct Hero<Content: View>: View {
     @Environment(\.accent) private var accent
     var theme: Theme?
     @ViewBuilder let content: Content
 
     var body: some View {
-        let t = theme ?? accent
+        let t = theme ?? accent, shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         content
             .foregroundStyle(.white)
-            .padding(16)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 ZStack {
-                    t.gradient
-                    // soft highlight + a big blurred blob for depth
-                    LinearGradient(colors: [.white.opacity(0.22), .clear], startPoint: .top, endPoint: .center)
-                    Circle().fill(.white.opacity(0.18)).frame(width: 180).blur(radius: 40).offset(x: 120, y: -60)
+                    LinearGradient(colors: [Color(hex: 0x232427), Color(hex: 0x0F1011)], startPoint: .top, endPoint: .bottom)
+                    RadialGradient(colors: [t.a.opacity(0.26), .clear], center: .topTrailing, startRadius: 0, endRadius: 260)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .shadow(color: t.b.opacity(0.35), radius: 14, y: 6)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(.white.opacity(0.08), lineWidth: 1))
+            .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
     }
 }
 
 struct Card<Content: View>: View {
-    @Environment(\.accent) private var accent
     let title: String?, icon: String?
     let content: Content
 
@@ -140,72 +169,85 @@ struct Card<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        VStack(alignment: .leading, spacing: 12) {
             if let title {
-                HStack(spacing: 7) {
-                    if let icon {
-                        Image(systemName: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(accent.gradient)
-                    }
-                    Text(title).font(.system(size: 13, weight: .bold, design: .rounded))
+                HStack(spacing: 6) {
+                    if let icon { Image(systemName: icon).font(.system(size: 10, weight: .semibold)) }
+                    Text(title.uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8)
                 }
+                .foregroundStyle(.secondary)
             }
             content
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.primary.opacity(0.035), in: shape)
+        .overlay(shape.strokeBorder(Palette.hairline, lineWidth: 1))
     }
 }
 
-/// Colored rounded-square symbol (rows, lists).
+/// Neutral rounded-square symbol (rows, lists).
 struct IconBadge: View {
-    let icon: String, color: Color
+    let icon: String
     var size: CGFloat = 24
+    var tint: Color? // colored only when it means something (a switch that is on)
 
     var body: some View {
         Image(systemName: icon)
-            .font(.system(size: size * 0.48, weight: .bold))
-            .foregroundStyle(.white)
+            .font(.system(size: size * 0.46, weight: .semibold))
+            .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.primary.opacity(0.75)))
             .frame(width: size, height: size)
-            .background(LinearGradient(colors: [color.opacity(0.8), color], startPoint: .top, endPoint: .bottom),
-                        in: RoundedRectangle(cornerRadius: size * 0.32, style: .continuous))
+            .background((tint ?? .primary).opacity(tint == nil ? 0.07 : 0.16), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
+            .animation(Motion.ease, value: tint == nil)
     }
 }
 
 struct Switch: View {
-    let title: String, icon: String, color: Color
+    let title: String, icon: String
     @Binding var on: Bool
 
-    init(_ title: String, _ icon: String, _ on: Binding<Bool>, color: Color = Palette.blue) {
-        self.title = title; self.icon = icon; self.color = color; _on = on
+    init(_ title: String, _ icon: String, _ on: Binding<Bool>) {
+        self.title = title; self.icon = icon; _on = on
     }
 
     var body: some View {
         HStack(spacing: 10) {
-            IconBadge(icon: icon, color: color)
-            Text(title).font(.system(size: 13, weight: .medium))
+            IconBadge(icon: icon, tint: on ? Palette.accent : nil)
+            Text(title).font(.system(size: 13))
             Spacer()
-            Toggle(title, isOn: $on).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(color)
+            Toggle(title, isOn: $on).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(Palette.accent)
         }
     }
 }
 
-/// Bento tile: tinted background, big rounded number.
+/// Stat tile: quiet card, big number, small caps label. `tone` says how good the value is;
+/// `fraction` adds a thin bar showing where it sits on its scale.
 struct Tile: View {
-    let icon: String, title: String, value: String, color: Color
+    let icon: String, title: String, value: String
+    var tone: Color?
+    var fraction: Double?
     var help = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
-                .frame(width: 26, height: 26).background(color.opacity(0.18), in: Circle())
-            Spacer(minLength: 2)
-            Text(value).font(.system(size: 19, weight: .heavy, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
-            Text(title).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.secondary)
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        VStack(alignment: .leading, spacing: 3) {
+            Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(tone ?? .secondary)
+            Spacer(minLength: 6)
+            Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+            Text(title.uppercased()).font(.system(size: 9, weight: .semibold)).tracking(0.4).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
+            if let fraction {
+                Capsule().fill(Color.primary.opacity(0.08)).frame(height: 3)
+                    .overlay(alignment: .leading) {
+                        GeometryReader { g in Capsule().fill(tone ?? Palette.accent).frame(width: g.size.width * min(max(fraction, 0), 1)) }
+                    }
+                    .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
-        .padding(11)
-        .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(12)
+        .background(Color.primary.opacity(0.035), in: shape)
+        .overlay(shape.strokeBorder(Palette.hairline, lineWidth: 1))
         .help(help)
     }
 }
@@ -215,6 +257,7 @@ struct BatteryGlyph: View {
     let level: Double // 0...1
     var limit: Double?
     var charging = false
+    var color: Color = .white
 
     var body: some View {
         let v = min(max(level, 0), 1)
@@ -224,17 +267,17 @@ struct BatteryGlyph: View {
                 ZStack(alignment: .bottom) {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.18))
                     UnevenRoundedRectangle(cornerRadii: .init(topLeading: 4, bottomLeading: 10, bottomTrailing: 10, topTrailing: 4), style: .continuous)
-                        .fill(LinearGradient(colors: [.white, .white.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                        .fill(LinearGradient(colors: [color, color.opacity(0.75)], startPoint: .top, endPoint: .bottom))
                         .frame(height: max(8, (g.size.height - 8) * v))
                         .padding(4)
                     if let limit {
                         Rectangle().fill(.white).frame(height: 2)
-                            .overlay(alignment: .trailing) { Text("\(Int(limit * 100))").font(.system(size: 8, weight: .heavy)).offset(x: 16) }
+                            .overlay(alignment: .trailing) { Text("\(Int(limit * 100))").font(.system(size: 8, weight: .semibold)).offset(x: 16) }
                             .offset(y: -(g.size.height - 8) * limit - 4)
                             .opacity(0.9)
                     }
                     if charging {
-                        Image(systemName: "bolt.fill").font(.system(size: 18, weight: .black))
+                        Image(systemName: "bolt.fill").font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.black.opacity(0.35))
                             .frame(maxHeight: .infinity)
                     }
@@ -243,7 +286,7 @@ struct BatteryGlyph: View {
             }
         }
         .frame(width: 52, height: 96)
-        .animation(.spring(response: 0.6), value: v)
+        .animation(Motion.snap, value: v)
     }
 }
 
@@ -272,13 +315,13 @@ struct Ring: View {
                     .offset(y: -(size - line) / 2).rotationEffect(.degrees(marker * 360))
             }
             VStack(spacing: 0) {
-                Text(label).font(.system(size: size * 0.22, weight: .heavy, design: .rounded)).monospacedDigit()
+                Text(label).font(.system(size: size * 0.22, weight: .semibold)).monospacedDigit()
                 if let caption { Text(caption).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary) }
             }
         }
         .frame(width: size - line, height: size - line)
         .padding(line / 2)
-        .animation(.easeInOut, value: v)
+        .animation(Motion.ease, value: v)
     }
 }
 
@@ -296,7 +339,7 @@ struct Meter: View {
             }
         }
         .frame(height: 8)
-        .animation(.easeInOut, value: v)
+        .animation(Motion.ease, value: v)
     }
 }
 
@@ -309,9 +352,9 @@ struct StatusPill: View {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(text).lineLimit(1)
         }
-        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .font(.system(size: 11, weight: .bold))
         .padding(.horizontal, 9).padding(.vertical, 4)
-        .background(color.opacity(0.22), in: Capsule())
+        .background(.black.opacity(0.16), in: Capsule())
     }
 }
 
@@ -329,51 +372,50 @@ struct HoverRow<Content: View>: View {
     }
 }
 
-/// Control Center–style tile: fills with color when on.
+/// Control Center–style tile: fills with the accent when on.
 struct ToggleTile: View {
-    let title: String, icon: String, theme: Theme
+    let title: String, icon: String
     @Binding var on: Bool
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         Button { on.toggle() } label: {
             VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: icon).font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(on ? theme.b : Color.secondary)
-                    .frame(width: 32, height: 32)
-                    .background(on ? Color.white : Color.primary.opacity(0.08), in: Circle())
+                Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+                    .frame(width: 30, height: 30)
+                    .background(on ? Color.black.opacity(0.1) : Color.primary.opacity(0.07), in: Circle())
                 Spacer(minLength: 0)
-                Text(title).font(.system(size: 12, weight: .bold, design: .rounded)).lineLimit(2).multilineTextAlignment(.leading)
+                Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(on ? "Aktif" : "Mati").font(.system(size: 10, weight: .semibold)).opacity(0.75)
+                Text(on ? "Aktif" : "Mati").font(.system(size: 10, weight: .medium)).opacity(0.65)
             }
-            .foregroundStyle(on ? Color.white : Color.primary)
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
-            .padding(11)
-            .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(on ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(Color.primary.opacity(0.05)))
-            }
-            .shadow(color: on ? theme.b.opacity(0.35) : .clear, radius: 8, y: 3)
+            .foregroundStyle(on ? Palette.onAccent : Color.primary)
+            .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+            .padding(12)
+            .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.primary.opacity(0.035)), in: shape)
+            .overlay(shape.strokeBorder(on ? .clear : Palette.hairline, lineWidth: 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.3), value: on)
+        .animation(Motion.snap, value: on)
     }
 }
 
 struct Action: View {
-    let title: String, icon: String, color: Color, run: () -> Void
+    let title: String, icon: String, run: () -> Void
     @Local private var hover = false
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         Button(action: run) {
             HStack(spacing: 10) {
-                IconBadge(icon: icon, color: color, size: 30)
-                Text(title).font(.system(size: 12.5, weight: .semibold, design: .rounded)).lineLimit(1)
+                IconBadge(icon: icon, size: 28)
+                Text(title).font(.system(size: 12, weight: .medium)).lineLimit(1)
                 Spacer(minLength: 0)
             }
             .padding(9)
-            .background(color.opacity(hover ? 0.2 : 0.11), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .background(Color.primary.opacity(hover ? 0.07 : 0.035), in: shape)
+            .overlay(shape.strokeBorder(Palette.hairline, lineWidth: 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

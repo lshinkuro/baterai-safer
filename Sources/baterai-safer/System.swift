@@ -28,7 +28,9 @@ func parsePS(_ s: String) -> [Proc] {
     s.split(separator: "\n").compactMap { line in
         let f = line.split(separator: " ", maxSplits: 4, omittingEmptySubsequences: true)
         guard f.count == 5, let pid = Int32(f[0]), let cpu = Double(f[1]), let kb = Double(f[2]) else { return nil }
-        return Proc(pid: pid, cpu: cpu, mb: kb / 1024, user: String(f[3]), name: f[4].trimmingCharacters(in: .whitespaces))
+        var name = f[4].trimmingCharacters(in: .whitespaces)
+        if name == "baterai-safer" { name = f[3] == "root" ? "Poni helper" : "Poni" } // executable kept its old name
+        return Proc(pid: pid, cpu: cpu, mb: kb / 1024, user: String(f[3]), name: name)
     }
 }
 
@@ -94,16 +96,16 @@ struct SystemTab: View {
         let mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0
         let top = (byMemory ? s.procs.sorted { $0.mb > $1.mb } : s.procs.sorted { $0.cpu > $1.cpu }).prefix(8)
         VStack(spacing: 12) {
-            Hero(theme: mem > 0.85 ? .coral : .electric) {
+            Hero(theme: mem > 0.85 ? .rose : .mint) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Label("Memori", systemImage: "memorychip.fill").font(.system(size: 12, weight: .bold, design: .rounded)).opacity(0.85)
+                        Label("Memori", systemImage: "memorychip.fill").font(.system(size: 12, weight: .bold)).opacity(0.85)
                         Spacer()
-                        Text("\(Int(mem * 100))% terpakai").font(.system(size: 11, weight: .bold, design: .rounded)).opacity(0.85)
+                        Text("\(Int(mem * 100))% terpakai").font(.system(size: 11, weight: .bold)).opacity(0.85)
                     }
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(bytes(s.memTotal - s.memUsed)).font(.system(size: 40, weight: .heavy, design: .rounded)).monospacedDigit()
-                        Text("tersisa").font(.system(size: 14, weight: .bold, design: .rounded)).opacity(0.8)
+                        Text(bytes(s.memTotal - s.memUsed)).font(.system(size: 40, weight: .semibold)).monospacedDigit()
+                        Text("tersisa").font(.system(size: 14, weight: .bold)).opacity(0.8)
                     }
                     Meter(value: mem, color: .white)
                     if s.swapUsed > 0 {
@@ -113,8 +115,8 @@ struct SystemTab: View {
                 }
             }
             HStack(spacing: 8) {
-                gauge("CPU", "cpu.fill", s.cpu, Palette.blue, "\(ProcessInfo.processInfo.activeProcessorCount) core")
-                gauge("Disk", "internaldrive.fill", disk, Palette.pink, "\(bytes(s.diskFree)) sisa")
+                gauge("CPU", "cpu.fill", s.cpu, Palette.accent, "\(ProcessInfo.processInfo.activeProcessorCount) core")
+                gauge("Disk", "internaldrive.fill", disk, Palette.accent, "\(bytes(s.diskFree)) sisa")
             }
 
             Card(title: "Aktivitas live", icon: "waveform.path.ecg") {
@@ -126,7 +128,7 @@ struct SystemTab: View {
                             .foregroundStyle(by: .value("Seri", "Memori")).interpolationMethod(.monotone)
                     }
                 }
-                .chartForegroundStyleScale(["CPU": Palette.blue, "Memori": Palette.pink])
+                .chartForegroundStyleScale(["CPU": Palette.accent, "Memori": Color.gray])
                 .chartYScale(domain: 0...100)
                 .chartXAxis(.hidden)
                 .chartYAxis {
@@ -149,16 +151,16 @@ struct SystemTab: View {
                                 if let icon = NSRunningApplication(processIdentifier: p.pid)?.icon {
                                     Image(nsImage: icon).resizable().frame(width: 20, height: 20)
                                 } else {
-                                    IconBadge(icon: "gearshape.fill", color: Palette.slate, size: 20)
+                                    IconBadge(icon: "gearshape.fill", size: 20)
                                 }
                                 Text(p.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                                 Text(byMemory ? bytes(p.mb * 1_048_576) : String(format: "%.1f%%", p.cpu))
-                                    .font(.system(.callout, design: .rounded).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
+                                    .font(.system(.callout).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
                                 if p.user == NSUserName() {
                                     Button {
                                         if confirm("Tutup \(p.name)?", "Aplikasi akan diminta keluar; pekerjaan yang belum disimpan bisa hilang pada proses non-aplikasi.", "Tutup") { s.quit(p) }
                                     } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 14)) }
-                                        .buttonStyle(.plain).foregroundStyle(.red.opacity(0.85)).help("Tutup proses")
+                                        .buttonStyle(.plain).foregroundStyle(Palette.red.opacity(0.85)).tip("Tutup proses")
                                         .opacity(hover ? 1 : 0)
                                 } else {
                                     Image(systemName: "lock.fill").font(.system(size: 11)).foregroundStyle(.tertiary)
@@ -178,12 +180,13 @@ struct SystemTab: View {
         HStack(spacing: 12) {
             Ring(value: v, color: v > 0.85 ? Palette.red : color, label: "\(Int(v * 100))%", size: 64, line: 8)
             VStack(alignment: .leading, spacing: 2) {
-                Label(title, systemImage: icon).font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(color)
+                Label(title, systemImage: icon).font(.system(size: 13, weight: .semibold))
                 Text(caption).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.6)
             }
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Palette.hairline, lineWidth: 1))
     }
 }

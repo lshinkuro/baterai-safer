@@ -91,11 +91,19 @@ struct BateraiApp: App {
         MenuBarExtra {
             Panel(m: m, sys: sys, cleaner: cleaner, tools: tools)
         } label: {
-            Image(systemName: m.status.charging && m.battery.ac ? "battery.100percent.bolt"
-                  : m.battery.ac ? "powerplug" : "battery.\(min(100, (m.battery.percent + 12) / 25 * 25))percent")
-            Text("\(m.battery.percent)%")
+            MenuLabel(m: m)
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+struct MenuLabel: View {
+    @ObservedObject var m: Model
+    @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when the percent switch changes
+
+    var body: some View {
+        Image(nsImage: .poni)
+        if FeatureFlags.isOn("menuPercent") { Text("\(m.battery.percent)%") }
     }
 }
 
@@ -106,21 +114,20 @@ struct Panel: View {
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
 
     var body: some View {
-        let theme = (Tab(rawValue: tab) ?? .battery).theme
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Poni").font(.system(size: 15, weight: .heavy, design: .rounded))
+                    Text("Poni").font(.system(size: 15, weight: .semibold))
                     Text("\(m.battery.percent)% · \(m.battery.ac ? "dicas" : "pakai baterai")").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button { NSApp.terminate(nil) } label: {
-                    Image(systemName: "power").font(.system(size: 11, weight: .heavy))
+                Button { if confirm("Keluar dari Poni?", "Notch dan menu bar ditutup. Batas pengisian tetap berjalan lewat helper.", "Keluar") { NSApp.terminate(nil) } } label: {
+                    Image(systemName: "power").font(.system(size: 11, weight: .semibold))
                         .frame(width: 28, height: 28)
                         .background(Color.primary.opacity(0.07), in: Circle())
                 }
-                .buttonStyle(.plain).help("Keluar")
+                .buttonStyle(.plain).tip("Keluar")
             }
             .padding(.horizontal, 16).padding(.top, 14)
 
@@ -143,13 +150,11 @@ struct Panel: View {
         }
         .frame(width: 400, height: 620)
         .background(alignment: .top) {
-            // The active tab's color glows behind the header.
-            RadialGradient(colors: [theme.a.opacity(0.4), theme.b.opacity(0.12), .clear], center: .top, startRadius: 0, endRadius: 330)
+            // A faint accent wash behind the header.
+            RadialGradient(colors: [Palette.accent.opacity(0.1), .clear], center: .top, startRadius: 0, endRadius: 330)
                 .frame(height: 330)
                 .allowsHitTesting(false)
-                .animation(.easeInOut(duration: 0.4), value: tab)
         }
-        .environment(\.accent, theme)
     }
 }
 
@@ -170,11 +175,11 @@ struct BatteryTab: View {
         return s.charging ? "Mengisi" : "Ditahan di batas"
     }
 
-    var heroTheme: Theme {
+    /// Mint when healthy or charging, amber when getting low, red when critical.
+    var tone: Color {
         let b = m.battery
-        if b.percent <= 20 && !b.ac { return .rose }
-        if m.status.charging && b.ac { return .mint }
-        return b.ac ? .electric : .amber
+        if b.ac || b.percent > 40 { return Palette.accent }
+        return b.percent > 20 ? Palette.amber : Palette.red
     }
 
     var limit: Int? { m.helperInstalled && m.config.enabled ? m.config.limit : nil }
@@ -182,13 +187,18 @@ struct BatteryTab: View {
     var body: some View {
         let b = m.battery
         VStack(spacing: 12) {
-            Hero(theme: heroTheme) {
+            Hero(theme: Theme(a: tone, b: tone)) {
                 HStack(alignment: .center, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
-                        StatusPill(text: stateText)
+                        if m.helperInstalled && !m.helperRunning {
+                            Button { m.admin("install-daemon") } label: { StatusPill(text: "Helper mati · Jalankan ulang", color: Palette.red) }
+                                .buttonStyle(.plain).help("Pasang ulang helper (minta password admin)")
+                        } else {
+                            StatusPill(text: stateText)
+                        }
                         HStack(alignment: .firstTextBaseline, spacing: 1) {
-                            Text("\(b.percent)").font(.system(size: 62, weight: .heavy, design: .rounded)).monospacedDigit()
-                            Text("%").font(.system(size: 26, weight: .heavy, design: .rounded)).opacity(0.75)
+                            Text("\(b.percent)").font(.system(size: 62, weight: .semibold)).monospacedDigit()
+                            Text("%").font(.system(size: 26, weight: .semibold)).foregroundStyle(tone)
                         }
                         .contentTransition(.numericText())
                         Group {
@@ -198,22 +208,25 @@ struct BatteryTab: View {
                                 Text("\(b.maxCapacity * b.percent / 100) mAh tersimpan")
                             }
                         }
-                        .font(.system(size: 13, weight: .bold, design: .rounded)).opacity(0.9)
+                        .font(.system(size: 13, weight: .bold)).opacity(0.9)
                         if let a = b.adapterName {
                             Label(a, systemImage: "powerplug.fill").font(.system(size: 11, weight: .semibold)).opacity(0.75).lineLimit(1)
                         }
                     }
                     Spacer(minLength: 0)
-                    BatteryGlyph(level: Double(b.percent) / 100, limit: limit.map { Double($0) / 100 }, charging: m.status.charging && b.ac)
+                    BatteryGlyph(level: Double(b.percent) / 100, limit: limit.map { Double($0) / 100 }, charging: m.status.charging && b.ac, color: tone)
                         .padding(.trailing, 10)
                 }
             }
 
             HStack(spacing: 8) {
-                Tile(icon: "heart.fill", title: "Kondisi", value: "\(b.health)%", color: Palette.pink, help: "\(b.maxCapacity)/\(b.designCapacity) mAh")
-                Tile(icon: "arrow.triangle.2.circlepath", title: "Siklus", value: "\(b.cycles)", color: Palette.blue)
-                Tile(icon: "thermometer.medium", title: "Suhu", value: b.temp.map { String(format: "%.1f°", $0) } ?? "–", color: Palette.orange)
-                Tile(icon: "bolt.fill", title: "Daya", value: String(format: "%+.1fW", b.watts), color: Palette.amber)
+                Tile(icon: "heart.fill", title: "Kondisi", value: "\(b.health)%", tone: b.health >= 80 ? Palette.accent : b.health >= 60 ? Palette.amber : Palette.red, fraction: Double(b.health) / 100, help: "\(b.maxCapacity)/\(b.designCapacity) mAh")
+                Tile(icon: "arrow.triangle.2.circlepath", title: "Siklus", value: "\(b.cycles)", tone: b.cycles < 800 ? Palette.accent : Palette.amber,
+                     fraction: Double(b.cycles) / 1000, help: "Baterai Mac dirancang untuk 1000 siklus")
+                Tile(icon: "thermometer.medium", title: "Suhu", value: b.temp.map { String(format: "%.1f°", $0) } ?? "–",
+                     tone: b.temp.map { $0 < 35 ? Palette.accent : $0 < 40 ? Palette.amber : Palette.red }, fraction: b.temp.map { ($0 - 20) / 25 })
+                Tile(icon: "bolt.fill", title: b.watts < 0 ? "Daya keluar" : "Daya masuk", value: String(format: "%.1f W", abs(b.watts)), tone: b.watts < 0 ? Palette.amber : Palette.accent,
+                     fraction: abs(b.watts) / 60, help: "Bar: 0–60 W")
             }
 
             Card(title: "Riwayat", icon: "chart.xyaxis.line") {
@@ -227,40 +240,40 @@ struct BatteryTab: View {
                 }
             } else {
                 Card(title: "Pengisian", icon: "bolt.batteryblock") {
-                    Switch("Aktifkan limiter", "battery.100percent", $m.config.enabled, color: Palette.green)
+                    Switch("Aktifkan limiter", "battery.100percent", $m.config.enabled)
                     HStack(spacing: 10) {
-                        IconBadge(icon: "slider.horizontal.3", color: Palette.blue)
+                        IconBadge(icon: "slider.horizontal.3")
                         Text("Batas")
                         Slider(value: Binding(get: { Double(m.config.limit) }, set: { m.config.limit = Int($0) }),
                                in: SMC.canInhibit ? 50...100 : 80...100, step: 5)
                             .controlSize(.small)
-                        Text("\(m.config.limit)%").font(.system(.body, design: .rounded).weight(.semibold)).monospacedDigit()
+                        Text("\(m.config.limit)%").font(.system(.body).weight(.semibold)).monospacedDigit()
                             .frame(width: 40, alignment: .trailing)
                     }
                     if SMC.canInhibit {
                         HStack(spacing: 10) {
-                            IconBadge(icon: "water.waves", color: Palette.teal)
+                            IconBadge(icon: "water.waves")
                             Stepper("Sailing \(m.config.limit - m.config.sailing)–\(m.config.limit)%", value: $m.config.sailing, in: 0...20)
                         }
                     } else {
                         Text("macOS 27: memakai Charge Limit bawaan (80–100%)").font(.caption).foregroundStyle(.secondary)
                     }
-                    Switch("Top up ke 100% (sementara)", "arrow.up.to.line", $m.config.topUp, color: Palette.teal)
-                    Switch("Auto discharge ke batas", "arrow.down.to.line", $m.config.autoDischarge, color: Palette.violet)
+                    Switch("Top up ke 100% (sementara)", "arrow.up.to.line", $m.config.topUp)
+                    Switch("Auto discharge ke batas", "arrow.down.to.line", $m.config.autoDischarge)
                 }
                 Card(title: "Proteksi", icon: "shield.lefthalf.filled") {
                     if SMC.canInhibit {
-                        Switch("Heat protection", "flame.fill", $m.config.heatProtection, color: Palette.red)
+                        Switch("Heat protection", "flame.fill", $m.config.heatProtection)
                     }
                     if SMC.canInhibit && m.config.heatProtection {
                         HStack(spacing: 10) {
-                            IconBadge(icon: "thermometer.high", color: Palette.orange)
+                            IconBadge(icon: "thermometer.high")
                             Stepper(String(format: "Berhenti di ≥ %.0f °C", m.config.maxTemp), value: $m.config.maxTemp, in: 30...45)
                         }
                     }
-                    Switch("Hentikan pengisian saat sleep", "moon.fill", $m.config.stopOnSleep, color: Palette.indigo)
+                    Switch("Hentikan pengisian saat sleep", "moon.fill", $m.config.stopOnSleep)
                     HStack(spacing: 10) {
-                        IconBadge(icon: "gauge.with.needle", color: Palette.slate)
+                        IconBadge(icon: "gauge.with.needle")
                         Text("Kalibrasi 100 → 10 → 100%")
                         Spacer()
                         if m.status.calibration == 0 {
@@ -272,7 +285,7 @@ struct BatteryTab: View {
                 }
             }
 
-            if !m.error.isEmpty { Text(m.error).font(.caption).foregroundStyle(.red) }
+            if !m.error.isEmpty { Text(m.error).font(.caption).foregroundStyle(Palette.red) }
 
             if m.helperInstalled {
                 Button("Uninstall helper") { m.admin("uninstall-daemon") }
@@ -290,7 +303,18 @@ struct HistoryChart: View {
     @Local private var metric = 0
     @Local private var hours = 6
 
-    let metrics = [("Baterai", "%", Palette.green), ("Suhu", "°", Palette.orange), ("Daya", "W", Palette.blue)]
+    let metrics = [("Baterai", "%"), ("Suhu", "°"), ("Daya", "W")]
+
+    /// Vertical color scale over the plot: battery is good high, temperature good low, power mint when charging.
+    func scale(_ domain: ClosedRange<Double>) -> LinearGradient {
+        let at = { (v: Double) in min(max((v - domain.lowerBound) / (domain.upperBound - domain.lowerBound), 0), 1) }
+        let stops: [(Color, Double)] = switch metric {
+        case 0: [(Palette.red, 0), (Palette.red, at(20)), (Palette.amber, at(30)), (Palette.amber, at(40)), (Palette.accent, at(55)), (Palette.accent, 1)]
+        case 1: [(Palette.accent, 0), (Palette.accent, at(34)), (Palette.amber, at(37)), (Palette.red, at(42)), (Palette.red, 1)]
+        default: [(Palette.amber, 0), (Palette.amber, at(0)), (Palette.accent, at(0)), (Palette.accent, 1)]
+        }
+        return LinearGradient(stops: stops.map { Gradient.Stop(color: $0.0, location: $0.1) }, startPoint: .bottom, endPoint: .top)
+    }
 
     func value(_ s: Sample) -> Double? { [Double(s.percent), s.temp, s.watts][metric] }
 
@@ -299,7 +323,7 @@ struct HistoryChart: View {
         let pts = samples.filter { $0.t >= from.timeIntervalSince1970 }
             .compactMap { s in value(s).map { (date: Date(timeIntervalSince1970: s.t), v: $0) } }
         let vs = pts.map(\.v)
-        let (name, unit, color) = metrics[metric]
+        let (name, unit) = metrics[metric]
         // percent is fixed 0–100; temp/power zoom to their range, power always includes 0
         let domain = metric == 0 ? 0...100.0
             : metric == 2 ? min(vs.min() ?? 0, 0) - 1...max(vs.max() ?? 0, 0) + 1
@@ -316,15 +340,15 @@ struct HistoryChart: View {
             Chart {
                 ForEach(pts, id: \.date) { p in
                     AreaMark(x: .value("Waktu", p.date), yStart: .value(name, domain.lowerBound), yEnd: .value(name, p.v))
-                        .foregroundStyle(LinearGradient(colors: [color.opacity(0.3), color.opacity(0.0)], startPoint: .top, endPoint: .bottom))
+                        .foregroundStyle(scale(domain)).opacity(0.16)
                         .interpolationMethod(.monotone)
                     LineMark(x: .value("Waktu", p.date), y: .value(name, p.v))
-                        .foregroundStyle(color).interpolationMethod(.monotone)
-                        .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .foregroundStyle(scale(domain)).interpolationMethod(.monotone)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
                 }
                 if metric == 0, let limit {
                     RuleMark(y: .value("Batas", limit))
-                        .foregroundStyle(.secondary).lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .foregroundStyle(Color.gray).lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                         .annotation(position: .top, alignment: .leading) { Text("Batas \(limit)%").font(.caption2).foregroundStyle(.secondary) }
                 }
             }

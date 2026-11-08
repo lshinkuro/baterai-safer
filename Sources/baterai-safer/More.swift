@@ -134,6 +134,11 @@ enum ColorPick {
             done(h)
         }
     }
+
+    /// nil clears the whole history.
+    static func remove(_ h: String?) {
+        UserDefaults.standard.set(h.map { h in recent.filter { $0 != h } } ?? [], forKey: key)
+    }
 }
 
 extension Color {
@@ -235,6 +240,7 @@ struct MoreView: View {
     @AppStorage("fullChargeAlert") private var fullCharge = true
     @Local private var micMuted = Mic.muted
     @Local private var colors = ColorPick.recent
+    @Local private var hoveredColor: String?
     @StateObject private var camera = CameraBox()
     @ObservedObject private var tools = ToolsModel.shared
     @ObservedObject private var downloads = Downloads.shared
@@ -245,19 +251,19 @@ struct MoreView: View {
     static let tools: [(id: String, icon: String, title: String, subtitle: String, color: Color)] = [
         ("charge", "battery.100percent.bolt", "Notif baterai penuh", "Kabari saat sampai batas", Palette.green),
         ("mic", "mic.slash.fill", "Mic Mute", "Bisukan mic di semua aplikasi · ⌃⌥M", Palette.red),
-        ("camera", "camera.fill", "Kamera cermin", "Cek penampilan sebelum rapat", Palette.sky),
-        ("color", "eyedropper", "Color picker", "Ambil warna dari layar", Palette.pink),
+        ("camera", "camera.fill", "Kamera cermin", "Cek penampilan sebelum rapat", Palette.accent),
+        ("color", "eyedropper", "Color picker", "Ambil warna dari layar", Palette.accent),
         ("awake", "cup.and.saucer.fill", "Tetap menyala", "30 menit, 1 jam, atau sampai jam tertentu", Palette.amber),
-        ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.blue),
-        ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.indigo),
-        ("lang", "character.book.closed.fill", "Belajar Bahasa", "Inggris, Spanyol, Jepang · kuis, ngobrol dengan AI", Palette.teal),
+        ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.accent),
+        ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.accent),
+        ("lang", "character.book.closed.fill", "Belajar Bahasa", "Inggris, Spanyol, Jepang · kuis, ngobrol dengan AI", Palette.accent),
     ]
 
     var body: some View {
         if let tool = Self.tools.first(where: { $0.id == page }) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
-                    NButton(icon: "chevron.left", title: "Lainnya") { withAnimation(.easeInOut(duration: 0.2)) { page = "" } }
+                    NButton(icon: "chevron.left", title: "Lainnya") { withAnimation(Motion.ease) { page = "" } }
                     Text(tool.title).font(.system(size: 13, weight: .bold))
                 }
                 Group {
@@ -278,16 +284,17 @@ struct MoreView: View {
         } else {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
                 ForEach(Self.tools, id: \.id) { t in
-                    Button { withAnimation(.easeInOut(duration: 0.2)) { page = t.id } } label: {
+                    Button { withAnimation(Motion.ease) { page = t.id } } label: {
                         VStack(alignment: .leading, spacing: 8) {
-                            Image(systemName: t.icon).font(.system(size: 16, weight: .bold)).foregroundStyle(t.color)
-                                .frame(width: 38, height: 38).background(t.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-                            Text(t.title).font(.system(size: 12.5, weight: .bold))
-                            Text(t.subtitle).font(.system(size: 10.5)).foregroundStyle(.gray).lineLimit(2)
+                            Image(systemName: t.icon).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+                                .frame(width: 36, height: 36).background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            Text(t.title).font(.system(size: 12, weight: .semibold))
+                            Text(t.subtitle).font(.system(size: 11)).foregroundStyle(.gray).lineLimit(2, reservesSpace: true)
                         }
                         .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
                         .padding(12)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.07), lineWidth: 1))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -304,7 +311,7 @@ struct MoreView: View {
                     Image(systemName: tools.awake ? "cup.and.saucer.fill" : "moon.zzz.fill").font(.system(size: 30, weight: .bold))
                         .foregroundStyle(tools.awake ? Palette.amber : .gray)
                     Text(tools.awake ? (tools.awakeUntil.map { "Menyala sampai \($0.formatted(date: .omitted, time: .shortened))" } ?? "Menyala sampai dimatikan")
-                         : "Mac boleh tidur seperti biasa").font(.system(size: 12.5, weight: .bold)).multilineTextAlignment(.center)
+                         : "Mac boleh tidur seperti biasa").font(.system(size: 12, weight: .bold)).multilineTextAlignment(.center)
                     if tools.awake { NButton(icon: "stop.fill", title: "Matikan", tint: Palette.red) { tools.awake = false } }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -312,7 +319,7 @@ struct MoreView: View {
             .frame(width: 220)
             NCard {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("CEGAH SLEEP SELAMA").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                    Text("CEGAH SLEEP SELAMA").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
                     HStack(spacing: 6) {
                         NButton(icon: "timer", title: "30 menit", tint: Palette.amber) { tools.keepAwake(minutes: 30) }
                         NButton(icon: "timer", title: "1 jam", tint: Palette.amber) { tools.keepAwake(minutes: 60) }
@@ -339,7 +346,7 @@ struct MoreView: View {
         NCard {
             VStack(alignment: .leading, spacing: 8) {
                 Toggle("Kabari saat download selesai", isOn: $downloadAlert).toggleStyle(.switch).controlSize(.small)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .onChange(of: downloadAlert) { on in on ? downloads.start() : downloads.stop() }
                 if downloads.recent.isEmpty {
                     Text(downloadAlert ? "Download berikutnya muncul di sini." : "Nyalakan untuk memantau folder Downloads (macOS akan minta izin sekali).")
@@ -348,7 +355,7 @@ struct MoreView: View {
                 ForEach(downloads.recent, id: \.self) { url in
                     HStack(spacing: 8) {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 22, height: 22)
-                        Text(url.lastPathComponent).font(.system(size: 11.5)).lineLimit(1)
+                        Text(url.lastPathComponent).font(.system(size: 11)).lineLimit(1)
                         Spacer()
                         NButton(icon: "magnifyingglass", title: "Tampilkan") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                     }
@@ -362,14 +369,14 @@ struct MoreView: View {
         NCard {
             VStack(alignment: .leading, spacing: 8) {
                 if volumes.list.isEmpty {
-                    Placeholder(icon: "externaldrive.fill", title: "Tidak ada drive eksternal", subtitle: "Colok flashdisk atau hard disk, lalu eject dari sini", color: Palette.indigo)
+                    Placeholder(icon: "externaldrive.fill", title: "Tidak ada drive eksternal", subtitle: "Colok flashdisk atau hard disk, lalu eject dari sini")
                 }
                 ForEach(volumes.list, id: \.self) { url in
                     HStack(spacing: 8) {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 26, height: 26)
-                        Text(url.lastPathComponent).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
+                        Text(url.lastPathComponent).font(.system(size: 12, weight: .semibold)).lineLimit(1)
                         Spacer()
-                        NButton(icon: "eject.fill", title: "Eject", tint: Palette.indigo, prominent: true) { volumes.eject(url) }
+                        NButton(icon: "eject.fill", title: "Eject", tint: Palette.accent, prominent: true) { volumes.eject(url) }
                     }
                 }
             }
@@ -383,7 +390,7 @@ struct MoreView: View {
         return NCard {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Kabari saat baterai mencapai batas", isOn: $fullCharge).toggleStyle(.switch).controlSize(.small)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text("Saat charger tercolok dan baterai mencapai \(limit)%, notch menampilkan \"Baterai \(limit)% · boleh cabut charger\". Batasnya mengikuti pengaturan di tab Baterai.")
                     .font(.system(size: 11)).foregroundStyle(.gray)
                 Spacer()
@@ -413,7 +420,7 @@ struct MoreView: View {
     var cameraPage: some View {
         ZStack {
             if camera.denied {
-                Placeholder(icon: "camera.fill", title: "Izin kamera ditolak", subtitle: "System Settings → Privacy & Security → Camera", color: Palette.sky)
+                Placeholder(icon: "camera.fill", title: "Izin kamera ditolak", subtitle: "System Settings → Privacy & Security → Camera")
             } else {
                 CameraPreview(session: camera.session)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -427,21 +434,28 @@ struct MoreView: View {
         HStack(spacing: 14) {
             NCard {
                 VStack(spacing: 10) {
-                    Image(systemName: "eyedropper.halffull").font(.system(size: 26, weight: .bold)).foregroundStyle(Palette.pink)
-                    NButton(icon: "eyedropper", title: "Ambil warna", tint: Palette.pink, prominent: true) {
+                    Image(systemName: "eyedropper.halffull").font(.system(size: 26, weight: .bold)).foregroundStyle(Palette.accent)
+                    NButton(icon: "eyedropper", title: "Ambil warna", tint: Palette.accent, prominent: true) {
                         ColorPick.pick { h in
                             colors = ColorPick.recent
                             if let h { Notch.shared.flash("\(h) disalin") }
                         }
                     }
-                    Text("Kode hex langsung tersalin").font(.system(size: 10.5)).foregroundStyle(.gray)
+                    Text("Kode hex langsung tersalin").font(.system(size: 11)).foregroundStyle(.gray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(width: 200)
             NCard {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("TERAKHIR").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                    HStack {
+                        Text("TERAKHIR").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
+                        Spacer()
+                        if !colors.isEmpty {
+                            Button("Hapus semua") { ColorPick.remove(nil); colors = [] }
+                                .buttonStyle(.plain).font(.system(size: 10, weight: .semibold)).foregroundStyle(.gray)
+                        }
+                    }
                     if colors.isEmpty {
                         Text("Belum ada warna").font(.system(size: 11)).foregroundStyle(.gray)
                     }
@@ -449,12 +463,22 @@ struct MoreView: View {
                         ForEach(colors, id: \.self) { h in
                             Button { copyText(h); Notch.shared.flash("\(h) disalin") } label: {
                                 VStack(spacing: 4) {
-                                    RoundedRectangle(cornerRadius: 8).fill(Color(hexString: h) ?? .gray).frame(height: 34)
-                                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.15)))
-                                    Text(h).font(.system(size: 9.5, design: .monospaced))
+                                    RoundedRectangle(cornerRadius: 10).fill(Color(hexString: h) ?? .gray).frame(height: 34)
+                                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.white.opacity(0.15)))
+                                    Text(h).font(.system(size: 10, design: .monospaced))
                                 }
                             }
                             .buttonStyle(.plain)
+                            .overlay(alignment: .topTrailing) {
+                                if hoveredColor == h {
+                                    Button { ColorPick.remove(h); colors = ColorPick.recent } label: {
+                                        Image(systemName: "xmark.circle.fill").font(.system(size: 14))
+                                    }
+                                    .buttonStyle(.plain).foregroundStyle(.white, .black.opacity(0.6)).offset(x: 5, y: -5).tip("Hapus \(h)")
+                                }
+                            }
+                            .onHover { hoveredColor = $0 ? h : (hoveredColor == h ? nil : hoveredColor) }
+                            .contextMenu { Button("Hapus") { ColorPick.remove(h); colors = ColorPick.recent } }
                         }
                     }
                 }

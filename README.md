@@ -16,7 +16,7 @@ brew services start poni   # jalankan di menu bar + otomatis saat login
 ln -sf "$(brew --prefix)/opt/poni/Poni.app" /Applications/   # opsional: Launchpad/Spotlight
 ```
 
-Klik ikon baterai Poni di menu bar → **Install helper…** (minta password admin sekali). Helper adalah daemon root yang menulis ke SMC, jadi batas tetap berlaku saat aplikasi ditutup.
+Klik ikon Poni di menu bar → **Install helper…** (minta password admin sekali). Helper adalah daemon root yang menulis ke SMC, jadi batas tetap berlaku saat aplikasi ditutup.
 
 Atau lewat terminal: `sudo poni install-daemon`.
 
@@ -77,6 +77,8 @@ Top up dan kalibrasi di macOS 27 membutuhkan aplikasi menu bar tetap berjalan.
 
 Panel menu bar punya 4 tab: **Baterai** (fitur di atas + grafik riwayat), **Sistem** (memori, CPU, disk, proses terberat yang bisa ditutup), **Cleaner** (bersihkan cache/log/DerivedData/DeviceSupport/npm/Trash, simulator tak terpakai, analisis disk per folder, file > 200 MB, uninstall aplikasi beserta file sisanya ke Trash), dan **Tools** (cegah sleep, file tersembunyi, ikon desktop, dark mode, screenshot area).
 
+Di menu bar Poni tampil sebagai wajah Poni dan persentase baterai; persentasenya bisa disembunyikan di Tools → Fitur → **Persen**.
+
 ## Notch
 
 Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka, atau pilih **Klik** di Tools → Fitur → Buka notch:
@@ -99,7 +101,7 @@ Shortcut: ⌃⌥Space buka/tutup, ⌃⌥N Catatan, ⌃⌥D Dev Utils, ⌃⌥V Cl
 
 Rapat berikutnya dari Kalender muncul di samping kamera 10 menit sebelum mulai, dengan tombol **Join** untuk Zoom/Meet/Teams/Webex (perlu izin Kalender).
 
-Notch bisa dimatikan di tab Tools, begitu juga tiap fitur (tab notch, Rapat, tab Sistem/Cleaner): fitur yang dimatikan hilang dan proses latarnya berhenti. Now Playing butuh izin Automation untuk Spotify/Music.
+Notch bisa dimatikan di tab Tools, begitu juga tiap fitur (tab notch, Join rapat, tab Sistem/Cleaner): fitur yang dimatikan hilang dan proses latarnya berhenti. Now Playing butuh izin Automation untuk Spotify/Music.
 
 ## CLI
 

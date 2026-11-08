@@ -5,8 +5,6 @@ enum NTab: Int, CaseIterable {
     case music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, more
     var icon: String { ["music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "square.grid.2x2.fill"][rawValue] }
     var title: String { ["Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Lainnya"][rawValue] }
-    var color: Color { [Palette.pink, Palette.orange, Palette.sky, Palette.violet, Palette.yellow, Palette.sky, Palette.teal, Palette.blue, Palette.indigo, Palette.green, Palette.slate][rawValue] }
-    var theme: Theme { [Theme.violet, .amber, .electric, .violet, .amber, .electric, .mint, .electric, .electric, .mint, .electric][rawValue] }
     var enabled: Bool { FeatureFlags.isOn("\(self)") }
 }
 
@@ -176,9 +174,9 @@ final class Notch {
     }
 
     func flash(_ message: String) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { state.toast = message }
+        withAnimation(Motion.snap) { state.toast = message }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            if self.state.toast == message { withAnimation(.easeOut) { self.state.toast = nil } }
+            if self.state.toast == message { withAnimation(Motion.ease) { self.state.toast = nil } }
         }
     }
 
@@ -196,7 +194,7 @@ final class Notch {
     }
 
     private func set(_ open: Bool) {
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) { state.expanded = open }
+        withAnimation(Motion.snap) { state.expanded = open }
         panel?.ignoresMouseEvents = !open
         if open {
             if let front = NSWorkspace.shared.frontmostApplication, front != .current { previous = front }
@@ -233,16 +231,16 @@ struct NotchShape: Shape {
 // MARK: Island building blocks (always dark)
 
 struct NCard<Content: View>: View {
-    @Environment(\.accent) private var accent
     var padding: CGFloat = 12
     @ViewBuilder let content: Content
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(LinearGradient(colors: [accent.a.opacity(0.16), accent.b.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.white.opacity(0.045), in: shape)
+            .overlay(shape.strokeBorder(.white.opacity(0.07), lineWidth: 1))
     }
 }
 
@@ -258,12 +256,12 @@ struct NButton: View {
         Button(action: run) {
             HStack(spacing: 5) {
                 Image(systemName: icon).font(.system(size: 11, weight: .bold))
-                if let title { Text(title).font(.system(size: 11.5, weight: .semibold)) }
+                if let title { Text(title).font(.system(size: 11, weight: .semibold)) }
             }
-            .foregroundStyle(prominent ? Color.white : tint)
+            .foregroundStyle(prominent ? Palette.onAccent : tint)
             .padding(.horizontal, title == nil ? 0 : 11)
             .frame(minWidth: 28, minHeight: 28)
-            .background(prominent ? AnyShapeStyle(tint.gradient) : AnyShapeStyle(Color.white.opacity(hover ? 0.16 : 0.09)), in: Capsule())
+            .background(prominent ? AnyShapeStyle(Palette.accent.opacity(hover ? 0.85 : 1)) : AnyShapeStyle(Color.white.opacity(hover ? 0.14 : 0.08)), in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -281,7 +279,7 @@ struct Chip: View {
             if let icon { Image(systemName: icon) }
             Text(text)
         }
-        .font(.system(size: 9.5, weight: .semibold))
+        .font(.system(size: 10, weight: .semibold))
         .foregroundStyle(color)
         .padding(.horizontal, 6).padding(.vertical, 2)
         .background(color.opacity(0.16), in: Capsule())
@@ -291,14 +289,13 @@ struct Chip: View {
 struct Placeholder: View {
     let icon: String, title: String
     var subtitle: String?
-    var color: Color = .gray
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
-                .frame(width: 46, height: 46)
-                .background(color.gradient, in: Circle())
-                .shadow(color: color.opacity(0.5), radius: 12)
+            Image(systemName: icon).font(.system(size: 18, weight: .medium)).foregroundStyle(.white.opacity(0.8))
+                .frame(width: 44, height: 44)
+                .background(Color.white.opacity(0.06), in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1))
             Text(title).font(.system(size: 13, weight: .semibold))
             if let subtitle { Text(subtitle).font(.system(size: 11)).foregroundStyle(.gray).multilineTextAlignment(.center) }
         }
@@ -307,10 +304,10 @@ struct Placeholder: View {
 }
 
 struct Equalizer: View {
-    var color: Color = .green
+    var color: Color = Palette.accent
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.12)) { ctx in
+        TimelineView(.animation(minimumInterval: 0.12, paused: Motion.reduced)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<4, id: \.self) { i in
@@ -372,7 +369,7 @@ struct NotchView: View {
                 VStack(spacing: 0) {
                     if live { collapsed.frame(width: size.width, height: n.height) } else if state.toast != nil { Color.clear.frame(height: n.height) }
                     if let t = state.toast {
-                        Label(t, systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .bold, design: .rounded))
+                        Label(t, systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Palette.green).lineLimit(1).frame(height: 26)
                     }
                 }
@@ -389,30 +386,30 @@ struct NotchView: View {
         HStack {
             Group {
                 if ai.running {
-                    Image(systemName: "sparkles").foregroundStyle(.purple)
+                    Image(systemName: "sparkles").foregroundStyle(Palette.accent)
                 } else if let m = soon {
                     Image(systemName: m.link == nil ? "calendar" : "video.fill").foregroundStyle(Color(nsColor: m.color ?? .systemBlue))
                 } else if focus.running {
                     HStack(spacing: 6) {
-                        Image(systemName: "timer").foregroundStyle(.orange)
+                        Image(systemName: "timer").foregroundStyle(Palette.accent)
                         if !task.isEmpty { Text(task).lineLimit(1).foregroundStyle(.white.opacity(0.85)) }
                     }
                 } else if let art = media.artwork {
                     Image(nsImage: art).resizable().aspectRatio(contentMode: .fill).frame(width: 20, height: 20)
-                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 } else {
-                    Image(systemName: "music.note").foregroundStyle(.pink)
+                    Image(systemName: "music.note").foregroundStyle(Palette.accent)
                 }
             }
             .frame(width: task.isEmpty ? 22 : 110, alignment: .leading)
             Spacer()
             if ai.running {
-                ProgressView().controlSize(.mini).tint(.purple)
+                ProgressView().controlSize(.mini).tint(Palette.accent)
             } else if let m = soon {
                 Text(m.start <= Date() ? "live" : m.when(Date()).replacingOccurrences(of: " lagi", with: ""))
-                    .font(.system(size: 12, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(Palette.sky)
+                    .font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
             } else if focus.running {
-                Text(focus.clock).font(.system(size: 12, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(.orange)
+                Text(focus.clock).font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
             } else {
                 Equalizer()
             }
@@ -431,19 +428,16 @@ struct NotchView: View {
                     let w = min(26, ((Self.open.width - n.width) / 2 - 26) / CGFloat(max(tabs.count, 1)) - 1)
                     ForEach(tabs, id: \.self) { t in
                         let on = state.tab == t
-                        Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { state.tab = t } } label: {
-                            Image(systemName: t.icon).font(.system(size: 11.5, weight: .bold))
-                                .foregroundStyle(on ? Color.white : t.color.opacity(0.75))
+                        Button { withAnimation(Motion.snap) { state.tab = t } } label: {
+                            Image(systemName: t.icon).font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(on ? Palette.onAccent : Color.gray)
                                 .frame(width: w, height: 22)
                                 .background {
-                                    if on {
-                                        Capsule().fill(t.theme.gradient).shadow(color: t.color.opacity(0.6), radius: 5)
-                                            .matchedGeometryEffect(id: "tab", in: ns)
-                                    }
+                                    if on { Capsule().fill(Palette.accent).matchedGeometryEffect(id: "tab", in: ns) }
                                 }
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain).help(t.title)
+                        .buttonStyle(.plain).tip(t.title)
                     }
                 }
                 .padding(2)
@@ -483,13 +477,6 @@ struct NotchView: View {
             .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16)
         }
         .foregroundStyle(.white)
-        .environment(\.accent, state.tab.theme)
-        .background(alignment: .top) {
-            // Same colored glow as the menu bar panel, keyed to the tab.
-            RadialGradient(colors: [state.tab.color.opacity(0.28), .clear], center: .top, startRadius: 0, endRadius: 300)
-                .allowsHitTesting(false)
-                .animation(.easeInOut(duration: 0.4), value: state.tab)
-        }
     }
 }
 
@@ -499,7 +486,7 @@ struct StatusClock: View {
             let b = Battery.read()
             HStack(spacing: 5) {
                 Image(systemName: b.ac ? "battery.100percent.bolt" : "battery.\(min(100, (b.percent + 12) / 25 * 25))percent")
-                    .foregroundStyle(b.percent <= 20 && !b.ac ? .red : .green)
+                    .foregroundStyle(b.percent <= 20 && !b.ac ? Palette.red : Palette.green)
                 Text("\(b.percent)%")
                 Text(ctx.date, format: .dateTime.hour().minute()).foregroundStyle(.gray)
             }
@@ -518,7 +505,7 @@ struct MusicView: View {
     var body: some View {
         if m.app == nil || m.title.isEmpty {
             Placeholder(icon: "music.note", title: m.app == nil ? "Tidak ada musik" : "\(m.app!) dijeda",
-                        subtitle: "Putar lagu di Spotify atau Apple Music", color: .pink)
+                        subtitle: "Putar lagu di Spotify atau Apple Music")
         } else {
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
                 let pos = m.now(ctx.date)
@@ -539,7 +526,7 @@ struct MusicView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(m.title).font(.system(size: 17, weight: .bold)).lineLimit(1)
+                                Text(m.title).font(.system(size: 18, weight: .bold)).lineLimit(1)
                                 Text(m.artist).font(.system(size: 13)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
                             }
                             Spacer()
@@ -559,7 +546,7 @@ struct MusicView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        .animation(.easeOut(duration: 0.3), value: i)
+                        .animation(Motion.ease, value: i)
 
                         GeometryReader { g in
                             ZStack(alignment: .leading) {
@@ -573,13 +560,13 @@ struct MusicView: View {
                             Spacer()
                             Text("-" + mmss(max(0, m.duration - pos)))
                         }
-                        .font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit().foregroundStyle(.white.opacity(0.5))
+                        .font(.system(size: 10, weight: .medium)).monospacedDigit().foregroundStyle(.white.opacity(0.5))
                         .padding(.top, 4)
 
                         HStack(spacing: 34) {
-                            control("backward.fill", 17) { m.send("previous track") }
-                            control(m.playing ? "pause.fill" : "play.fill", 26) { m.send("playpause") }
-                            control("forward.fill", 17) { m.send("next track") }
+                            control("backward.fill", 17, "Sebelumnya") { m.send("previous track") }
+                            control(m.playing ? "pause.fill" : "play.fill", 26, m.playing ? "Jeda" : "Putar") { m.send("playpause") }
+                            control("forward.fill", 17, "Berikutnya") { m.send("next track") }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 6)
@@ -589,9 +576,9 @@ struct MusicView: View {
         }
     }
 
-    func control(_ icon: String, _ size: CGFloat, _ run: @escaping () -> Void) -> some View {
+    func control(_ icon: String, _ size: CGFloat, _ name: String, _ run: @escaping () -> Void) -> some View {
         Button(action: run) { Image(systemName: icon).font(.system(size: size)).frame(width: 36, height: 30).contentShape(Rectangle()) }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain).tip(name)
     }
 }
 
@@ -601,15 +588,15 @@ struct FocusView: View {
     @Local private var done = ""
 
     var body: some View {
-        let color: Color = f.onBreak ? .green : .orange
+        let color: Color = f.onBreak ? Palette.green : Palette.accent
         HStack(spacing: 14) {
             NCard {
                 VStack(spacing: 12) {
                     Ring(value: f.remaining / f.total, color: color, label: f.clock, caption: f.onBreak ? "istirahat" : "fokus", size: 128, line: 10)
                     HStack(spacing: 8) {
-                        NButton(icon: "arrow.counterclockwise") { f.reset() }.help("Ulang")
+                        NButton(icon: "arrow.counterclockwise") { f.reset() }.tip("Ulang")
                         NButton(icon: f.running ? "pause.fill" : "play.fill", title: f.running ? "Jeda" : "Mulai", tint: color, prominent: true) { f.toggle() }
-                        NButton(icon: "forward.end.fill") { f.next() }.help(f.onBreak ? "Lewati istirahat" : "Lewati ke istirahat")
+                        NButton(icon: "forward.end.fill") { f.next() }.tip(f.onBreak ? "Lewati istirahat" : "Lewati ke istirahat")
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -632,7 +619,7 @@ struct FocusView: View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
                 HStack(spacing: 6) {
-                    Image(systemName: "scope").foregroundStyle(.orange)
+                    Image(systemName: "scope").foregroundStyle(Palette.accent)
                     TextField("Mau mengerjakan apa?", text: $f.intention).textFieldStyle(.plain).disabled(f.running)
                 }
                 .font(.system(size: 12, weight: .semibold))
@@ -642,17 +629,18 @@ struct FocusView: View {
                     ForEach(Focus.durations, id: \.self) { m in
                         Button { f.minutes = m } label: {
                             Text("\(m)m").font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(f.minutes == m ? Color.white : Color.gray)
+                                .foregroundStyle(f.minutes == m ? Palette.onAccent : Color.gray)
                                 .padding(.horizontal, 8).padding(.vertical, 5)
-                                .background(f.minutes == m ? Color.orange.opacity(0.9) : Color.clear, in: Capsule())
+                                .background(f.minutes == m ? Palette.accent.opacity(0.9) : Color.clear, in: Capsule())
                                 .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
                     }
                     if !Focus.durations.contains(f.minutes) {
                         Text("\(f.minutes)m").font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Palette.onAccent)
                             .padding(.horizontal, 8).padding(.vertical, 5)
-                            .background(Color.orange.opacity(0.9), in: Capsule())
+                            .background(Palette.accent.opacity(0.9), in: Capsule())
                     }
                     // Custom length in 5-minute steps.
                     Stepper("", value: $f.minutes, in: 5...180, step: 5).labelsHidden().controlSize(.mini)
@@ -664,7 +652,7 @@ struct FocusView: View {
             }
             HStack(spacing: 8) {
                 Toggle("Blokir pengganggu", isOn: $f.blockOn).toggleStyle(.switch).controlSize(.mini)
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                 Menu {
                     let running = NSWorkspace.shared.runningApplications
                         .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != Bundle.main.bundleIdentifier }
@@ -680,7 +668,7 @@ struct FocusView: View {
                 }
                 .menuStyle(.borderlessButton).fixedSize()
                 Spacer()
-                if f.blocking { Chip(text: "aktif", icon: "hand.raised.fill", color: Palette.orange) }
+                if f.blocking { Chip(text: "aktif", icon: "hand.raised.fill", color: Palette.accent) }
             }
         }
     }
@@ -689,15 +677,15 @@ struct FocusView: View {
         NCard(padding: 10) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
-                    Label("\(f.streak) hari", systemImage: "flame.fill").foregroundStyle(.orange)
-                    Label("\(f.today) menit hari ini", systemImage: "clock.fill").foregroundStyle(Palette.blue)
+                    Label("\(f.streak) hari", systemImage: "flame.fill").foregroundStyle(Palette.accent)
+                    Label("\(f.today) menit hari ini", systemImage: "clock.fill").foregroundStyle(Palette.accent)
                     Spacer()
                     Text("7 HARI").foregroundStyle(.gray)
                 }
                 .font(.system(size: 10, weight: .bold))
                 Chart(f.last7, id: \.day) { d in
                     BarMark(x: .value("Hari", d.day), y: .value("Menit", d.minutes), width: .ratio(0.55))
-                        .foregroundStyle(Color.orange.gradient).cornerRadius(4)
+                        .foregroundStyle(Palette.accent.gradient).cornerRadius(4)
                 }
                 .chartYAxis(.hidden)
                 .chartXAxis { AxisMarks { _ in AxisValueLabel().font(.system(size: 9)).foregroundStyle(Color.gray) } }
@@ -717,7 +705,7 @@ struct FocusView: View {
                 Text("Sesi selesai 🎉").font(.system(size: 15, weight: .bold))
                 Text(task.isEmpty ? "\(f.minutes) menit fokus" : "\(task) · \(f.minutes) menit").font(.system(size: 12)).foregroundStyle(.gray)
                 TextField("Apa yang selesai?", text: $done).textFieldStyle(.plain).onSubmit(saveReflection)
-                    .font(.system(size: 12.5))
+                    .font(.system(size: 12))
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Spacer(minLength: 0)
@@ -725,7 +713,7 @@ struct FocusView: View {
                     Text("Tersimpan di catatan Jurnal Fokus").font(.system(size: 10)).foregroundStyle(.gray)
                     Spacer()
                     NButton(icon: "xmark", title: "Lewati") { f.reflecting = nil; done = "" }
-                    NButton(icon: "checkmark", title: "Simpan", tint: .orange, prominent: true, run: saveReflection)
+                    NButton(icon: "checkmark", title: "Simpan", tint: Palette.accent, prominent: true, run: saveReflection)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -755,11 +743,11 @@ struct AIView: View {
             VStack(spacing: 10) {
                 HStack(spacing: 2) {
                     ForEach(Array(["Chat", "Pemakaian"].enumerated()), id: \.offset) { i, title in
-                        Button { withAnimation(.easeInOut(duration: 0.2)) { page = i } } label: {
-                            Text(title).font(.system(size: 11.5, weight: .semibold))
-                                .foregroundStyle(page == i ? Color.white : Color.gray)
+                        Button { withAnimation(Motion.ease) { page = i } } label: {
+                            Text(title).font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(page == i ? Palette.onAccent : Color.gray)
                                 .padding(.horizontal, 11).padding(.vertical, 5)
-                                .background(page == i ? Color.purple.opacity(0.9) : Color.clear, in: Capsule())
+                                .background(page == i ? Palette.accent.opacity(0.9) : Color.clear, in: Capsule())
                                 .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -780,7 +768,7 @@ struct AIView: View {
 
     @ViewBuilder var chat: some View {
         if ai.clis.isEmpty {
-            Placeholder(icon: "sparkles", title: "Belum ada CLI AI", subtitle: "Pasang Claude Code atau Kiro CLI", color: .purple)
+            Placeholder(icon: "sparkles", title: "Belum ada CLI AI", subtitle: "Pasang Claude Code atau Kiro CLI")
         } else {
             VStack(spacing: 10) {
                 ScrollViewReader { proxy in
@@ -788,24 +776,24 @@ struct AIView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             if ai.chat.isEmpty {
                                 Placeholder(icon: "sparkles", title: "Tanya \(ai.selected)",
-                                            subtitle: "Percakapan berlanjut sampai kamu mulai yang baru (✎)", color: .purple)
+                                            subtitle: "Percakapan berlanjut sampai kamu mulai yang baru (✎)")
                                     .frame(height: 170)
                             }
                             ForEach(ai.chat) { x in
                                 Text(x.prompt).font(.system(size: 12, weight: .medium))
                                     .padding(.horizontal, 12).padding(.vertical, 7)
-                                    .background(LinearGradient(colors: [.purple, .indigo], startPoint: .leading, endPoint: .trailing),
-                                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .background(Color.white.opacity(0.1),
+                                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                                     .frame(maxWidth: .infinity, alignment: .trailing)
                                 HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: "sparkles").font(.system(size: 10, weight: .bold)).foregroundStyle(.purple)
-                                        .frame(width: 22, height: 22).background(Color.purple.opacity(0.2), in: Circle())
+                                    Image(systemName: "sparkles").font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.accent)
+                                        .frame(width: 22, height: 22).background(Palette.accent.opacity(0.2), in: Circle())
                                     if x.answer.isEmpty {
                                         HStack(spacing: 6) { ProgressView().controlSize(.small); Text("\(ai.selected) berpikir…").foregroundStyle(.gray) }
                                             .font(.system(size: 12)).padding(.top, 3)
                                     } else {
                                         Text((try? AttributedString(markdown: x.answer, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(x.answer))
-                                            .font(.system(size: 12)).foregroundStyle(x.failed ? .red : .white.opacity(0.92))
+                                            .font(.system(size: 12)).foregroundStyle(x.failed ? Palette.red : .white.opacity(0.92))
                                             .lineSpacing(2)
                                             .textSelection(.enabled)
                                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -826,16 +814,16 @@ struct AIView: View {
                         TextField("Tanya \(ai.selected)…", text: $ai.prompt).textFieldStyle(.plain).onSubmit { ai.ask() }
                             .focused($focused).onAppear { focused = true }
                         if ai.running {
-                            Button { ai.stop() } label: { Image(systemName: "stop.circle.fill").font(.system(size: 20)) }.buttonStyle(.plain).help("Hentikan")
+                            Button { ai.stop() } label: { Image(systemName: "stop.circle.fill").font(.system(size: 20)) }.buttonStyle(.plain).tip("Hentikan")
                         } else {
-                            Button { ai.ask() } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 20)).foregroundStyle(.purple) }
-                                .buttonStyle(.plain).disabled(ai.prompt.isEmpty).opacity(ai.prompt.isEmpty ? 0.4 : 1)
+                            Button { ai.ask() } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 20)).foregroundStyle(Palette.accent) }
+                                .buttonStyle(.plain).tip("Kirim").disabled(ai.prompt.isEmpty).opacity(ai.prompt.isEmpty ? 0.4 : 1)
                         }
                     }
                     .padding(.leading, 12).padding(.trailing, 4).padding(.vertical, 4)
                     .background(Color.white.opacity(0.09), in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.08)))
-                    NButton(icon: "square.and.pencil") { ai.reset() }.help("Percakapan baru")
+                    NButton(icon: "square.and.pencil") { ai.reset() }.tip("Percakapan baru")
                 }
             }
         }
@@ -869,7 +857,7 @@ struct ClipView: View {
             }
             if shown.isEmpty {
                 Placeholder(icon: "doc.on.clipboard", title: c.items.isEmpty ? "Clipboard kosong" : "Tidak ada yang cocok",
-                            subtitle: c.items.isEmpty ? "Teks dan gambar yang kamu copy muncul di sini" : nil, color: .teal)
+                            subtitle: c.items.isEmpty ? "Teks dan gambar yang kamu copy muncul di sini" : nil)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 5) {
@@ -887,8 +875,8 @@ struct ClipView: View {
                     if let img = c.thumb(item) {
                         Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
                     } else {
-                        Image(systemName: "text.alignleft").font(.system(size: 11, weight: .semibold)).foregroundStyle(.teal)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.teal.opacity(0.15))
+                        Image(systemName: "text.alignleft").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.accent)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity).background(Palette.accent.opacity(0.15))
                     }
                 }
                 .frame(width: 40, height: 30)
@@ -896,21 +884,21 @@ struct ClipView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(copied == item.id ? "Disalin ✓" : (item.text ?? (item.ocr?.isEmpty == false ? item.ocr! : "Gambar")))
                         .font(.system(size: 12)).lineLimit(1)
-                        .foregroundStyle(copied == item.id ? .green : .white)
-                    if item.image != nil { Text(item.ocr?.isEmpty == false ? "Gambar · teks terbaca" : "Gambar").font(.system(size: 9.5)).foregroundStyle(.gray) }
+                        .foregroundStyle(copied == item.id ? Palette.green : .white)
+                    if item.image != nil { Text(item.ocr?.isEmpty == false ? "Gambar · teks terbaca" : "Gambar").font(.system(size: 10)).foregroundStyle(.gray) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if hover || item.pinned {
                     Button { c.togglePin(item) } label: { Image(systemName: item.pinned ? "pin.fill" : "pin") }
-                        .buttonStyle(.plain).foregroundStyle(item.pinned ? .yellow : .gray).help("Pin")
+                        .buttonStyle(.plain).foregroundStyle(item.pinned ? Palette.accent : .gray).tip("Pin")
                 }
                 if hover {
-                    Button { c.delete(item) } label: { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(.gray)
+                    Button { c.delete(item) } label: { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(.gray).tip("Hapus")
                 }
             }
             .font(.system(size: 11))
         }
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture {
             c.copy(item)
             copied = item.id
@@ -928,15 +916,15 @@ struct ShelfView: View {
             VStack(spacing: 10) {
                 Image(systemName: "tray.and.arrow.down.fill").font(.system(size: 22, weight: .semibold))
                     .frame(width: 50, height: 50)
-                    .background((dropping ? Color.blue : Color.white.opacity(0.1)).gradient, in: Circle())
+                    .background((dropping ? Palette.accent : Color.white.opacity(0.1)).gradient, in: Circle())
                 Text(dropping ? "Lepas untuk menyimpan" : "Seret file ke notch").font(.system(size: 13, weight: .semibold))
                 Text("Simpan sementara, lalu seret keluar atau kirim lewat AirDrop").font(.system(size: 11)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
-                .foregroundStyle(dropping ? Color.blue : Color.white.opacity(0.2)))
-            .animation(.easeInOut(duration: 0.15), value: dropping)
+                .foregroundStyle(dropping ? Palette.accent : Color.white.opacity(0.2)))
+            .animation(Motion.ease, value: dropping)
         } else {
             VStack(spacing: 10) {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -946,10 +934,10 @@ struct ShelfView: View {
                 }
                 .frame(maxHeight: .infinity)
                 HStack(spacing: 8) {
-                    Text("\(s.files.count) file · seret keluar untuk memindahkan").font(.system(size: 10.5)).foregroundStyle(.gray)
+                    Text("\(s.files.count) file · seret keluar untuk memindahkan").font(.system(size: 11)).foregroundStyle(.gray)
                     Spacer()
                     NButton(icon: "xmark", title: "Kosongkan") { s.files = [] }
-                    NButton(icon: "dot.radiowaves.left.and.right", title: "AirDrop", tint: .blue, prominent: true) { s.airDrop(s.files) }
+                    NButton(icon: "dot.radiowaves.left.and.right", title: "AirDrop", tint: Palette.accent, prominent: true) { s.airDrop(s.files) }
                 }
             }
         }
@@ -965,11 +953,11 @@ struct ShelfView: View {
             .overlay(alignment: .topTrailing) {
                 if hover {
                     Button { s.files.removeAll { $0 == url } } label: { Image(systemName: "xmark.circle.fill").font(.system(size: 15)) }
-                        .buttonStyle(.plain).foregroundStyle(.white, .gray)
+                        .buttonStyle(.plain).foregroundStyle(.white, .gray).tip("Keluarkan dari Shelf")
                 }
             }
         }
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
         .contextMenu {
             Button("AirDrop") { s.airDrop([url]) }
@@ -984,10 +972,10 @@ struct StatsView: View {
     var body: some View {
         let b = Battery.read(), mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0
         HStack(spacing: 10) {
-            stat("Baterai", "battery.75percent", Double(b.percent) / 100, b.percent <= 20 ? Palette.red : Palette.green, b.ac ? "dicas" : "tidak dicas")
-            stat("CPU", "cpu", s.cpu, s.cpu > 0.85 ? Palette.red : Palette.blue, "\(ProcessInfo.processInfo.activeProcessorCount) core")
-            stat("Memori", "memorychip", mem, mem > 0.85 ? Palette.red : Palette.violet, "\(bytes(s.memTotal - s.memUsed)) sisa")
-            stat("Disk", "internaldrive", disk, disk > 0.85 ? Palette.red : Palette.pink, "\(bytes(s.diskFree)) bebas")
+            stat("Baterai", "battery.75percent", Double(b.percent) / 100, b.percent <= 20 && !b.ac ? Palette.red : b.ac ? Palette.green : Palette.amber, b.ac ? "dicas" : "tidak dicas")
+            stat("CPU", "cpu", s.cpu, s.cpu > 0.85 ? Palette.red : Palette.accent, "\(ProcessInfo.processInfo.activeProcessorCount) core")
+            stat("Memori", "memorychip", mem, mem > 0.85 ? Palette.red : Palette.accent, "\(bytes(s.memTotal - s.memUsed)) sisa")
+            stat("Disk", "internaldrive", disk, disk > 0.85 ? Palette.red : Palette.accent, "\(bytes(s.diskFree)) bebas")
         }
         .onAppear { s.start() }
         .onDisappear { s.stop() }
@@ -998,7 +986,7 @@ struct StatsView: View {
             VStack(spacing: 8) {
                 Label(title, systemImage: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(.gray)
                 Ring(value: v, color: color, label: "\(Int(v * 100))%", size: 92, line: 9)
-                Text(caption).font(.system(size: 10.5, weight: .medium)).foregroundStyle(.white.opacity(0.7)).lineLimit(1).minimumScaleFactor(0.8)
+                Text(caption).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -1033,9 +1021,9 @@ struct GitView: View {
                     } else {
                         NButton(icon: "link", title: "Bitbucket") { connecting = "bitbucket" }
                     }
-                    NButton(icon: "arrow.clockwise") { pr.refresh(repos: g.repos.map(\.path)) }.help("Muat ulang PR")
+                    NButton(icon: "arrow.clockwise") { pr.refresh(repos: g.repos.map(\.path)) }.tip("Muat ulang PR")
                 } else {
-                    NButton(icon: "arrow.clockwise") { g.refresh() }.help("Segarkan status")
+                    NButton(icon: "arrow.clockwise") { g.refresh() }.tip("Segarkan status")
                     NButton(icon: "plus", title: "Tambah repo") { g.add() }
                 }
             }
@@ -1065,15 +1053,15 @@ struct GitView: View {
     }
 
     func pane(_ title: String, count: Int, on: Bool, _ run: @escaping () -> Void) -> some View {
-        Button(action: { withAnimation(.easeInOut(duration: 0.2)) { run() } }) {
+        Button(action: { withAnimation(Motion.ease) { run() } }) {
             HStack(spacing: 5) {
                 Text(title)
-                if count > 0 { Text("\(count)").font(.system(size: 9.5, weight: .bold)).padding(.horizontal, 5).background(Color.white.opacity(0.18), in: Capsule()) }
+                if count > 0 { Text("\(count)").font(.system(size: 10, weight: .bold)).padding(.horizontal, 5).background(Color.white.opacity(0.18), in: Capsule()) }
             }
-            .font(.system(size: 11.5, weight: .semibold))
-            .foregroundStyle(on ? Color.white : Color.gray)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(on ? Palette.onAccent : Color.gray)
             .padding(.horizontal, 11).padding(.vertical, 5)
-            .background(on ? Color.indigo.opacity(0.9) : Color.clear, in: Capsule())
+            .background(on ? Palette.accent.opacity(0.9) : Color.clear, in: Capsule())
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -1081,7 +1069,7 @@ struct GitView: View {
 
     @ViewBuilder var repoList: some View {
         if g.repos.isEmpty {
-            Placeholder(icon: "arrow.triangle.branch", title: "Belum ada repo", subtitle: "Klik Tambah repo untuk memantau branch dan perubahan", color: .indigo)
+            Placeholder(icon: "arrow.triangle.branch", title: "Belum ada repo", subtitle: "Klik Tambah repo untuk memantau branch dan perubahan")
         } else {
             ScrollView {
                 VStack(spacing: 6) {
@@ -1093,20 +1081,20 @@ struct GitView: View {
 
     func repoRow(_ r: Repo) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "folder.fill").font(.system(size: 14)).foregroundStyle(.indigo)
-                .frame(width: 34, height: 34).background(Color.indigo.opacity(0.18), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Image(systemName: "folder.fill").font(.system(size: 14)).foregroundStyle(Palette.accent)
+                .frame(width: 34, height: 34).background(Palette.accent.opacity(0.18), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(r.name).font(.system(size: 13, weight: .semibold))
-                    Chip(text: r.status.branch, icon: "arrow.triangle.branch", color: .purple)
+                    Chip(text: r.status.branch, icon: "arrow.triangle.branch", color: Palette.accent)
                 }
                 HStack(spacing: 6) {
                     Chip(text: r.status.changes == 0 ? "bersih" : "\(r.status.changes) berubah", icon: r.status.changes == 0 ? "checkmark" : "pencil",
-                         color: r.status.changes > 0 ? .orange : .green)
-                    if r.status.ahead > 0 { Chip(text: "\(r.status.ahead)", icon: "arrow.up", color: .green) }
-                    if r.status.behind > 0 { Chip(text: "\(r.status.behind)", icon: "arrow.down", color: .blue) }
+                         color: r.status.changes > 0 ? Palette.amber : Palette.green)
+                    if r.status.ahead > 0 { Chip(text: "\(r.status.ahead)", icon: "arrow.up", color: Palette.green) }
+                    if r.status.behind > 0 { Chip(text: "\(r.status.behind)", icon: "arrow.down", color: Palette.accent) }
                     if !r.message.isEmpty {
-                        Text(r.message).font(.system(size: 10)).foregroundStyle(r.message.hasPrefix("Gagal") ? .red : .gray).lineLimit(1)
+                        Text(r.message).font(.system(size: 10)).foregroundStyle(r.failed ? Palette.red : .gray).lineLimit(1).help(r.message)
                     }
                 }
             }
@@ -1115,11 +1103,11 @@ struct GitView: View {
                 ProgressView().controlSize(.small)
             } else {
                 if r.status.changes > 0 {
-                    NButton(icon: "checkmark.circle", title: "Commit", tint: .green) { composing = r }
+                    NButton(icon: "checkmark.circle", title: "Commit", tint: Palette.green) { composing = r }
                 }
-                NButton(icon: "arrow.triangle.2.circlepath") { g.run(r, "fetch") }.help("Fetch")
-                NButton(icon: "arrow.down") { g.run(r, "pull") }.help("Pull (fast-forward)")
-                NButton(icon: "arrow.up") { g.run(r, "push") }.help("Push")
+                NButton(icon: "arrow.triangle.2.circlepath") { g.run(r, "fetch") }.tip("Fetch")
+                NButton(icon: "arrow.down") { g.run(r, "pull") }.tip("Pull (fast-forward)")
+                NButton(icon: "arrow.up") { g.run(r, "push") }.tip("Push")
             }
             Menu {
                 Button("Buka di Terminal") { g.open(r, app: "com.apple.Terminal") }
@@ -1128,10 +1116,10 @@ struct GitView: View {
                 Divider()
                 Button("Hapus dari daftar") { g.remove(r) }
             } label: { Image(systemName: "ellipsis") }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .tip("Lainnya").menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
         }
         .padding(10)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -1144,10 +1132,10 @@ struct PRPane: View {
 
     var body: some View {
         if !pr.error.isEmpty && pr.prs.isEmpty {
-            Placeholder(icon: "exclamationmark.triangle.fill", title: "Tidak bisa memuat PR", subtitle: pr.error, color: .red)
+            Placeholder(icon: "exclamationmark.triangle.fill", title: "Tidak bisa memuat PR", subtitle: pr.error)
         } else if pr.prs.isEmpty {
             Placeholder(icon: "checkmark.seal.fill", title: pr.loading ? "Memuat PR…" : "Tidak ada PR terbuka",
-                        subtitle: "PR yang minta review-mu, PR milikmu, dan PR di repo yang dipantau", color: .green)
+                        subtitle: "PR yang minta review-mu, PR milikmu, dan PR di repo yang dipantau")
         } else {
             HStack(spacing: 10) {
                 ScrollView {
@@ -1165,19 +1153,19 @@ struct PRPane: View {
         let on = pr.selected == p
         return Button { pr.select(p) } label: {
             VStack(alignment: .leading, spacing: 4) {
-                Text(p.title).font(.system(size: 11.5, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
+                Text(p.title).font(.system(size: 11, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
                 HStack(spacing: 4) {
                     Text(verbatim: "\(p.repo.components(separatedBy: "/").last ?? "")#\(p.number)").foregroundStyle(.gray)
-                    if p.host == .bitbucket { Chip(text: "bitbucket", color: .blue) }
-                    if p.reviewRequested { Chip(text: "review", color: .purple) }
+                    if p.host == .bitbucket { Chip(text: "bitbucket", color: Palette.accent) }
+                    if p.reviewRequested { Chip(text: "review", color: Palette.accent) }
                     if p.isDraft { Chip(text: "draft") }
                 }
-                .font(.system(size: 9.5))
+                .font(.system(size: 10))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)
-            .background(on ? Color.indigo.opacity(0.35) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(on ? Color.indigo : .clear))
+            .background(on ? Palette.accent.opacity(0.35) : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(on ? Palette.accent : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1189,37 +1177,37 @@ struct PRPane: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(p.title).font(.system(size: 12.5, weight: .bold)).lineLimit(1)
+                            Text(p.title).font(.system(size: 12, weight: .bold)).lineLimit(1)
                             Text(verbatim: "\(p.repo)#\(p.number) · @\(p.author)").font(.system(size: 10)).foregroundStyle(.gray)
                         }
                         Spacer()
-                        NButton(icon: "safari") { NSWorkspace.shared.open(URL(string: p.url)!) }.help("Buka di browser")
+                        NButton(icon: "safari") { NSWorkspace.shared.open(URL(string: p.url)!) }.tip("Buka di browser")
                     }
                     if let d = pr.detail {
                         HStack(spacing: 5) {
                             switch d.checks {
-                            case "pass": Chip(text: "CI lulus", icon: "checkmark.circle.fill", color: .green)
-                            case "fail": Chip(text: "CI gagal", icon: "xmark.circle.fill", color: .red)
-                            case "pending": Chip(text: "CI berjalan", icon: "clock.fill", color: .yellow)
+                            case "pass": Chip(text: "CI lulus", icon: "checkmark.circle.fill", color: Palette.green)
+                            case "fail": Chip(text: "CI gagal", icon: "xmark.circle.fill", color: Palette.red)
+                            case "pending": Chip(text: "CI berjalan", icon: "clock.fill", color: Palette.amber)
                             default: EmptyView()
                             }
-                            Chip(text: "+\(d.additions)", color: .green)
-                            Chip(text: "−\(d.deletions)", color: .red)
+                            Chip(text: "+\(d.additions)", color: Palette.green)
+                            Chip(text: "−\(d.deletions)", color: Palette.red)
                             Chip(text: "\(d.changedFiles) file")
-                            if d.conflicted { Chip(text: "konflik", icon: "exclamationmark.triangle.fill", color: .orange) }
+                            if d.conflicted { Chip(text: "konflik", icon: "exclamationmark.triangle.fill", color: Palette.amber) }
                         }
                         reviewArea(p, d)
                     } else {
                         ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     if !pr.message.isEmpty {
-                        Text(pr.message).font(.system(size: 10)).foregroundStyle(pr.message.hasPrefix("Gagal") ? .red : .gray).lineLimit(2)
+                        Text(pr.message).font(.system(size: 10)).foregroundStyle(pr.failed ? Palette.red : .gray).lineLimit(2).help(pr.message)
                     }
                 }
             }
         } else {
             NCard {
-                Placeholder(icon: "text.magnifyingglass", title: "Pilih PR", subtitle: "Lalu minta AI me-review diff-nya", color: .indigo)
+                Placeholder(icon: "text.magnifyingglass", title: "Pilih PR", subtitle: "Lalu minta AI me-review diff-nya")
             }
         }
     }
@@ -1234,9 +1222,9 @@ struct PRPane: View {
         } else if pr.review.isEmpty {
             VStack(spacing: 8) {
                 contextBar(p)
-                NButton(icon: "sparkles", title: "Review dengan \(pr.reviewCLI)", tint: .purple, prominent: true) { pr.aiReview(ai, repos: repos) }
+                NButton(icon: "sparkles", title: "Review dengan \(pr.reviewCLI)", tint: Palette.accent, prominent: true) { pr.aiReview(ai, repos: repos) }
                 Text(pr.reviewCLI == "Claude" ? "Diff dikirim ke Claude tanpa akses tool apa pun" : "Kiro tidak diberi izin tool, tapi isolasinya belum dicek seketat Claude")
-                    .font(.system(size: 9.5)).foregroundStyle(.gray)
+                    .font(.system(size: 10)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -1246,13 +1234,13 @@ struct PRPane: View {
                 } else {
                     ScrollView {
                         Text((try? AttributedString(markdown: pr.review, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(pr.review))
-                            .font(.system(size: 11.5)).lineSpacing(2).textSelection(.enabled)
+                            .font(.system(size: 11)).lineSpacing(2).textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
             .padding(6)
-            .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             HStack(spacing: 6) {
                 Menu {
@@ -1263,9 +1251,9 @@ struct PRPane: View {
                     .menuStyle(.borderlessButton).fixedSize()
                     .font(.system(size: 11, weight: .semibold))
                 Spacer()
-                if !pr.contextNote.isEmpty { Text(pr.contextNote).font(.system(size: 9.5)).foregroundStyle(.gray).lineLimit(1) }
+                if !pr.contextNote.isEmpty { Text(pr.contextNote).font(.system(size: 10)).foregroundStyle(.gray).lineLimit(1) }
                 NButton(icon: editing ? "checkmark" : "pencil") { editing.toggle() }.help(editing ? "Selesai mengedit" : "Edit review")
-                NButton(icon: "doc.on.doc") { copyText(pr.review) }.help("Salin review")
+                NButton(icon: "doc.on.doc") { copyText(pr.review) }.tip("Salin review")
                 Menu {
                     ForEach(p.host == .github ? [("merge", "Merge commit"), ("squash", "Squash & merge"), ("rebase", "Rebase & merge")]
                                               : [("merge", "Merge (strategi repo)")], id: \.0) { m in
@@ -1321,7 +1309,7 @@ struct PRPane: View {
                 Button { connectSonar() } label: { Label("Sonar", systemImage: "link") }.buttonStyle(.plain)
             }
         }
-        .font(.system(size: 10.5, weight: .semibold))
+        .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(.white.opacity(0.85))
     }
 
@@ -1341,15 +1329,16 @@ struct CommitPane: View {
     @Local private var thinking = false
     @Local private var busy = false
     @Local private var result = ""
+    @Local private var resultOK = false
 
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
-                NButton(icon: "chevron.left") { close() }.help("Kembali")
+                NButton(icon: "chevron.left") { close() }.tip("Kembali")
                 Text(repo.name).font(.system(size: 13, weight: .bold))
-                Chip(text: repo.status.branch, icon: "arrow.triangle.branch", color: .purple)
+                Chip(text: repo.status.branch, icon: "arrow.triangle.branch", color: Palette.accent)
                 Spacer()
-                Text("\(files.count) file akan di-commit").font(.system(size: 10.5)).foregroundStyle(.gray)
+                Text("\(files.count) file akan di-commit").font(.system(size: 11)).foregroundStyle(.gray)
             }
             HStack(spacing: 10) {
                 NCard(padding: 8) {
@@ -1359,10 +1348,10 @@ struct CommitPane: View {
                                 let code = String(f.prefix(2)).trimmingCharacters(in: .whitespaces)
                                 HStack(spacing: 6) {
                                     Text(code == "??" ? "A" : String(code.prefix(1)))
-                                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                                        .foregroundStyle(code == "??" || code.hasPrefix("A") ? .green : code.hasPrefix("D") ? .red : .orange)
+                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(code == "??" || code.hasPrefix("A") ? Palette.green : code.hasPrefix("D") ? Palette.red : Palette.amber)
                                         .frame(width: 14)
-                                    Text(String(f.dropFirst(3))).font(.system(size: 10.5, design: .monospaced)).lineLimit(1).truncationMode(.head)
+                                    Text(String(f.dropFirst(3))).font(.system(size: 11, design: .monospaced)).lineLimit(1).truncationMode(.head)
                                 }
                             }
                         }
@@ -1372,9 +1361,9 @@ struct CommitPane: View {
                 .frame(width: 220)
                 VStack(spacing: 8) {
                     ZStack(alignment: .topLeading) {
-                        TextEditor(text: $message).font(.system(size: 11.5)).scrollContentBackground(.hidden)
+                        TextEditor(text: $message).font(.system(size: 11)).scrollContentBackground(.hidden)
                         if message.isEmpty {
-                            Text(thinking ? "AI sedang membaca diff…" : "Pesan commit").font(.system(size: 11.5)).foregroundStyle(.gray)
+                            Text(thinking ? "AI sedang membaca diff…" : "Pesan commit").font(.system(size: 11)).foregroundStyle(.gray)
                                 .padding(.leading, 5).allowsHitTesting(false)
                         }
                     }
@@ -1384,7 +1373,7 @@ struct CommitPane: View {
                         if thinking {
                             ProgressView().controlSize(.small)
                         } else {
-                            NButton(icon: "sparkles", title: "Tulis dengan AI", tint: .purple) {
+                            NButton(icon: "sparkles", title: "Tulis dengan AI", tint: Palette.accent) {
                                 thinking = true
                                 g.aiMessage(repo, ai: ai) { ok, text in thinking = false; if ok { message = text } else { result = text } }
                             }
@@ -1394,10 +1383,11 @@ struct CommitPane: View {
                         if busy {
                             ProgressView().controlSize(.small)
                         } else {
-                            NButton(icon: "checkmark", title: push ? "Commit & Push" : "Commit", tint: .green, prominent: true) {
+                            NButton(icon: "checkmark", title: push ? "Commit & Push" : "Commit", tint: Palette.green, prominent: true) {
                                 busy = true
                                 g.commit(repo, message: message, push: push) { ok, text in
                                     busy = false
+                                    resultOK = ok
                                     result = text
                                     if ok { message = ""; g.changes(repo) { files = $0 } }
                                 }
@@ -1407,7 +1397,7 @@ struct CommitPane: View {
                         }
                     }
                     if !result.isEmpty {
-                        Text(result).font(.system(size: 10.5)).foregroundStyle(result.contains("✓") ? .green : .red).lineLimit(2)
+                        Text(result).font(.system(size: 11)).foregroundStyle(resultOK ? Palette.green : Palette.red).lineLimit(2).help(result)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -1425,25 +1415,27 @@ struct ConnectForm: View {
     @Local var url: String
     @Local private var token = ""
     @Local private var status = ""
+    @Local private var statusOK = false
     @Local private var busy = false
 
     var body: some View {
         NCard {
             VStack(alignment: .leading, spacing: 9) {
                 Label(title, systemImage: "link").font(.system(size: 13, weight: .bold))
-                Text(help).font(.system(size: 10.5)).foregroundStyle(.gray).fixedSize(horizontal: false, vertical: true)
+                Text(help).font(.system(size: 11)).foregroundStyle(.gray).fixedSize(horizontal: false, vertical: true)
                 field("globe", TextField(placeholder, text: $url))
                 field("key.fill", SecureField("Token", text: $token))
                 HStack {
-                    if !status.isEmpty { Text(status).font(.system(size: 10.5)).foregroundStyle(status.hasPrefix("Terhubung") ? .green : .red).lineLimit(2) }
+                    if !status.isEmpty { Text(status).font(.system(size: 11)).foregroundStyle(statusOK ? Palette.green : Palette.red).lineLimit(2).help(status) }
                     Spacer()
                     if busy { ProgressView().controlSize(.small) }
                     NButton(icon: "xmark", title: "Batal") { done() }
-                    NButton(icon: "checkmark", title: "Simpan & tes", tint: .blue, prominent: true) {
+                    NButton(icon: "checkmark", title: "Simpan & tes", tint: Palette.accent, prominent: true) {
                         busy = true
                         status = ""
                         connect(url, token.trimmingCharacters(in: .whitespacesAndNewlines)) { ok, msg in
                             busy = false
+                            statusOK = ok
                             status = msg
                             if ok { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { done() } }
                         }
@@ -1475,13 +1467,14 @@ struct MeetingChip: View {
                 Text(m.title).lineLimit(1).frame(maxWidth: 110, alignment: .leading)
                 Text(m.when(Date())).foregroundStyle(.white.opacity(0.8)).fixedSize()
                 if m.link != nil {
-                    Text("Join").font(.system(size: 10.5, weight: .heavy)).fixedSize().padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(.white, in: Capsule()).foregroundStyle(Palette.blue)
+                    Text("Join").font(.system(size: 11, weight: .semibold)).fixedSize().padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(.black.opacity(0.75), in: Capsule()).foregroundStyle(Palette.accent)
                 }
             }
-            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(Palette.onAccent)
             .padding(.leading, 9).padding(.trailing, 4).padding(.vertical, 4)
-            .background(Theme.electric.gradient, in: Capsule())
+            .background(Palette.accent, in: Capsule())
         }
         .buttonStyle(.plain)
         .help("\(m.title) — \(m.link == nil ? "buka Kalender" : "gabung rapat")")
@@ -1496,7 +1489,7 @@ struct NotesView: View {
     var body: some View {
         HStack(spacing: 10) {
             VStack(spacing: 6) {
-                NButton(icon: "plus", title: "Baru", tint: Palette.yellow) { n.add(); focused = true }
+                NButton(icon: "plus", title: "Baru", tint: Palette.accent) { n.add(); focused = true }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 ScrollView {
                     VStack(spacing: 3) {
@@ -1504,12 +1497,12 @@ struct NotesView: View {
                             let on = note.id == n.selected
                             Button { n.selected = note.id } label: {
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(note.title).font(.system(size: 11.5, weight: .bold)).lineLimit(1)
-                                    Text(note.updated, format: Date.RelativeFormatStyle(presentation: .named, locale: Locale(identifier: "id_ID"))).font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.5))
+                                    Text(note.title).font(.system(size: 11, weight: .bold)).lineLimit(1)
+                                    Text(note.updated, format: Date.RelativeFormatStyle(presentation: .named, locale: Locale(identifier: "id_ID"))).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 9).padding(.vertical, 6)
-                                .background(on ? AnyShapeStyle(Theme.amber.gradient) : AnyShapeStyle(Color.white.opacity(0.05)),
+                                .background(on ? AnyShapeStyle(Color.white.opacity(0.14)) : AnyShapeStyle(Color.white.opacity(0.05)),
                                             in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 .contentShape(Rectangle())
                             }
@@ -1529,24 +1522,24 @@ struct NotesView: View {
                                 Image(systemName: "lock.fill")
                                 Text("Ada gambar atau tabel: edit di Notes supaya tidak rusak").lineLimit(1)
                                 Spacer()
-                                NButton(icon: "arrow.up.forward.app", title: "Buka di Notes", tint: Palette.yellow) { n.openInNotes(note.id) }
+                                NButton(icon: "arrow.up.forward.app", title: "Buka di Notes", tint: Palette.accent) { n.openInNotes(note.id) }
                             }
-                            .font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Palette.yellow)
+                            .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.accent)
                         }
                         TextEditor(text: Binding(get: { n.current?.text ?? "" }, set: { n.update($0) }))
-                            .font(.system(size: 12.5)).scrollContentBackground(.hidden).focused($focused).disabled(note.readOnly)
+                            .font(.system(size: 12)).scrollContentBackground(.hidden).focused($focused).disabled(note.readOnly)
                         HStack(spacing: 6) {
                             syncStatus(note)
                             Spacer()
                             if n.thinking { ProgressView().controlSize(.small) }
-                            NButton(icon: "sparkles", title: "Rapikan dengan AI", tint: Palette.violet) { n.tidy(ai) }.disabled(n.thinking)
-                            NButton(icon: "doc.on.doc") { copyText(note.text) }.help("Salin catatan")
+                            NButton(icon: "sparkles", title: "Rapikan dengan AI", tint: Palette.accent) { n.tidy(ai) }.disabled(n.thinking)
+                            NButton(icon: "doc.on.doc") { copyText(note.text) }.tip("Salin catatan")
                             NButton(icon: "trash", tint: Palette.red) { n.delete(note.id) }.help("Hapus catatan")
                         }
                     }
                 }
             } else {
-                NCard { Placeholder(icon: "note.text", title: "Belum ada catatan", subtitle: "Klik Baru, atau ⌃⌥N dari mana saja", color: Palette.yellow) }
+                NCard { Placeholder(icon: "note.text", title: "Belum ada catatan", subtitle: "Klik Baru, atau ⌃⌥N dari mana saja") }
             }
         }
         .onAppear { if n.notes.isEmpty { n.add() }; focused = true; n.sync() }
@@ -1580,19 +1573,19 @@ struct DevView: View {
             VStack(spacing: 6) {
                 NCard(padding: 8) {
                     ZStack(alignment: .topLeading) {
-                        TextEditor(text: $input).font(.system(size: 11.5, design: .monospaced)).scrollContentBackground(.hidden).focused($focused)
+                        TextEditor(text: $input).font(.system(size: 11, design: .monospaced)).scrollContentBackground(.hidden).focused($focused)
                         if input.isEmpty {
-                            Text("Tempel JSON, JWT, Base64, URL, timestamp, atau teks apa pun").font(.system(size: 11.5))
+                            Text("Tempel JSON, JWT, Base64, URL, timestamp, atau teks apa pun").font(.system(size: 11))
                                 .foregroundStyle(.white.opacity(0.4)).padding(.leading, 5).allowsHitTesting(false)
                         }
                     }
                 }
                 HStack(spacing: 6) {
-                    NButton(icon: "doc.on.clipboard", title: "Tempel", tint: Palette.sky) { input = NSPasteboard.general.string(forType: .string) ?? "" }
-                    NButton(icon: "clock") { input = String(Int(Date().timeIntervalSince1970)) }.help("Timestamp sekarang")
-                    NButton(icon: "number") { input = UUID().uuidString; copyText(input); copied = "UUID" }.help("Buat & salin UUID baru")
+                    NButton(icon: "doc.on.clipboard", title: "Tempel", tint: Palette.accent) { input = NSPasteboard.general.string(forType: .string) ?? "" }
+                    NButton(icon: "clock") { input = String(Int(Date().timeIntervalSince1970)) }.tip("Timestamp sekarang")
+                    NButton(icon: "number") { input = UUID().uuidString; copyText(input); copied = "UUID" }.tip("Buat & salin UUID baru")
                     Spacer()
-                    if !input.isEmpty { NButton(icon: "xmark") { input = "" } }
+                    if !input.isEmpty { NButton(icon: "xmark") { input = "" }.tip("Kosongkan") }
                 }
             }
             .frame(width: 290)
@@ -1600,23 +1593,22 @@ struct DevView: View {
             ScrollView {
                 VStack(spacing: 6) {
                     if results.isEmpty {
-                        Placeholder(icon: "curlybraces", title: "Dev Utils", subtitle: "Hasil konversi muncul otomatis. Semua diproses di Mac ini.", color: Palette.sky)
+                        Placeholder(icon: "curlybraces", title: "Dev Utils", subtitle: "Hasil konversi muncul otomatis. Semua diproses di Mac ini.")
                             .frame(height: 200)
                     }
-                    ForEach(Array(results.enumerated()), id: \.element.id) { i, r in
-                        let color = Palette.cycle[i % Palette.cycle.count]
+                    ForEach(results, id: \.id) { r in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(r.title).font(.system(size: 10.5, weight: .heavy, design: .rounded)).foregroundStyle(color)
+                                Text(r.title.uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.6).foregroundStyle(.gray)
                                 Spacer()
                                 Button(copied == r.title ? "Disalin ✓" : "Salin") { copyText(r.output); copied = r.title }
-                                    .buttonStyle(.plain).font(.system(size: 10.5, weight: .bold)).foregroundStyle(copied == r.title ? Palette.green : .white.opacity(0.7))
+                                    .buttonStyle(.plain).font(.system(size: 11, weight: .bold)).foregroundStyle(copied == r.title ? Palette.green : .white.opacity(0.7))
                             }
                             Text(r.output).font(.system(size: 11, design: .monospaced)).lineLimit(8).textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(9)
-                        .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                 }
             }

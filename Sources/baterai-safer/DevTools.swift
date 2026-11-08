@@ -91,6 +91,7 @@ struct Repo: Identifiable {
     var status = GitStatus()
     var busy = false
     var message = ""
+    var failed = false // message is an error (red)
     var id: String { path }
     var name: String { (path as NSString).lastPathComponent }
 }
@@ -104,7 +105,7 @@ final class GitModel: ObservableObject {
     func refresh(_ r: Repo) {
         runAsync(Self.git, ["-C", r.path, "status", "--porcelain=v2", "--branch"]) { code, out, _ in
             guard let i = self.repos.firstIndex(where: { $0.id == r.id }) else { return }
-            if code == 0 { self.repos[i].status = parseGitStatus(out) } else { self.repos[i].message = "Bukan repo git lagi?" }
+            if code == 0 { self.repos[i].status = parseGitStatus(out) } else { self.repos[i].failed = true; self.repos[i].message = "Bukan repo git lagi?" }
         }
     }
 
@@ -139,6 +140,7 @@ final class GitModel: ObservableObject {
             guard let i = self.repos.firstIndex(where: { $0.id == r.id }) else { return }
             self.repos[i].busy = false
             let last = (err + out).split(separator: "\n").last.map(String.init) ?? ""
+            self.repos[i].failed = code != 0
             self.repos[i].message = code == 0 ? "\(action) selesai" : "Gagal: \(last)"
             self.refresh(self.repos[i])
         }

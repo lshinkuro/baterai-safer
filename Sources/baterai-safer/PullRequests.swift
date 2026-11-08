@@ -215,6 +215,7 @@ final class PRModel: ObservableObject {
     @Published var review = ""        // editable before posting
     @Published var reviewing = false
     @Published var message = ""
+    @Published var failed = false    // message is an error (red)
     @Published var bitbucketConnected = Bitbucket.connected
     @Published var sonarConnected = Sonar.connected
     @Published var reviewCLI = UserDefaults.standard.string(forKey: "reviewCLI") ?? "Claude" {
@@ -274,6 +275,7 @@ final class PRModel: ObservableObject {
         detail = nil
         review = ""
         message = ""
+        failed = false
         diff = ""
         if pr.host == .bitbucket { selectBitbucket(pr); return }
         guard let gh else { return }
@@ -281,7 +283,7 @@ final class PRModel: ObservableObject {
                       "body,additions,deletions,changedFiles,mergeable,headRefName,baseRefName,statusCheckRollup"]) { _, out, err in
             guard self.selected == pr else { return }
             self.detail = (try? JSONDecoder().decode(GHDetail.self, from: Data(out.utf8)))?.detail
-            if self.detail == nil { self.message = "Gagal memuat PR: \(lastLine(err))" }
+            if self.detail == nil { self.failed = true; self.message = "Gagal memuat PR: \(lastLine(err))" }
         }
     }
 
@@ -315,7 +317,7 @@ final class PRModel: ObservableObject {
         }
         g.notify(queue: .main) {
             guard self.selected == pr else { return }
-            guard failed.isEmpty else { self.message = "Gagal memuat PR: \(failed)"; return }
+            guard failed.isEmpty else { self.failed = true; self.message = "Gagal memuat PR: \(failed)"; return }
             guard !commit.isEmpty else { self.detail = d; return }
             Bitbucket.call("/rest/build-status/1.0/commits/\(commit)") { _, data in
                 let values = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["values"] as? [[String: Any]] ?? []
@@ -339,7 +341,7 @@ final class PRModel: ObservableObject {
                 ai.oneShot(reviewPrompt(pr, d, diff: diff, guides: guides, sonar: sonar), cli: cli) { ok, text in
                     guard self.selected == pr else { return }
                     self.reviewing = false
-                    if ok { self.review = text } else { self.message = text }
+                    if ok { self.review = text } else { self.failed = true; self.message = text }
                 }
             }
             if Sonar.connected, let key = Sonar.projectKey(pr, repos: repos) {
@@ -355,7 +357,7 @@ final class PRModel: ObservableObject {
         guard let gh else { return }
         runAsync(gh, ["pr", "diff", "\(pr.number)", "-R", pr.repo]) { code, diff, err in
             guard self.selected == pr else { return }
-            guard code == 0 else { self.reviewing = false; self.message = "Gagal ambil diff: \(lastLine(err))"; return }
+            guard code == 0 else { self.reviewing = false; self.failed = true; self.message = "Gagal ambil diff: \(lastLine(err))"; return }
             run(diff)
         }
     }
@@ -363,8 +365,9 @@ final class PRModel: ObservableObject {
     /// event: comment / approve / request-changes. Posts publicly, so the view confirms first.
     func post(_ event: String) {
         guard let pr = selected, !review.isEmpty else { return }
+        failed = false
         message = "Mengirim…"
-        let report = { (ok: Bool, err: String) in self.message = ok ? "Review terkirim ✓" : "Gagal: \(err)" }
+        let report = { (ok: Bool, err: String) in self.failed = !ok; self.message = ok ? "Review terkirim ✓" : "Gagal: \(err)" }
         if pr.host == .github {
             guard let gh else { return }
             runAsync(gh, ["pr", "review", "\(pr.number)", "-R", pr.repo, "--\(event)", "--body", review]) { code, _, err in report(code == 0, lastLine(err)) }
@@ -389,8 +392,10 @@ final class PRModel: ObservableObject {
     /// method: merge / squash / rebase (GitHub); Bitbucket uses the repo's default strategy.
     func merge(_ method: String) {
         guard let pr = selected else { return }
+        failed = false
         message = "Merging…"
         let done = { (ok: Bool, err: String) in
+            self.failed = !ok
             self.message = ok ? "PR #\(pr.number) di-merge ✓" : "Gagal merge: \(err)"
             if ok { self.prs.removeAll { $0 == pr }; self.selected = nil }
         }

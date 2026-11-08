@@ -124,7 +124,7 @@ struct AgendaView: View {
             switch a.access {
             case false?:
                 Placeholder(icon: "calendar.badge.exclamationmark", title: "Izin Kalender ditolak",
-                            subtitle: "System Settings → Privacy & Security → Calendars → Poni", color: Palette.sky)
+                            subtitle: "System Settings → Privacy & Security → Calendars → Poni")
             case nil:
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             default:
@@ -144,19 +144,19 @@ struct AgendaView: View {
         return VStack(spacing: 5) {
             HStack(spacing: 4) {
                 Text(a.month.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: "id_ID"))).capitalized)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .font(.system(size: 13, weight: .semibold))
                 Spacer()
                 navButton("chevron.left") { a.shift(-1) }
                 Button { a.month = Date(); pick(cal.startOfDay(for: Date())); a.reload() } label: {
-                    Text("Hari ini").font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.sky)
-                        .padding(.horizontal, 7).padding(.vertical, 3).background(Palette.sky.opacity(0.15), in: Capsule())
+                    Text("Hari ini").font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.accent)
+                        .padding(.horizontal, 7).padding(.vertical, 3).background(Palette.accent.opacity(0.15), in: Capsule())
                 }
                 .buttonStyle(.plain)
                 navButton("chevron.right") { a.shift(1) }
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
                 ForEach(Array(weekdays.enumerated()), id: \.offset) { _, d in
-                    Text(d).font(.system(size: 9, weight: .heavy)).foregroundStyle(.white.opacity(0.35))
+                    Text(d).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.35))
                 }
                 ForEach(Array(monthGrid(a.month).enumerated()), id: \.offset) { _, day in
                     if let day { dayCell(day) } else { Color.clear.frame(height: 24) }
@@ -167,7 +167,7 @@ struct AgendaView: View {
 
     func navButton(_ icon: String, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Image(systemName: icon).font(.system(size: 9.5, weight: .heavy)).frame(width: 20, height: 20)
+            Image(systemName: icon).font(.system(size: 10, weight: .semibold)).frame(width: 20, height: 20)
                 .background(Color.white.opacity(0.08), in: Circle())
         }
         .buttonStyle(.plain)
@@ -179,20 +179,20 @@ struct AgendaView: View {
         let count = a.on(day).count, past = day < cal.startOfDay(for: Date())
         return Button { pick(day) } label: {
             VStack(spacing: 2) {
-                Text("\(cal.component(.day, from: day))").font(.system(size: 11, weight: on || today ? .heavy : .semibold, design: .rounded))
+                Text("\(cal.component(.day, from: day))").font(.system(size: 11, weight: on || today ? .bold : .medium))
                 HStack(spacing: 2) {
                     ForEach(0..<min(count, 3), id: \.self) { _ in Circle().frame(width: 3.5, height: 3.5) }
                 }
                 .frame(height: 3.5)
-                .foregroundStyle(on ? Color.white : Palette.sky)
+                .foregroundStyle(on ? Color.white : Palette.accent)
             }
             .frame(maxWidth: .infinity, minHeight: 24)
-            .foregroundStyle(on ? Color.white : past ? .white.opacity(0.35) : .white.opacity(0.9))
+            .foregroundStyle(on ? Palette.onAccent : past ? .white.opacity(0.35) : .white.opacity(0.9))
             .background {
                 if on {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Theme.electric.gradient).shadow(color: Palette.sky.opacity(0.5), radius: 6)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.accent)
                 } else if today {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Palette.sky, lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.accent, lineWidth: 1.5)
                 }
             }
             .contentShape(Rectangle())
@@ -212,26 +212,26 @@ struct AgendaView: View {
         let cal = Calendar.current, list = a.on(a.selected)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 10) {
-                Text("\(cal.component(.day, from: a.selected))").font(.system(size: 30, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Theme.electric.gradient)
+                Text("\(cal.component(.day, from: a.selected))").font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(Palette.accent)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(a.selected.formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "id_ID"))).capitalized)
                         .font(.system(size: 13, weight: .bold))
                     Text(list.isEmpty ? a.selected.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: "id_ID")))
                          : "\(list.count) acara")
-                        .font(.system(size: 10.5)).foregroundStyle(.gray)
+                        .font(.system(size: 11)).foregroundStyle(.gray)
                 }
                 Spacer()
-                NButton(icon: "plus", title: "Tambah", tint: Palette.sky, prominent: true) { startAdding() }
+                NButton(icon: "plus", title: "Tambah", tint: Palette.accent, prominent: true) { startAdding() }
             }
             if list.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.plus").font(.system(size: 26, weight: .semibold)).foregroundStyle(Palette.sky.opacity(0.8))
-                    Text("Hari ini kosong").font(.system(size: 12.5, weight: .semibold))
-                    Text("Tambah rapat, nanti diingatkan sebelum mulai.").font(.system(size: 10.5)).foregroundStyle(.gray)
+                    Image(systemName: "calendar.badge.plus").font(.system(size: 26, weight: .semibold)).foregroundStyle(Palette.accent.opacity(0.8))
+                    Text("Hari ini kosong").font(.system(size: 12, weight: .semibold))
+                    Text("Tambah rapat, nanti diingatkan sebelum mulai.").font(.system(size: 11)).foregroundStyle(.gray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [5, 4])).foregroundStyle(Color.white.opacity(0.15)))
             } else {
                 ScrollView {
@@ -253,16 +253,16 @@ struct AgendaView: View {
                 HStack(spacing: 10) {
                     VStack(alignment: .trailing, spacing: 0) {
                         Text(e.isAllDay ? "Hari" : e.startDate.formatted(date: .omitted, time: .shortened))
-                            .font(.system(size: 13, weight: .heavy, design: .rounded)).monospacedDigit()
+                            .font(.system(size: 13, weight: .semibold)).monospacedDigit()
                         Text(e.isAllDay ? "penuh" : durationLabel(Int(e.endDate.timeIntervalSince(e.startDate) / 60)))
-                            .font(.system(size: 9.5)).foregroundStyle(.gray).lineLimit(1)
+                            .font(.system(size: 10)).foregroundStyle(.gray).lineLimit(1)
                     }
                     .frame(width: 52, alignment: .trailing)
                     Capsule().fill(color).frame(width: 3, height: 32)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(e.title ?? "Rapat").font(.system(size: 12.5, weight: .bold)).lineLimit(1)
+                        Text(e.title ?? "Rapat").font(.system(size: 12, weight: .bold)).lineLimit(1)
                         HStack(spacing: 4) {
-                            if let status { Chip(text: status.text, icon: status.live ? "dot.radiowaves.left.and.right" : "clock", color: status.live ? Palette.green : Palette.sky) }
+                            if let status { Chip(text: status.text, icon: status.live ? "dot.radiowaves.left.and.right" : "clock", color: status.live ? Palette.green : Palette.accent) }
                             if let r { Chip(text: shortReminder(r), icon: "bell.fill", color: Palette.amber) }
                             if !editable { Chip(text: "hanya baca", icon: "lock.fill", color: .gray) }
                         }
@@ -289,28 +289,28 @@ struct AgendaView: View {
         }
         .padding(.horizontal, 10).padding(.vertical, 8)
         .background(LinearGradient(colors: [color.opacity(0.16), color.opacity(0.05)], startPoint: .leading, endPoint: .trailing),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     var form: some View {
         let cal = Calendar.current
         return VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text(editing == nil ? "Rapat baru" : "Edit rapat").font(.system(size: 13, weight: .heavy))
+                Text(editing == nil ? "Rapat baru" : "Edit rapat").font(.system(size: 13, weight: .semibold))
                 Text(when.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "id_ID"))))
-                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.sky)
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.accent)
                 Spacer()
-                Text("pilih tanggal di kalender").font(.system(size: 9.5)).foregroundStyle(.gray)
+                Text("pilih tanggal di kalender").font(.system(size: 10)).foregroundStyle(.gray)
             }
             HStack(spacing: 6) {
-                Image(systemName: "pencil").foregroundStyle(Palette.sky)
+                Image(systemName: "pencil").foregroundStyle(Palette.accent)
                 TextField("Judul, mis. Standup tim", text: $title).textFieldStyle(.plain).focused($focused).onSubmit(save)
             }
-            .font(.system(size: 12.5, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .padding(.horizontal, 12).padding(.vertical, 7)
             .background(Color.white.opacity(0.09), in: Capsule())
             HStack(spacing: 6) {
-                Text(when.formatted(date: .omitted, time: .shortened)).font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit()
+                Text(when.formatted(date: .omitted, time: .shortened)).font(.system(size: 22, weight: .semibold)).monospacedDigit()
                     .frame(width: 70, alignment: .leading)
                 stepButton("minus") { when = when.addingTimeInterval(-15 * 60) }
                 stepButton("plus") { when = when.addingTimeInterval(15 * 60) }
@@ -330,16 +330,16 @@ struct AgendaView: View {
                     chip(m.map(shortReminder) ?? "Mati", on: reminder == m) { reminder = m }
                 }
             }
-            if !error.isEmpty { Text(error).font(.system(size: 10.5)).foregroundStyle(Palette.red) }
+            if !error.isEmpty { Text(error).font(.system(size: 11)).foregroundStyle(Palette.red) }
             Spacer(minLength: 0)
             HStack(spacing: 6) {
                 if let e = editing {
                     NButton(icon: "trash", tint: Palette.red) { a.delete(e); adding = false }.help("Hapus")
                 }
-                Text("Tersimpan ke Kalender macOS").font(.system(size: 9.5)).foregroundStyle(.gray)
+                Text("Tersimpan ke Kalender macOS").font(.system(size: 10)).foregroundStyle(.gray)
                 Spacer()
                 NButton(icon: "xmark", title: "Batal") { adding = false }
-                NButton(icon: "checkmark", title: "Simpan", tint: Palette.sky, prominent: true, run: save)
+                NButton(icon: "checkmark", title: "Simpan", tint: Palette.accent, prominent: true, run: save)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -347,17 +347,17 @@ struct AgendaView: View {
 
     func row<C: View>(_ label: String, _ icon: String, @ViewBuilder _ chips: () -> C) -> some View {
         HStack(spacing: 5) {
-            Label(label, systemImage: icon).font(.system(size: 10.5, weight: .bold)).foregroundStyle(.gray).frame(width: 74, alignment: .leading)
+            Label(label, systemImage: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(.gray).frame(width: 74, alignment: .leading)
             chips()
         }
     }
 
     func chip(_ text: String, on: Bool, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Text(text).font(.system(size: 10.5, weight: .bold, design: .rounded))
-                .foregroundStyle(on ? Color.white : .white.opacity(0.6))
+            Text(text).font(.system(size: 11, weight: .bold))
+                .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.6))
                 .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(on ? AnyShapeStyle(Theme.electric.gradient) : AnyShapeStyle(Color.white.opacity(0.07)), in: Capsule())
+                .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.white.opacity(0.07)), in: Capsule())
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -365,7 +365,7 @@ struct AgendaView: View {
 
     func stepButton(_ icon: String, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Image(systemName: icon).font(.system(size: 10, weight: .heavy)).frame(width: 24, height: 24)
+            Image(systemName: icon).font(.system(size: 10, weight: .semibold)).frame(width: 24, height: 24)
                 .background(Color.white.opacity(0.09), in: Circle())
         }
         .buttonStyle(.plain).help("15 menit")

@@ -91,15 +91,15 @@ struct UsagePage: View {
         HStack(spacing: 10) {
             NCard {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("HARI INI").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
-                    Text(tokens(r.today.input + r.today.output + r.today.cache)).font(.system(size: 30, weight: .heavy, design: .rounded))
-                    Text("token Claude Code").font(.system(size: 10.5)).foregroundStyle(.gray)
+                    Text("HARI INI").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
+                    Text(tokens(r.today.input + r.today.output + r.today.cache)).font(.system(size: 30, weight: .semibold))
+                    Text("token Claude Code").font(.system(size: 11)).foregroundStyle(.gray)
                     Spacer(minLength: 0)
                     HStack(spacing: 4) {
-                        Chip(text: "in \(tokens(r.today.input))", color: Palette.blue)
-                        Chip(text: "out \(tokens(r.today.output))", color: Palette.pink)
+                        Chip(text: "in \(tokens(r.today.input))", color: .gray)
+                        Chip(text: "out \(tokens(r.today.output))", color: .gray)
                     }
-                    Chip(text: "cache \(tokens(r.today.cache))", color: Palette.teal)
+                    Chip(text: "cache \(tokens(r.today.cache))", color: .gray)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
@@ -108,16 +108,16 @@ struct UsagePage: View {
             NCard {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("7 HARI · \(tokens(r.total))").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                        Text("7 HARI · \(tokens(r.total))").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
                         Spacer()
                         if u.loading { ProgressView().controlSize(.mini) }
-                        Button { u.refresh(force: true) } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(.gray)
+                        Button { u.refresh(force: true) } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(.gray).tip("Muat ulang")
                     }
                     let peak = max(days.map(\.1).max() ?? 0, 1)
                     HStack(alignment: .bottom, spacing: 8) {
                         ForEach(days, id: \.0) { d in
                             VStack(spacing: 3) {
-                                RoundedRectangle(cornerRadius: 4).fill(Color.purple.gradient)
+                                RoundedRectangle(cornerRadius: 4).fill(Palette.accent.gradient)
                                     .frame(height: max(2, 70 * CGFloat(d.1) / CGFloat(peak)))
                                 Text(d.0).font(.system(size: 9)).foregroundStyle(.gray)
                             }
@@ -131,9 +131,9 @@ struct UsagePage: View {
                             Spacer()
                             Text(tokens(m.value)).monospacedDigit().foregroundStyle(.gray)
                         }
-                        .font(.system(size: 10.5))
+                        .font(.system(size: 11))
                     }
-                    Text("Dari chat Poni: \(tokens(r.ours))").font(.system(size: 10)).foregroundStyle(Palette.violet)
+                    Text("Dari chat Poni: \(tokens(r.ours))").font(.system(size: 10)).foregroundStyle(Palette.accent)
                 }
             }
 

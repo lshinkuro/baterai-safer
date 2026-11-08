@@ -518,10 +518,10 @@ struct LangPage: View {
 
     var target: some View {
         HStack(spacing: 5) {
-            Ring(value: min(1, Double(m.today) / Double(max(m.s.target, 1))), color: Palette.teal, label: "", size: 20, line: 4)
+            Ring(value: min(1, Double(m.today) / Double(max(m.s.target, 1))), color: Palette.accent, label: "", size: 20, line: 4)
             VStack(alignment: .leading, spacing: 0) {
-                Text("\(m.today)/\(m.s.target)").font(.system(size: 10.5, weight: .bold)).monospacedDigit()
-                Text("🔥 \(m.streak)").font(.system(size: 9.5)).foregroundStyle(.gray)
+                Text("\(m.today)/\(m.s.target)").font(.system(size: 11, weight: .bold)).monospacedDigit()
+                Text("🔥 \(m.streak)").font(.system(size: 10)).foregroundStyle(.gray)
             }
         }
         .help("Target kata hari ini · streak")
@@ -535,17 +535,17 @@ struct LangPage: View {
                 NCard {
                     VStack(spacing: 6) {
                         HStack(spacing: 8) {
-                            Text(w.word).font(.system(size: 26, weight: .heavy, design: .rounded))
-                            Button { m.speak(w.word) } label: { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Palette.teal) }.buttonStyle(.plain)
+                            Text(w.word).font(.system(size: 26, weight: .semibold))
+                            Button { m.speak(w.word) } label: { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Palette.accent) }.buttonStyle(.plain).tip("Dengarkan")
                         }
                         if quiz || m.revealed {
                             Text(w.example).font(.system(size: 11)).foregroundStyle(.white.opacity(0.7)).multilineTextAlignment(.center).lineLimit(2)
                                 .onTapGesture { m.speak(w.example) }
                         }
                         if m.revealed && !quiz {
-                            Text(w.meaning).font(.system(size: 14, weight: .bold)).foregroundStyle(Palette.teal)
+                            Text(w.meaning).font(.system(size: 14, weight: .bold)).foregroundStyle(Palette.accent)
                         }
-                        Text("kotak \(m.card(w).box)/5 · \(m.dueCount) perlu diulang").font(.system(size: 9.5)).foregroundStyle(.gray)
+                        Text("kotak \(m.card(w).box)/5 · \(m.dueCount) perlu diulang").font(.system(size: 10)).foregroundStyle(.gray)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -555,7 +555,7 @@ struct LangPage: View {
                             choice(o, state: m.picked == nil ? nil : o == w.meaning ? true : m.picked == o ? false : nil) { m.pick(o) }
                         }
                     } else if !m.revealed {
-                        NButton(icon: "eye.fill", title: "Lihat arti", tint: Palette.teal, prominent: true) { m.revealed = true; m.speak(w.word) }
+                        NButton(icon: "eye.fill", title: "Lihat arti", tint: Palette.accent, prominent: true) { m.revealed = true; m.speak(w.word) }
                     } else {
                         NButton(icon: "checkmark", title: "Hafal", tint: Palette.green, prominent: true) { m.answer(knew: true) }
                         NButton(icon: "arrow.counterclockwise", title: "Belum hafal", tint: Palette.red) { m.answer(knew: false) }
@@ -578,17 +578,17 @@ struct LangPage: View {
     /// state: nil = neutral, true = the right answer, false = the wrong pick.
     func choice(_ text: String, state: Bool?, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Text(text).font(.system(size: 11.5, weight: .semibold)).multilineTextAlignment(.leading).lineLimit(2)
+            Text(text).font(.system(size: 11, weight: .semibold)).multilineTextAlignment(.leading).lineLimit(2)
                 .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading).padding(.horizontal, 10)
                 .background(state == true ? Palette.green.opacity(0.5) : state == false ? Palette.red.opacity(0.5) : Color.white.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
     var addWordsButton: some View {
-        NButton(icon: "sparkles", title: m.busy ? "Membuat…" : "Tambah kata (AI)", tint: Palette.violet) { m.addWords() }
+        NButton(icon: "sparkles", title: m.busy ? "Membuat…" : "Tambah kata (AI)", tint: Palette.accent) { m.addWords() }
             .disabled(m.busy || m.genStatus != nil).help(m.genStatus ?? "\(m.engineName) membuat 8 kata baru")
     }
 
@@ -597,22 +597,22 @@ struct LangPage: View {
     @ViewBuilder var test: some View {
         if m.questions.isEmpty {
             VStack(spacing: 10) {
-                Image(systemName: "graduationcap.fill").font(.system(size: 28)).foregroundStyle(Palette.teal)
-                Text("Latihan soal \(m.testName)").font(.system(size: 14, weight: .heavy))
+                Image(systemName: "graduationcap.fill").font(.system(size: 28)).foregroundStyle(Palette.accent)
+                Text("Latihan soal \(m.testName)").font(.system(size: 14, weight: .semibold))
                 Text("5 soal pilihan ganda dibuat oleh \(m.engineName), lengkap dengan pembahasan. Skornya tersimpan di Progres.")
                     .font(.system(size: 11)).foregroundStyle(.gray).multilineTextAlignment(.center).frame(maxWidth: 380)
-                NButton(icon: m.busy ? "hourglass" : "play.fill", title: m.busy ? "Membuat soal…" : "Mulai tes", tint: Palette.teal, prominent: true) { m.startTest() }
+                NButton(icon: m.busy ? "hourglass" : "play.fill", title: m.busy ? "Membuat soal…" : "Mulai tes", tint: Palette.accent, prominent: true) { m.startTest() }
                     .disabled(m.busy || m.genStatus != nil)
                 if let why = m.genStatus { Text(why).font(.system(size: 10)).foregroundStyle(Palette.amber) }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if m.qIndex >= m.questions.count {
             VStack(spacing: 8) {
-                Text("\(m.score)/\(m.questions.count)").font(.system(size: 40, weight: .heavy, design: .rounded)).foregroundStyle(Theme.mint.gradient)
+                Text("\(m.score)/\(m.questions.count)").font(.system(size: 40, weight: .semibold)).foregroundStyle(Palette.accent)
                 Text(m.score == m.questions.count ? "Sempurna! 🎉" : m.score * 2 >= m.questions.count ? "Bagus, terus latihan 💪" : "Ayo coba lagi, pelan-pelan 🙂")
                     .font(.system(size: 13, weight: .bold))
                 HStack {
-                    NButton(icon: "arrow.clockwise", title: "Tes lagi", tint: Palette.teal, prominent: true) { m.startTest() }.disabled(m.busy)
+                    NButton(icon: "arrow.clockwise", title: "Tes lagi", tint: Palette.accent, prominent: true) { m.startTest() }.disabled(m.busy)
                     NButton(icon: "chart.bar.fill", title: "Lihat progres") { mode = 4 }
                 }
             }
@@ -622,11 +622,11 @@ struct LangPage: View {
             HStack(alignment: .top, spacing: 12) {
                 NCard {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("SOAL \(m.qIndex + 1)/\(m.questions.count) · skor \(m.score)").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                        Text("SOAL \(m.qIndex + 1)/\(m.questions.count) · skor \(m.score)").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
                         Text(q.q).font(.system(size: 13, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                         if m.chosen != nil, !q.why.isEmpty {
-                            Text("💡 \(q.why)").font(.system(size: 10.5)).foregroundStyle(Palette.amber).lineLimit(4)
+                            Text("💡 \(q.why)").font(.system(size: 11)).foregroundStyle(Palette.amber).lineLimit(4)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -637,7 +637,7 @@ struct LangPage: View {
                     }
                     Spacer(minLength: 0)
                     if m.chosen != nil {
-                        NButton(icon: "arrow.right", title: m.qIndex + 1 == m.questions.count ? "Lihat skor" : "Berikutnya", tint: Palette.teal, prominent: true) { m.nextQuestion() }
+                        NButton(icon: "arrow.right", title: m.qIndex + 1 == m.questions.count ? "Lihat skor" : "Berikutnya", tint: Palette.accent, prominent: true) { m.nextQuestion() }
                     }
                 }
                 .frame(width: 250)
@@ -649,7 +649,7 @@ struct LangPage: View {
 
     @ViewBuilder var talk: some View {
         if let why = m.aiStatus {
-            Placeholder(icon: "sparkles", title: "Ngobrol butuh \(m.engineName)", subtitle: why + " · ganti di ⚙︎", color: Palette.violet)
+            Placeholder(icon: "sparkles", title: "Ngobrol butuh \(m.engineName)", subtitle: why + " · ganti di ⚙︎")
         } else {
             VStack(spacing: 6) {
                 HStack(spacing: 4) {
@@ -687,7 +687,7 @@ struct LangPage: View {
             }
             .buttonStyle(.plain).help(voice.phase == .idle ? "Mulai" : "Berhenti")
             VStack(alignment: .leading, spacing: 6) {
-                Text(status).font(.system(size: 14, weight: .heavy, design: .rounded))
+                Text(status).font(.system(size: 14, weight: .semibold))
                 if !voice.heard.isEmpty || voice.phase == .thinking {
                     Text(voice.heard.isEmpty ? (m.chat.last(where: { $0.me })?.text ?? "") : voice.heard)
                         .font(.system(size: 12)).foregroundStyle(.white.opacity(0.75)).lineLimit(2)
@@ -698,11 +698,11 @@ struct LangPage: View {
                             .foregroundStyle(line.hasPrefix("✏️") ? Palette.amber : .white).lineLimit(3)
                     }
                 }
-                if let e = voice.error { Text(e).font(.system(size: 10.5)).foregroundStyle(Palette.red) }
+                if let e = voice.error { Text(e).font(.system(size: 11)).foregroundStyle(Palette.red) }
                 Spacer(minLength: 0)
                 Text(voice.onDevice ? "Suara dikenali di Mac ini · ketuk orb untuk berhenti"
                      : "Ucapan \(m.s.lang.title) dikenali lewat server Apple · ketuk orb untuk berhenti")
-                    .font(.system(size: 9.5)).foregroundStyle(.gray)
+                    .font(.system(size: 10)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -721,13 +721,13 @@ struct LangPage: View {
                         ForEach(Array(m.chat.enumerated()), id: \.offset) { i, c in
                             HStack(alignment: .top, spacing: 6) {
                                 if c.me { Spacer(minLength: 40) }
-                                Text(LocalizedStringKey(c.text)).font(.system(size: 11.5)).textSelection(.enabled)
+                                Text(LocalizedStringKey(c.text)).font(.system(size: 11)).textSelection(.enabled)
                                     .padding(.horizontal, 10).padding(.vertical, 6)
-                                    .background(c.me ? AnyShapeStyle(Theme.mint.gradient) : AnyShapeStyle(Color.white.opacity(0.08)),
-                                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .background(c.me ? AnyShapeStyle(Color.white.opacity(0.14)) : AnyShapeStyle(Color.white.opacity(0.06)),
+                                                in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 if !c.me {
-                                    Button { m.speak(spokenPart(c.text)) } label: { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Palette.teal) }
-                                        .buttonStyle(.plain)
+                                    Button { m.speak(spokenPart(c.text)) } label: { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Palette.accent) }
+                                        .buttonStyle(.plain).tip("Dengarkan")
                                     Spacer(minLength: 40)
                                 }
                             }
@@ -741,9 +741,9 @@ struct LangPage: View {
             HStack(spacing: 6) {
                 TextField(m.s.lang.placeholder, text: $input).textFieldStyle(.plain)
                     .onSubmit { m.send(input); input = "" }
-                Button { m.send(input); input = "" } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 20)).foregroundStyle(Palette.teal) }
-                    .buttonStyle(.plain).disabled(input.isEmpty || m.busy)
-                NButton(icon: "square.and.pencil") { m.resetChat() }.help("Percakapan baru")
+                Button { m.send(input); input = "" } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 20)).foregroundStyle(Palette.accent) }
+                    .buttonStyle(.plain).disabled(input.isEmpty || m.busy).tip("Kirim")
+                NButton(icon: "square.and.pencil") { m.resetChat() }.tip("Percakapan baru")
             }
             .font(.system(size: 12))
             .padding(.leading, 12).padding(.trailing, 4).padding(.vertical, 4)
@@ -758,40 +758,40 @@ struct LangPage: View {
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     stat("\(m.mastered)", "hafal", Palette.green)
-                    stat("\(m.learning)", "dipelajari", Palette.sky)
+                    stat("\(m.learning)", "dipelajari", Palette.accent)
                 }
                 HStack(spacing: 8) {
                     stat(m.accuracy.map { "\(Int(($0 * 100).rounded()))%" } ?? "–", "akurasi 7 hari", Palette.amber)
-                    stat("🔥\(m.streak)", "hari beruntun", Palette.orange)
+                    stat("🔥\(m.streak)", "hari beruntun", Palette.accent)
                 }
             }
             .frame(width: 230)
             NCard(padding: 10) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("LATIHAN 7 HARI · \(m.s.lang.title.uppercased())").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                    Text("LATIHAN 7 HARI · \(m.s.lang.title.uppercased())").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
                     let peak = max(m.week.map(\.n).max() ?? 0, 1)
                     HStack(alignment: .bottom, spacing: 8) {
                         ForEach(m.week, id: \.day) { d in
                             VStack(spacing: 3) {
-                                RoundedRectangle(cornerRadius: 4).fill(Palette.teal.gradient).frame(height: max(2, 56 * CGFloat(d.n) / CGFloat(peak)))
+                                RoundedRectangle(cornerRadius: 4).fill(Palette.accent.gradient).frame(height: max(2, 56 * CGFloat(d.n) / CGFloat(peak)))
                                 Text(d.day).font(.system(size: 9)).foregroundStyle(.gray)
                             }
                             .frame(maxWidth: .infinity)
                         }
                     }
                     .frame(height: 72, alignment: .bottom)
-                    Text("TES \(m.testName)").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                    Text("TES \(m.testName)").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
                     if m.tests.isEmpty {
-                        Text("Belum ada. Coba tab \(m.testName).").font(.system(size: 10.5)).foregroundStyle(.gray)
+                        Text("Belum ada. Coba tab \(m.testName).").font(.system(size: 11)).foregroundStyle(.gray)
                     } else {
                         HStack(spacing: 6) {
                             ForEach(Array(m.tests.suffix(5).enumerated()), id: \.offset) { _, t in
                                 VStack(spacing: 1) {
-                                    Text("\(t.score)/\(t.total)").font(.system(size: 12, weight: .heavy, design: .rounded))
-                                    Text(t.date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: "id_ID")))).font(.system(size: 8.5)).foregroundStyle(.gray)
+                                    Text("\(t.score)/\(t.total)").font(.system(size: 12, weight: .semibold))
+                                    Text(t.date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: "id_ID")))).font(.system(size: 9)).foregroundStyle(.gray)
                                 }
                                 .frame(maxWidth: .infinity).padding(.vertical, 4)
-                                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             }
                         }
                     }
@@ -804,7 +804,7 @@ struct LangPage: View {
     func stat(_ value: String, _ label: String, _ color: Color) -> some View {
         NCard(padding: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(value).font(.system(size: 22, weight: .heavy, design: .rounded)).foregroundStyle(color)
+                Text(value).font(.system(size: 22, weight: .semibold)).foregroundStyle(color)
                 Text(label).font(.system(size: 10)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -817,20 +817,20 @@ struct LangPage: View {
         HStack(alignment: .top, spacing: 10) {
             NCard(padding: 10) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("TEMAN NGOBROL & PEMBUAT SOAL").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                    Text("TEMAN NGOBROL & PEMBUAT SOAL").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
                     engine("apple", "Apple Intelligence", "Di Mac, offline, gratis", LangModel.appleStatus)
                     engine("claude", "Claude", "Lebih pintar, lewat Claude Code", LangModel.claude == nil ? "Claude Code belum terpasang" : nil)
                     HStack {
-                        Text("Target harian").font(.system(size: 11.5))
+                        Text("Target harian").font(.system(size: 11))
                         Spacer()
                         Stepper("\(m.s.target) kata", value: Binding(get: { m.s.target }, set: { m.s.target = $0; m.persist() }), in: 5...50, step: 5)
-                            .font(.system(size: 11.5)).controlSize(.small)
+                            .font(.system(size: 11)).controlSize(.small)
                     }
                 }
             }
             NCard(padding: 10) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("SUARA \(m.s.lang.title.uppercased())").font(.system(size: 9.5, weight: .bold)).foregroundStyle(.gray)
+                    Text("SUARA \(m.s.lang.title.uppercased())").font(.system(size: 10, weight: .bold)).foregroundStyle(.gray)
                     HStack {
                         Picker("", selection: Binding(get: { m.voice?.identifier ?? "" }, set: { m.s.voices[m.s.lang.rawValue] = $0; m.persist(); m.speak(m.s.lang.sample) })) {
                             ForEach(m.voices, id: \.identifier) { v in
@@ -838,12 +838,12 @@ struct LangPage: View {
                             }
                         }
                         .labelsHidden().controlSize(.small)
-                        Button { m.speak(m.s.lang.sample) } label: { Image(systemName: "play.circle.fill").font(.system(size: 18)).foregroundStyle(Palette.teal) }
-                            .buttonStyle(.plain).help("Dengarkan")
+                        Button { m.speak(m.s.lang.sample) } label: { Image(systemName: "play.circle.fill").font(.system(size: 18)).foregroundStyle(Palette.accent) }
+                            .buttonStyle(.plain).tip("Dengarkan")
                     }
                     Text("Suara Enhanced / Premium jauh lebih natural. Unduh gratis di pengaturan macOS, lalu pilih di sini.")
                         .font(.system(size: 10)).foregroundStyle(.gray)
-                    NButton(icon: "arrow.down.circle", title: "Unduh suara lain", tint: Palette.teal) {
+                    NButton(icon: "arrow.down.circle", title: "Unduh suara lain", tint: Palette.accent) {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.universalaccess?SpokenContent")!)
                     }
                 }
@@ -855,7 +855,7 @@ struct LangPage: View {
         let on = m.s.engine == id
         return Button { m.setEngine(id) } label: {
             HStack(spacing: 8) {
-                Image(systemName: on ? "largecircle.fill.circle" : "circle").foregroundStyle(on ? Palette.teal : .gray)
+                Image(systemName: on ? "largecircle.fill.circle" : "circle").foregroundStyle(on ? Palette.accent : .gray)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(.system(size: 12, weight: .bold))
                     Text(problem ?? note).font(.system(size: 10)).foregroundStyle(problem == nil ? Color.gray : Palette.amber)
@@ -863,7 +863,7 @@ struct LangPage: View {
                 Spacer()
             }
             .padding(7)
-            .background(on ? Palette.teal.opacity(0.14) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .background(on ? Palette.accent.opacity(0.14) : Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -872,9 +872,9 @@ struct LangPage: View {
     func pill(_ text: String, on: Bool, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
             Text(text).font(.system(size: 11, weight: .bold))
-                .foregroundStyle(on ? Color.white : .white.opacity(0.55))
+                .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.55))
                 .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(on ? AnyShapeStyle(Theme.mint.gradient) : AnyShapeStyle(Color.white.opacity(0.07)), in: Capsule())
+                .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.white.opacity(0.07)), in: Capsule())
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)

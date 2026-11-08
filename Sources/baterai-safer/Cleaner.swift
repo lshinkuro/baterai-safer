@@ -204,14 +204,14 @@ struct CleanerTab: View {
             Hero {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Label("Bisa dibersihkan", systemImage: "sparkles").font(.system(size: 12, weight: .bold, design: .rounded)).opacity(0.85)
-                        Text(scanning ? "Memindai…" : bytes(total)).font(.system(size: 40, weight: .heavy, design: .rounded)).monospacedDigit()
+                        Label("Bisa dibersihkan", systemImage: "sparkles").font(.system(size: 12, weight: .bold)).opacity(0.85)
+                        Text(scanning ? "Memindai…" : bytes(total)).font(.system(size: 40, weight: .semibold)).monospacedDigit()
                             .contentTransition(.numericText())
                         Text("cache, log, dan sisa build").font(.system(size: 12, weight: .semibold)).opacity(0.8)
                     }
                     Spacer()
                     Button { c.scan() } label: {
-                        Image(systemName: "arrow.clockwise").font(.system(size: 15, weight: .heavy))
+                        Image(systemName: "arrow.clockwise").font(.system(size: 15, weight: .semibold))
                             .frame(width: 42, height: 42).background(.white.opacity(0.22), in: Circle())
                     }
                     .buttonStyle(.plain).help("Pindai ulang").disabled(scanning)
@@ -221,11 +221,11 @@ struct CleanerTab: View {
             Card(title: "File sampah", icon: "trash") {
                 ForEach(c.junk) { j in
                     HStack(spacing: 10) {
-                        IconBadge(icon: j.icon, color: j.color)
+                        IconBadge(icon: j.icon)
                         Text(j.title)
                         Spacer()
                         if let s = j.size {
-                            Text(bytes(s)).font(.system(.callout, design: .rounded).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
+                            Text(bytes(s)).font(.system(.callout).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
                         } else {
                             ProgressView().controlSize(.small)
                         }
@@ -239,7 +239,7 @@ struct CleanerTab: View {
 
             Card(title: "Simulator iOS", icon: "iphone.gen3") {
                 HStack(spacing: 10) {
-                    IconBadge(icon: "iphone.gen3", color: Palette.teal)
+                    IconBadge(icon: "iphone.gen3")
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Simulator tak terpakai")
                         Text("Simulator yang runtime-nya sudah tidak terpasang").font(.caption2).foregroundStyle(.secondary)
@@ -258,7 +258,7 @@ struct CleanerTab: View {
                     TextField("Cari aplikasi", text: $query).textFieldStyle(.plain)
                 }
                 .padding(.horizontal, 8).padding(.vertical, 6)
-                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
 
                 VStack(spacing: 0) {
                     ForEach(c.apps.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }) { a in
@@ -266,15 +266,15 @@ struct CleanerTab: View {
                             HStack(spacing: 8) {
                                 Image(nsImage: NSWorkspace.shared.icon(forFile: a.url.path)).resizable().frame(width: 24, height: 24)
                                 Text(a.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                                Text(a.size.map(bytes) ?? "…").font(.system(.callout, design: .rounded)).monospacedDigit().foregroundStyle(.secondary)
+                                Text(a.size.map(bytes) ?? "…").font(.system(.callout)).monospacedDigit().foregroundStyle(.secondary)
                                 Button {
                                     c.uninstall(a) { extra in
                                         let list = extra.map { "• ~/Library/" + $0.path.replacingOccurrences(of: NSHomeDirectory() + "/Library/", with: "") }.joined(separator: "\n")
                                         return confirm("Hapus \(a.name)?", "Aplikasi\(extra.isEmpty ? "" : " dan \(extra.count) file sisanya") dipindah ke Trash:\n\(list)", "Pindah ke Trash")
                                     }
                                 } label: { Image(systemName: "trash.circle.fill").font(.system(size: 16)) }
-                                    .buttonStyle(.plain).foregroundStyle(.red.opacity(0.85))
-                                    .help("Pindah ke Trash beserta file sisanya").opacity(hover ? 1 : 0)
+                                    .buttonStyle(.plain).foregroundStyle(Palette.red.opacity(0.85))
+                                    .tip("Pindah ke Trash beserta file sisanya").opacity(hover ? 1 : 0)
                             }
                         }
                     }
@@ -300,7 +300,7 @@ struct DiskAnalyzer: View {
             HStack(spacing: 6) {
                 if c.folder != home {
                     Button { c.analyze((c.folder as NSString).deletingLastPathComponent) } label: { Image(systemName: "chevron.left") }
-                        .buttonStyle(.borderless)
+                        .buttonStyle(.borderless).tip("Folder induk")
                 }
                 Text(c.folder.replacingOccurrences(of: home, with: "~")).font(.caption.weight(.semibold)).lineLimit(1).truncationMode(.head)
                 Spacer()
@@ -315,16 +315,16 @@ struct DiskAnalyzer: View {
             }
             VStack(spacing: 0) {
                 ForEach(Array(c.folders.prefix(12).enumerated()), id: \.element.id) { i, item in
-                    SizedRow(item: item, fraction: item.size / top, color: Palette.cycle[i % Palette.cycle.count],
+                    SizedRow(item: item, fraction: item.size / top, color: Palette.accent,
                              drill: { c.analyze(item.url.path) }, trash: trashAction(item))
                 }
             }
             if !c.bigFiles.isEmpty {
                 Divider()
-                Text("File di atas 200 MB").font(.system(size: 12, weight: .bold, design: .rounded))
+                Text("File di atas 200 MB").font(.system(size: 12, weight: .bold))
                 VStack(spacing: 0) {
                     ForEach(Array(c.bigFiles.enumerated()), id: \.element.id) { i, item in
-                        SizedRow(item: item, fraction: item.size / (c.bigFiles.first?.size ?? 1), color: Palette.cycle[(i + 3) % Palette.cycle.count],
+                        SizedRow(item: item, fraction: item.size / (c.bigFiles.first?.size ?? 1), color: Color.gray,
                                  drill: nil, trash: trashAction(item))
                     }
                 }
@@ -363,12 +363,12 @@ struct SizedRow: View {
                     }
                     .frame(height: 6)
                 }
-                Text(bytes(item.size)).font(.system(.caption, design: .rounded).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
+                Text(bytes(item.size)).font(.system(.caption).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)
                     .frame(width: 64, alignment: .trailing)
                 HStack(spacing: 6) {
                     Button { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } label: { Image(systemName: "magnifyingglass") }
-                        .help("Tampilkan di Finder")
-                    if let trash { Button(action: trash) { Image(systemName: "trash") }.foregroundStyle(.red).help("Pindah ke Trash") }
+                        .tip("Tampilkan di Finder")
+                    if let trash { Button(action: trash) { Image(systemName: "trash") }.foregroundStyle(Palette.red).tip("Pindah ke Trash") }
                 }
                 .buttonStyle(.borderless).opacity(hover ? 1 : 0)
             }

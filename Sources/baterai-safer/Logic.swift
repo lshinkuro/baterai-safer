@@ -101,6 +101,7 @@ func selfTest() {
     let ps = parsePS("  1   0.0  12000 root     launchd\n 512  12.5 204800 me       Google Chrome Helper\nbad line\n")
     assert(ps.count == 2 && ps[1] == Proc(pid: 512, cpu: 12.5, mb: 200, user: "me", name: "Google Chrome Helper"), "ps parse")
     assert(parsePS("3284   0.2 205792 a2267            WhatsApp\n").first?.name == "WhatsApp", "ps: no leading spaces in name")
+    assert(parsePS("9 0.1 100 root baterai-safer\n10 0.1 100 me baterai-safer\n").map(\.name) == ["Poni helper", "Poni"], "ps: own process shows as Poni")
     assert(parseLRC("[00:12.50] Halo\n[01:02.00]\nbukan lirik\n") == [Lyric(t: 12.5, line: "Halo"), Lyric(t: 62, line: "")], "lrc")
     let day = { (i: Int) in dayKey(Calendar.current.date(byAdding: .day, value: -i, to: Date())!) }
     assert(focusStreak([day(0): 25, day(1): 50, day(3): 25], today: Date()) == 2, "streak counts back from today")

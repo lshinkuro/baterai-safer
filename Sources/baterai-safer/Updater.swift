@@ -161,7 +161,7 @@ struct UpdateCard: View {
         Card(title: "Update", icon: "arrow.down.circle") {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Versi \(u.current)").font(.system(size: 12.5, weight: .semibold))
+                    Text("Versi \(u.current)").font(.system(size: 12, weight: .semibold))
                     if !u.status.isEmpty { Text(u.status).font(.caption).foregroundStyle(u.latest != nil ? Palette.green : .secondary) }
                 }
                 Spacer()
