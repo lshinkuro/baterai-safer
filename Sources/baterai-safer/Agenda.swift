@@ -117,6 +117,7 @@ struct AgendaView: View {
     @Local private var minutes = 60
     @Local private var reminder: Int? = 10
     @Local private var error = ""
+    @Local private var picking = false   // month/year picker instead of the day grid
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -138,22 +139,53 @@ struct AgendaView: View {
     }
 
     var month: some View {
-        let cal = Calendar.current
+        var cal = Calendar.current
+        cal.locale = appLocale                       // month and weekday names in the app's language…
+        cal.firstWeekday = Calendar.current.firstWeekday // …but the week starts where monthGrid's does
         let symbols = cal.veryShortStandaloneWeekdaySymbols
         let weekdays = (0..<7).map { symbols[(cal.firstWeekday - 1 + $0) % 7] }
         return VStack(spacing: 5) {
             HStack(spacing: 4) {
-                Text(a.month.formatted(.dateTime.month(.wide).year().locale(appLocale)).capitalized)
-                    .font(.system(size: 13, weight: .semibold))
+                Button { withAnimation(Motion.ease) { picking.toggle() } } label: {
+                    HStack(spacing: 4) {
+                        Text(picking ? a.month.formatted(.dateTime.year().locale(appLocale))
+                                     : a.month.formatted(.dateTime.month(.wide).year().locale(appLocale)).capitalized)
+                            .font(.system(size: 13, weight: .semibold))
+                        Image(systemName: picking ? "chevron.up" : "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(.gray)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).tip("Pilih bulan dan tahun")
                 Spacer()
-                navButton("chevron.left") { a.shift(-1) }
-                Button { a.month = Date(); pick(cal.startOfDay(for: Date())); a.reload() } label: {
+                // While picking, the arrows step whole years.
+                navButton("chevron.left") { a.shift(picking ? -12 : -1) }
+                Button { a.month = Date(); pick(cal.startOfDay(for: Date())); a.reload(); picking = false } label: {
                     Text("Hari ini").font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.accent)
                         .padding(.horizontal, 7).padding(.vertical, 3).background(Palette.accent.opacity(0.15), in: Capsule())
                 }
                 .buttonStyle(.plain)
-                navButton("chevron.right") { a.shift(1) }
+                navButton("chevron.right") { a.shift(picking ? 12 : 1) }
             }
+            if picking {
+                let current = cal.component(.month, from: a.month)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                    ForEach(1...12, id: \.self) { m in
+                        Button {
+                            a.month = cal.date(bySetting: .month, value: m, of: cal.date(from: cal.dateComponents([.year], from: a.month)) ?? a.month) ?? a.month
+                            a.reload()
+                            withAnimation(Motion.ease) { picking = false }
+                        } label: {
+                            Text(cal.shortStandaloneMonthSymbols[m - 1].capitalized).font(.system(size: 12, weight: m == current ? .bold : .medium))
+                                .foregroundStyle(m == current ? Palette.onAccent : .white.opacity(0.9))
+                                .frame(maxWidth: .infinity, minHeight: 34)
+                                .background(m == current ? Palette.accent : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 4)
+            } else {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
                 ForEach(Array(weekdays.enumerated()), id: \.offset) { _, d in
                     Text(d).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.35))
@@ -161,6 +193,7 @@ struct AgendaView: View {
                 ForEach(Array(monthGrid(a.month).enumerated()), id: \.offset) { _, day in
                     if let day { dayCell(day) } else { Color.clear.frame(height: 24) }
                 }
+            }
             }
         }
     }
@@ -184,7 +217,7 @@ struct AgendaView: View {
                     ForEach(0..<min(count, 3), id: \.self) { _ in Circle().frame(width: 3.5, height: 3.5) }
                 }
                 .frame(height: 3.5)
-                .foregroundStyle(on ? Color.white : Palette.accent)
+                .foregroundStyle(on ? Palette.onAccent : Palette.accent)
             }
             .frame(maxWidth: .infinity, minHeight: 24)
             .foregroundStyle(on ? Palette.onAccent : past ? .white.opacity(0.35) : .white.opacity(0.9))
