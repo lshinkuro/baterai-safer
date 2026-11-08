@@ -231,5 +231,23 @@ func selfTest() {
     assert(ur.today.input == 10 && ur.today.output == 5 && ur.today.cache == 120, "usage: today split")
     assert(tokens(1_234_567) == "1.2M" && tokens(999) == "999", "token format")
     assert(UsageModel.ourFolder.hasSuffix("-Library-Application-Support-BateraiSafer-ai"), "our claude folder")
+    var sn = Snake(); sn.food = Snake.Point(x: 6, y: 5)
+    sn.step(spawn: { Snake.Point(x: 0, y: 0) })
+    assert(sn.score == 1 && sn.body[0] == Snake.Point(x: 6, y: 5) && sn.food == Snake.Point(x: 0, y: 0), "snake: eats and grows")
+    sn.turn(Snake.Point(x: -1, y: 0)); sn.step()
+    assert(sn.body[0] == Snake.Point(x: 7, y: 5), "snake: can't reverse into its neck")
+    sn.turn(Snake.Point(x: 0, y: -1)); for _ in 0..<6 { sn.step() }
+    assert(sn.over, "snake: wall ends the game")
+    var mem = Memory(shuffled: false)
+    mem.flip(0); mem.flip(1)
+    assert(mem.moves == 1 && mem.matched.isEmpty && mem.open == [0, 1], "memory: miss stays open")
+    mem.flip(8)
+    assert(mem.open == [8], "memory: third card hides the miss")
+    mem.flip(0)
+    assert(mem.matched == [0, 8] && mem.open.isEmpty, "memory: pair matches")
+    let xs: [Character?] = ["X", "X", nil, nil, "O", nil, nil, nil, nil]
+    assert(XO.bestMove(xs) == 2, "xo: blocks a win")
+    let os: [Character?] = ["X", "X", nil, "O", "O", nil, "X", nil, nil]
+    assert(XO.bestMove(os) == 5, "xo: takes a win")
     print("selftest ok")
 }

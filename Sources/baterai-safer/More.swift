@@ -250,13 +250,14 @@ struct MoreView: View {
 
     static let tools: [(id: String, icon: String, title: String, subtitle: String, color: Color)] = [
         ("charge", "battery.100percent.bolt", "Notif baterai penuh", "Kabari saat sampai batas", Palette.green),
-        ("mic", "mic.slash.fill", "Mic Mute", "Bisukan mic di semua aplikasi · ⌃⌥M", Palette.red),
+        ("mic", "mic.slash.fill", "Mic Mute", "Semua aplikasi · ⌃⌥M", Palette.red),
         ("camera", "camera.fill", "Kamera cermin", "Cek penampilan sebelum rapat", Palette.accent),
         ("color", "eyedropper", "Color picker", "Ambil warna dari layar", Palette.accent),
-        ("awake", "cup.and.saucer.fill", "Tetap menyala", "30 menit, 1 jam, atau sampai jam tertentu", Palette.amber),
+        ("awake", "cup.and.saucer.fill", "Tetap menyala", "Cegah Mac tidur sementara", Palette.amber),
         ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.accent),
         ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.accent),
-        ("lang", "character.book.closed.fill", "Belajar Bahasa", "Inggris, Spanyol, Jepang · kuis, ngobrol dengan AI", Palette.accent),
+        ("lang", "character.book.closed.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
+        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu kembar, X-O", Palette.accent),
     ]
 
     var body: some View {
@@ -275,6 +276,7 @@ struct MoreView: View {
                     case "downloads": downloadsPage
                     case "drives": drivesPage
                     case "lang": LangPage()
+                    case "games": GamesPage()
                     default: colorPage
                     }
                 }
@@ -282,13 +284,13 @@ struct MoreView: View {
             }
             .transition(.opacity)
         } else {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
                 ForEach(Self.tools, id: \.id) { t in
                     Button { withAnimation(Motion.ease) { page = t.id } } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             Image(systemName: t.icon).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.85))
                                 .frame(width: 36, height: 36).background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            Text(t.title).font(.system(size: 12, weight: .semibold))
+                            Text(t.title).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.85)
                             Text(t.subtitle).font(.system(size: 11)).foregroundStyle(.gray).lineLimit(2, reservesSpace: true)
                         }
                         .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
