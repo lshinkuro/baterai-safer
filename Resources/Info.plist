@@ -39,6 +39,10 @@
 	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Untuk menampilkan rapat berikutnya dan tombol Join di notch.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Untuk menghitung jadwal sholat di lokasimu. Lokasi hanya dipakai di Mac ini.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Untuk menghitung jadwal sholat di lokasimu. Lokasi hanya dipakai di Mac ini.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Untuk menampilkan dan mengontrol lagu di Spotify/Music, menyimpan catatan ke Apple Notes, dan mengganti mode gelap.</string>
 </dict>

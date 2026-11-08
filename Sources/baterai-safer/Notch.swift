@@ -2,9 +2,9 @@ import SwiftUI
 import Charts
 
 enum NTab: Int, CaseIterable {
-    case music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, more
-    var icon: String { ["music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "square.grid.2x2.fill"][rawValue] }
-    var title: String { ["Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Lainnya"][rawValue] }
+    case music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, ibadah, more
+    var icon: String { ["music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "moon.stars.fill", "square.grid.2x2.fill"][rawValue] }
+    var title: String { ["Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Ibadah", "Lainnya"][rawValue] }
     var enabled: Bool { FeatureFlags.isOn("\(self)") }
 }
 
@@ -162,6 +162,7 @@ final class Notch {
         if NTab.music.enabled { media.start() } else { media.stop() }       // AppleScript poll every second
         if NTab.clipboard.enabled { clips.start() } else { clips.stop() }   // pasteboard check every 0.5 s
         if FeatureFlags.isOn("meeting") { meet.start() } else { meet.stop() }
+        if NTab.ibadah.enabled { Ibadah.shared.start() } else { Ibadah.shared.stop() } // reminders
         if !state.tab.enabled, let first = NTab.allCases.first(where: \.enabled) { state.tab = first }
     }
 
@@ -468,6 +469,7 @@ struct NotchView: View {
                 case .shelf: ShelfView(s: shelf, dropping: dropping)
                 case .git: GitView(g: git, pr: pr, ai: ai)
                 case .stats: StatsView(s: sys)
+                case .ibadah: IbadahView()
                 case .more: MoreView()
                 }
             }
@@ -918,36 +920,41 @@ struct AIHistory: View {
     }
 }
 
-/// The AI chat in its own resizable window, for long answers and big visuals. Same AIModel as the
-/// notch, so the conversation carries over both ways; the green button makes it full screen.
-enum AIWindow {
-    private static var window: NSWindow?
+/// A resizable dark window around a notch feature that needs more room (AI chat, Al-Qur'an).
+/// Created once per id and kept, so its state survives closing; the green button makes it full screen.
+enum AppWindow {
+    private static var windows: [String: NSWindow] = [:]
 
-    static func show() {
+    static func show<V: View>(_ id: String, title: String, size: NSSize, @ViewBuilder content: () -> V) {
         if Notch.shared.state.expanded { Notch.shared.toggle(nil) } // close the island first
-        if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 680),
+        if windows[id] == nil {
+            let w = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
-            w.title = "Poni AI"
+            w.title = title
             w.titlebarAppearsTransparent = true
             w.appearance = NSAppearance(named: .darkAqua)
             w.isReleasedWhenClosed = false
             w.collectionBehavior.insert(.fullScreenPrimary)
             w.minSize = NSSize(width: 560, height: 420)
-            w.contentView = NSHostingView(rootView: AIView(ai: Notch.shared.ai, windowed: true)
+            w.contentView = NSHostingView(rootView: content()
                 .padding(.horizontal, 20).padding(.top, 36).padding(.bottom, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .foregroundStyle(.white).background(Color.black)
                 .environment(\.colorScheme, .dark))
             w.center()
-            window = w
+            windows[id] = w
         }
         // After the notch hands focus back to the previous app, take it for the window.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             NSApp.activate(ignoringOtherApps: true)
-            window?.makeKeyAndOrderFront(nil)
+            windows[id]?.makeKeyAndOrderFront(nil)
         }
     }
+}
+
+/// The AI chat in a window: same AIModel as the notch, so the conversation carries over both ways.
+enum AIWindow {
+    static func show() { AppWindow.show("ai", title: "Poni AI", size: NSSize(width: 920, height: 680)) { AIView(ai: Notch.shared.ai, windowed: true) } }
 }
 
 func copyText(_ s: String) {

@@ -34,6 +34,7 @@ Status: **menunggu akun Apple Developer**. Rilis tetap jalan dengan tanda tangan
    - `com.apple.security.device.camera` — Kamera cermin
    - `com.apple.security.device.audio-input` — latihan suara Belajar Bahasa
    - `com.apple.security.personal-information.calendars` — Rapat
+   - `com.apple.security.personal-information.location` — jadwal sholat (lokasi otomatis)
 2. **`scripts/bundle.sh`**: kalau env `SIGN_ID` di-set, tanda tangani dengan
    `codesign --force --options runtime --timestamp --entitlements Resources/Poni.entitlements --sign "$SIGN_ID"`;
    kalau tidak, tetap ad-hoc seperti sekarang (Homebrew dan build lokal tidak berubah).

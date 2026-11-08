@@ -44,6 +44,7 @@ import SwiftUI
         case .shelf: AnyView(ShelfView(s: n.shelf, dropping: false))
         case .git: AnyView(GitView(g: n.git, pr: n.pr, ai: n.ai))
         case .stats: AnyView(StatsView(s: n.sys))
+        case .ibadah: AnyView(IbadahView())
         default: AnyView(MoreView())
         }
         if t == .more {

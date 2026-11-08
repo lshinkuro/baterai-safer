@@ -269,5 +269,14 @@ func selfTest() {
     assert(AIModel.known[1].2("q", .last).contains("--resume") && !AIModel.known[1].2("q", .none).contains("--resume"), "ai: kiro resume flag")
     let saved = try! JSONDecoder().decode([AISession].self, from: JSONEncoder().encode([AISession(id: sid, cli: "Claude", chat: talk)]))
     assert(saved.first?.title == "hai" && saved.first?.chat.count == 3, "ai: sessions round-trip")
+    // Kemenag RI schedule for Kota Jakarta on 8 Nov 2026 (api.myquran.com, id 1301), to the minute ±1.
+    var jkt = Calendar(identifier: .gregorian); jkt.timeZone = TimeZone(identifier: "Asia/Jakarta")!
+    let nov8 = jkt.date(from: DateComponents(year: 2026, month: 11, day: 8, hour: 12))!
+    let pt = prayerTimes(on: nov8, lat: -6.2088, lon: 106.8456, tz: jkt.timeZone)
+    let kemenag: [Prayer: (Int, Int)] = [.imsak: (3, 57), .subuh: (4, 7), .terbit: (5, 22), .dzuhur: (11, 40), .ashar: (14, 58), .maghrib: (17, 51), .isya: (19, 3)]
+    for (p, (hh, mm)) in kemenag {
+        let c = jkt.dateComponents([.hour, .minute], from: pt[p]!)
+        assert(abs((c.hour! * 60 + c.minute!) - (hh * 60 + mm)) <= 1, "sholat: \(p.title) \(c.hour!):\(c.minute!) vs Kemenag \(hh):\(mm)")
+    }
     print("selftest ok")
 }

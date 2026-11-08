@@ -4,3 +4,5 @@
 "NSCalendarsFullAccessUsageDescription" = "To show your next meeting and a Join button in the notch.";
 "NSCalendarsUsageDescription" = "To show your next meeting and a Join button in the notch.";
 "NSAppleEventsUsageDescription" = "To show and control music in Spotify/Music, save notes to Apple Notes, and switch dark mode.";
+"NSLocationUsageDescription" = "To calculate prayer times where you are. Your location stays on this Mac.";
+"NSLocationWhenInUseUsageDescription" = "To calculate prayer times where you are. Your location stays on this Mac.";
