@@ -167,7 +167,20 @@ struct AgendaView: View {
                 navButton("chevron.right") { a.shift(picking ? 12 : 1) }
             }
             if picking {
-                let current = cal.component(.month, from: a.month)
+                let current = cal.component(.month, from: a.month), year = cal.component(.year, from: a.month)
+                HStack(spacing: 4) {
+                    ForEach(year - 2...year + 2, id: \.self) { y in
+                        Button { a.shift((y - year) * 12) } label: {
+                            Text(String(y)).font(.system(size: 11, weight: y == year ? .bold : .medium)).monospacedDigit()
+                                .foregroundStyle(y == year ? Palette.onAccent : .white.opacity(0.8))
+                                .frame(maxWidth: .infinity, minHeight: 24)
+                                .background(y == year ? Palette.accent : Color.white.opacity(0.05), in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 4)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     ForEach(1...12, id: \.self) { m in
                         Button {
