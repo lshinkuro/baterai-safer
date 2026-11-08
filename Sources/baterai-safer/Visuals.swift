@@ -115,13 +115,14 @@ struct WebPreview: NSViewRepresentable {
 
 struct VisualCard: View {
     let v: Visual
+    var height: CGFloat = 200
     @StateObject private var box = WebBox()
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         VStack(alignment: .leading, spacing: 8) {
             WebPreview(html: v.page, box: box)
-                .frame(height: 200)
+                .frame(height: height)
                 .clipShape(shape)
                 .overlay(shape.strokeBorder(.white.opacity(0.07), lineWidth: 1))
             HStack(spacing: 6) {

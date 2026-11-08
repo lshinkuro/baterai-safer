@@ -743,6 +743,7 @@ struct FocusView: View {
 
 struct AIView: View {
     @ObservedObject var ai: AIModel
+    var windowed = false // shown in AIWindow instead of the notch
     @FocusState private var focused: Bool
     @AppStorage("aiPage") private var page = 0
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when the usage page is toggled
@@ -785,7 +786,7 @@ struct AIView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
                             if ai.chat.isEmpty {
-                                Placeholder(icon: "sparkles", title: "Tanya \(ai.selected)",
+                                Placeholder(icon: "sparkles", title: String(format: tr("Tanya %@"), ai.selected),
                                             subtitle: "Percakapan berlanjut sampai kamu mulai yang baru (✎)")
                                     .frame(height: 170)
                             }
@@ -812,7 +813,7 @@ struct AIView: View {
                                                     .frame(maxWidth: .infinity, alignment: .leading)
                                                     .contextMenu { Button("Salin jawaban") { copyText(x.answer) } }
                                             }
-                                            if let v = parts.visual { VisualCard(v: v) }
+                                            if let v = parts.visual { VisualCard(v: v, height: windowed ? 380 : 200) }
                                         }
                                         .padding(.top, 3)
                                     }
@@ -842,8 +843,43 @@ struct AIView: View {
                     .background(Color.white.opacity(0.09), in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.08)))
                     NButton(icon: "square.and.pencil") { ai.reset() }.tip("Percakapan baru")
+                    if !windowed {
+                        NButton(icon: "arrow.up.left.and.arrow.down.right") { AIWindow.show() }.tip("Buka di jendela besar")
+                    }
                 }
             }
+        }
+    }
+}
+
+/// The AI chat in its own resizable window, for long answers and big visuals. Same AIModel as the
+/// notch, so the conversation carries over both ways; the green button makes it full screen.
+enum AIWindow {
+    private static var window: NSWindow?
+
+    static func show() {
+        if Notch.shared.state.expanded { Notch.shared.toggle(nil) } // close the island first
+        if window == nil {
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 680),
+                             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            w.title = "Poni AI"
+            w.titlebarAppearsTransparent = true
+            w.appearance = NSAppearance(named: .darkAqua)
+            w.isReleasedWhenClosed = false
+            w.collectionBehavior.insert(.fullScreenPrimary)
+            w.minSize = NSSize(width: 560, height: 420)
+            w.contentView = NSHostingView(rootView: AIView(ai: Notch.shared.ai, windowed: true)
+                .padding(.horizontal, 20).padding(.top, 36).padding(.bottom, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .foregroundStyle(.white).background(Color.black)
+                .environment(\.colorScheme, .dark))
+            w.center()
+            window = w
+        }
+        // After the notch hands focus back to the previous app, take it for the window.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NSApp.activate(ignoringOtherApps: true)
+            window?.makeKeyAndOrderFront(nil)
         }
     }
 }
