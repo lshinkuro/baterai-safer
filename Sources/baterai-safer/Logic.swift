@@ -45,6 +45,14 @@ func save<T: Encodable>(_ v: T, _ path: String) {
     try? JSONEncoder().encode(v).write(to: URL(fileURLWithPath: path), options: .atomic)
 }
 
+/// A calibration left by a helper that stopped hours ago is dropped, not resumed: resuming would cut
+/// the adapter and drain the battery to 10% long after the user started it (and maybe forgot it).
+func resumed(_ s: Status, now: Double) -> Status {
+    var s = s
+    if s.calibration != 0 && now - s.updated > 6 * 3600 { s.calibration = 0 }
+    return s
+}
+
 /// Pure policy: given settings and a battery reading, decide charging and adapter state.
 func decide(_ c: Config, _ b: Battery, _ s: inout Status) -> (charge: Bool, adapter: Bool) {
     guard c.enabled else { s.calibration = 0; return (true, true) }
@@ -278,5 +286,7 @@ func selfTest() {
         let c = jkt.dateComponents([.hour, .minute], from: pt[p]!)
         assert(abs((c.hour! * 60 + c.minute!) - (hh * 60 + mm)) <= 1, "sholat: \(p.title) \(c.hour!):\(c.minute!) vs Kemenag \(hh):\(mm)")
     }
+    var stale = Status(); stale.calibration = 2; stale.updated = 1000
+    assert(resumed(stale, now: 1000 + 7 * 3600).calibration == 0 && resumed(stale, now: 1000 + 60).calibration == 2, "daemon: drops a calibration left hours ago, keeps a fresh one")
     print("selftest ok")
 }

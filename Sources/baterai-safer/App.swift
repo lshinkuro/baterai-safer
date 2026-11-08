@@ -27,6 +27,10 @@ final class Model: ObservableObject {
 
     var helperInstalled: Bool { FileManager.default.fileExists(atPath: Paths.plist) }
     var helperRunning: Bool { Date().timeIntervalSince1970 - status.updated < 30 }
+    /// The binary launchd starts for the helper (the plist is world-readable).
+    var helperBinary: String? { (NSDictionary(contentsOfFile: Paths.plist)?["ProgramArguments"] as? [String])?.first }
+    /// Installed but pointing at a binary that's gone, e.g. an old Homebrew "Baterai Safer" after moving to the DMG.
+    var helperBroken: Bool { helperInstalled && helperBinary.map { !FileManager.default.fileExists(atPath: $0) } == true }
 
     func refresh() {
         battery = Battery.read()
@@ -184,6 +188,18 @@ struct BatteryTab: View {
 
     var limit: Int? { m.helperInstalled && m.config.enabled ? m.config.limit : nil }
 
+    var helperProblem: String {
+        let since = m.status.updated > 0 ? Date(timeIntervalSince1970: m.status.updated).formatted(.dateTime.day().month(.wide).hour().minute().locale(appLocale)) : "?"
+        let cause = m.helperBroken
+            ? String(format: tr("Sejak %@ helper menunjuk ke Poni versi lama yang sudah dihapus."), since)
+            : String(format: tr("Helper tidak merespons sejak %@."), since)
+        // macOS 27+: the app sets the native Charge Limit itself, so the limit holds; only helper features stop.
+        let effect = SMC.canInhibit
+            ? tr("Baterai diisi tanpa batas.")
+            : String(format: tr("Charge Limit macOS masih menahan di %@%%, tapi auto discharge, kalibrasi, proteksi panas, dan berhenti saat sleep tidak berjalan."), "\(nativeTarget(m.config, m.status))")
+        return cause + " " + effect + " " + tr("Pasang ulang helper supaya memakai versi ini (minta password admin).")
+    }
+
     var body: some View {
         let b = m.battery
         VStack(spacing: 12) {
@@ -191,8 +207,10 @@ struct BatteryTab: View {
                 HStack(alignment: .center, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
                         if m.helperInstalled && !m.helperRunning {
-                            Button { m.admin("install-daemon") } label: { StatusPill(text: "Helper mati · Jalankan ulang", color: Palette.red) }
-                                .buttonStyle(.plain).help("Pasang ulang helper (minta password admin)")
+                            Button { m.admin("install-daemon") } label: {
+                                StatusPill(text: m.helperBroken ? "Helper perlu dipasang ulang" : "Helper mati · Jalankan ulang", color: Palette.red)
+                            }
+                            .buttonStyle(.plain).help("Pasang ulang helper (minta password admin)")
                         } else {
                             StatusPill(text: stateText)
                         }
@@ -216,6 +234,13 @@ struct BatteryTab: View {
                     Spacer(minLength: 0)
                     BatteryGlyph(level: Double(b.percent) / 100, limit: limit.map { Double($0) / 100 }, charging: m.status.charging && b.ac, color: tone)
                         .padding(.trailing, 10)
+                }
+            }
+
+            if m.helperInstalled && !m.helperRunning {
+                Card(title: SMC.canInhibit ? "Batas pengisian tidak berjalan" : "Helper tidak berjalan", icon: "exclamationmark.triangle.fill") {
+                    Text(helperProblem).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button("Pasang ulang helper…") { m.admin("install-daemon") }.buttonStyle(.borderedProminent).tint(Palette.accent)
                 }
             }
 

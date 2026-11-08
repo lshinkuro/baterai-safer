@@ -4,7 +4,7 @@ import IOKit.pwr_mgt
 
 // Root daemon: owns SMC writes, so limits hold while the menu bar app is closed.
 enum Daemon {
-    static var status = load(Paths.status, Status())
+    static var status = resumed(load(Paths.status, Status()), now: Date().timeIntervalSince1970)
     static var rootPort: io_connect_t = 0
 
     static func apply(charge: Bool, adapter: Bool) {
