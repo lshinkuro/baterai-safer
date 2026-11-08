@@ -259,5 +259,15 @@ func selfTest() {
     let lottie = extractVisual("Spinner:\n```json\n{\"v\":\"5.7.4\",\"fr\":30,\"ip\":0,\"op\":60,\"w\":100,\"h\":100,\"layers\":[]}\n```")
     assert(lottie.visual?.kind == .lottie && lottie.visual?.ext == "json", "visual: lottie json")
     assert(extractVisual("```json\n{\"name\": \"poni\"}\n```").visual == nil, "visual: other json stays code")
+    let talk = [Exchange(prompt: "hai", answer: "halo"), Exchange(prompt: "x", answer: "gagal", failed: true), Exchange(prompt: "lagi", answer: String(repeating: "a", count: 2000))]
+    let tx = transcript(talk)
+    assert(tx.contains("User: hai\nAssistant: halo") && !tx.contains("gagal") && tx.contains("…") && tx.hasSuffix("New message:\n"), "ai: transcript skips failures and trims long answers")
+    assert(transcript([]).isEmpty, "ai: no transcript without answers")
+    let sid = UUID()
+    let claude = AIModel.known[0].2
+    assert(claude("q", .new(sid)).contains("--session-id") && claude("q", .session(sid)).contains("--resume") && !claude("q", .none).contains("-c"), "ai: claude session flags")
+    assert(AIModel.known[1].2("q", .last).contains("--resume") && !AIModel.known[1].2("q", .none).contains("--resume"), "ai: kiro resume flag")
+    let saved = try! JSONDecoder().decode([AISession].self, from: JSONEncoder().encode([AISession(id: sid, cli: "Claude", chat: talk)]))
+    assert(saved.first?.title == "hai" && saved.first?.chat.count == 3, "ai: sessions round-trip")
     print("selftest ok")
 }

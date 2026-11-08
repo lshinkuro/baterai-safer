@@ -746,6 +746,7 @@ struct AIView: View {
     var windowed = false // shown in AIWindow instead of the notch
     @FocusState private var focused: Bool
     @AppStorage("aiPage") private var page = 0
+    @Local private var history = false // notch: saved conversations in place of the chat
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when the usage page is toggled
 
     // Pages swap the whole area instead of splitting it, so each keeps the full notch size.
@@ -780,8 +781,21 @@ struct AIView: View {
     @ViewBuilder var chat: some View {
         if ai.clis.isEmpty {
             Placeholder(icon: "sparkles", title: "Belum ada CLI AI", subtitle: "Pasang Claude Code atau Kiro CLI")
+        } else if windowed {
+            HStack(alignment: .top, spacing: 16) {
+                AIHistory(ai: ai).frame(width: 230)
+                conversation
+            }
         } else {
+            conversation
+        }
+    }
+
+    var conversation: some View {
             VStack(spacing: 10) {
+                if history && !windowed {
+                    AIHistory(ai: ai) { withAnimation(Motion.ease) { history = false } }
+                } else {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
@@ -824,6 +838,7 @@ struct AIView: View {
                     }
                     .onChange(of: ai.chat.map(\.answer)) { _ in withAnimation { proxy.scrollTo("end") } }
                 }
+                }
                 HStack(spacing: 8) {
                     Picker("", selection: $ai.selected) { ForEach(ai.clis, id: \.name) { Text($0.name).tag($0.name) } }
                         .labelsHidden().fixedSize().controlSize(.small)
@@ -842,13 +857,64 @@ struct AIView: View {
                     .padding(.leading, 12).padding(.trailing, 4).padding(.vertical, 4)
                     .background(Color.white.opacity(0.09), in: Capsule())
                     .overlay(Capsule().strokeBorder(Color.white.opacity(0.08)))
-                    NButton(icon: "square.and.pencil") { ai.reset() }.tip("Percakapan baru")
+                    if !windowed {
+                        NButton(icon: "clock.arrow.circlepath", tint: history ? Palette.accent : .white) { withAnimation(Motion.ease) { history.toggle() } }
+                            .tip("Riwayat percakapan")
+                    }
+                    NButton(icon: "square.and.pencil") { ai.reset(); history = false }.tip("Percakapan baru")
                     if !windowed {
                         NButton(icon: "arrow.up.left.and.arrow.down.right") { AIWindow.show() }.tip("Buka di jendela besar")
                     }
                 }
             }
+    }
+}
+
+/// Saved conversations, newest first: a list in the notch, a sidebar in the AI window.
+struct AIHistory: View {
+    @ObservedObject var ai: AIModel
+    var picked: () -> Void = {}
+
+    var body: some View {
+        if ai.sessions.isEmpty {
+            Placeholder(icon: "clock.arrow.circlepath", title: "Belum ada riwayat", subtitle: "Percakapan tersimpan otomatis di Mac ini")
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(ai.sessions) { s in row(s) }
+                }
+            }
         }
+    }
+
+    func row(_ s: AISession) -> some View {
+        HStack(spacing: 6) {
+            Button { ai.open(s); picked() } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(s.title).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    HStack(spacing: 4) {
+                        Text(s.cli)
+                        Text("·")
+                        Text(s.updated, format: Date.RelativeFormatStyle(presentation: .named, locale: appLocale))
+                    }
+                    .font(.system(size: 10)).foregroundStyle(.gray)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Menu { Button(role: .destructive) { remove(s) } label: { Label(tr("Hapus"), systemImage: "trash") } } label: {
+                Image(systemName: "ellipsis").font(.system(size: 11, weight: .bold))
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().tip("Hapus")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .background(Color.white.opacity(s.id == ai.current ? 0.12 : 0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contextMenu { Button(tr("Hapus")) { remove(s) } }
+    }
+
+    func remove(_ s: AISession) {
+        if confirm(String(format: tr("Hapus %@?"), s.title), "Percakapan ini dihapus dari riwayat Poni.", "Hapus") { ai.delete(s) }
     }
 }
 

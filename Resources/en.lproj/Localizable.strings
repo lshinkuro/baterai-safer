@@ -663,3 +663,8 @@
 "Disimpan ke Downloads · %lld" = "Saved to Downloads · %lld";
 "Gagal menyimpan" = "Couldn't save";
 "Buka di jendela besar" = "Open in a large window";
+"Riwayat percakapan" = "Conversation history";
+"Belum ada riwayat" = "No history yet";
+"Percakapan tersimpan otomatis di Mac ini" = "Conversations are saved automatically on this Mac";
+"Percakapan ini dihapus dari riwayat Poni." = "This conversation is removed from Poni's history.";
+"Terputus" = "Cut off";
