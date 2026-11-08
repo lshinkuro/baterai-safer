@@ -226,7 +226,10 @@ final class AIModel: ObservableObject {
     Make a visual for the request below (diagram, chart, flowchart, icon or vector graphic). Reply with one \
     self-contained SVG in a ```svg block: viewBox set, inline styles, light background, no external fonts, \
     images or scripts. Use a ```html block only if it truly needs interactivity, still with no external \
-    resources. After the code, at most one short sentence. Answer in the request's language.
+    resources. For an animation, animate the SVG with CSS or SMIL. If the request asks for Lottie, reply \
+    instead with Lottie (Bodymovin 5.x) JSON in a ```json block: shape layers only, no images, no \
+    expressions, 30 fps, loops cleanly. After the code, at most one short sentence. Answer in the \
+    request's language.
 
     Request:
 

@@ -1,21 +1,35 @@
 import SwiftUI
 import WebKit
 
-// AI → Visual: diagrams, charts, flowcharts and icons the AI draws as SVG (or self-contained HTML),
-// previewed in the chat and saved as PNG / SVG / HTML.
+// AI → Visual: diagrams, charts, flowcharts, icons and animations the AI draws as SVG, self-contained
+// HTML or Lottie JSON, previewed in the chat and saved as PNG / SVG / HTML / JSON.
 
 struct Visual: Equatable {
-    enum Kind: String { case svg, html }
+    enum Kind: String { case svg, html, lottie }
     let kind: Kind
     let code: String
 
-    /// The page shown in the preview and opened in the browser: SVG centered on a white canvas.
+    var ext: String { kind == .lottie ? "json" : kind.rawValue }
+
+    /// Bundled lottie-web light player (SVG renderer, no expressions); nil outside the .app.
+    static let lottiePlayer = Bundle.main.url(forResource: "lottie_light.min", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+
+    /// The page shown in the preview and opened in the browser, on a white canvas.
     var page: String {
-        guard kind == .svg else { return code }
-        return """
+        let head = """
         <!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#fff}\
-        body{display:flex;align-items:center;justify-content:center}svg{max-width:100%;max-height:100%;height:auto}</style>\(code)
+        body{display:flex;align-items:center;justify-content:center}svg{max-width:100%;max-height:100%;height:auto}\
+        #a{width:100%;height:100%}</style>
         """
+        switch kind {
+        case .html: return code
+        case .svg: return head + code
+        case .lottie:
+            guard let player = Self.lottiePlayer else { return head + "<p style=\"font:13px -apple-system\">Lottie preview needs Poni.app</p>" }
+            // JSON is a JS literal; only a "</" could close the script tag early.
+            let data = code.replacingOccurrences(of: "</", with: "<\\/")
+            return head + "<div id=a></div><script>\(player)</script><script>lottie.loadAnimation({container:document.getElementById('a'),renderer:'svg',loop:true,autoplay:true,animationData:\(data)})</script>"
+        }
     }
 
     /// Source file contents; a standalone .svg needs the namespace, which inline SVG often omits.
@@ -34,7 +48,8 @@ func extractVisual(_ answer: String) -> (text: String, visual: Visual?) {
         let lang = ns.substring(with: m.range(at: 1)).lowercased()
         let body = ns.substring(with: m.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = body.lowercased()
-        let kind: Visual.Kind? = lang == "html" || lower.hasPrefix("<!doctype") || lower.contains("<html") || lower.contains("<script") ? .html
+        let kind: Visual.Kind? = isLottie(body) ? .lottie
+            : lang == "html" || lower.hasPrefix("<!doctype") || lower.contains("<html") || lower.contains("<script") ? .html
             : ["svg", "xml", ""].contains(lang) && lower.contains("<svg") ? .svg : nil
         guard let kind else { continue }
         let text = ns.replacingCharacters(in: m.range, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -46,6 +61,12 @@ func extractVisual(_ answer: String) -> (text: String, visual: Visual?) {
         return (text.trimmingCharacters(in: .whitespacesAndNewlines), Visual(kind: .svg, code: String(answer[r])))
     }
     return (answer, nil)
+}
+
+/// Bodymovin JSON: an object with layers and a frame rate or version.
+func isLottie(_ s: String) -> Bool {
+    guard s.hasPrefix("{"), let o = (try? JSONSerialization.jsonObject(with: Data(s.utf8))) as? [String: Any] else { return false }
+    return o["layers"] is [Any] && (o["fr"] != nil || o["v"] != nil)
 }
 
 /// Writes into ~/Downloads without overwriting anything (poni-visual.png, poni-visual-2.png, …).
@@ -107,8 +128,8 @@ struct VisualCard: View {
                 NButton(icon: "arrow.down.circle", title: "PNG", tint: Palette.accent, prominent: true) {
                     box.png { data in saved(data.flatMap { saveToDownloads($0, ext: "png") }) }
                 }
-                NButton(icon: "chevron.left.forwardslash.chevron.right", title: v.kind.rawValue.uppercased()) {
-                    saved(saveToDownloads(Data(v.file.utf8), ext: v.kind.rawValue))
+                NButton(icon: "chevron.left.forwardslash.chevron.right", title: v.ext.uppercased()) {
+                    saved(saveToDownloads(Data(v.file.utf8), ext: v.ext))
                 }
                 NButton(icon: "safari") { openInBrowser() }.tip("Buka di browser")
                 NButton(icon: "doc.on.doc") { copyText(v.file); Notch.shared.flash("Kode disalin") }.tip("Salin kode")

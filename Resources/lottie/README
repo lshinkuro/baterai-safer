@@ -1,0 +1,2 @@
+lottie-web 5.12.2 (npm, sha1 579ca9fe6d3fd9e352571edd3c0be162492f68e5), build/player/lottie_light.min.js.
+Light build: SVG renderer only, no expressions, so AI-written animations never run code.

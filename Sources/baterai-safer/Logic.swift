@@ -256,5 +256,8 @@ func selfTest() {
     let bare = extractVisual("Logo: <svg width=\"4\"></svg> ok")
     assert(bare.visual?.kind == .svg && bare.text == "Logo:  ok", "visual: bare svg")
     assert(Visual(kind: .svg, code: "<svg viewBox=\"0 0 1 1\"/>").file.hasPrefix("<svg xmlns=\"http://www.w3.org/2000/svg\""), "visual: svg file gets namespace")
+    let lottie = extractVisual("Spinner:\n```json\n{\"v\":\"5.7.4\",\"fr\":30,\"ip\":0,\"op\":60,\"w\":100,\"h\":100,\"layers\":[]}\n```")
+    assert(lottie.visual?.kind == .lottie && lottie.visual?.ext == "json", "visual: lottie json")
+    assert(extractVisual("```json\n{\"name\": \"poni\"}\n```").visual == nil, "visual: other json stays code")
     print("selftest ok")
 }
