@@ -34,7 +34,9 @@ swift .claude/skills/poni-ui-check/stack.swift out.png a.png b.png c.png
 
 ## Live check (when a render isn't enough)
 
-- Run the real app: `pkill -f 'Poni.app/Contents/MacOS'; scripts/bundle.sh dev-local && open .build/Poni.app`.
+- Run the real app: `pkill -f 'Poni.app/Contents/MacOS/baterai-safer$'; scripts/bundle.sh dev-local && open .build/Poni.app`.
+  The `$` matters: the root helper runs the same binary as `… baterai-safer daemon`; never match it (it can't be
+  killed without root anyway, and stopping it would stop the charge limiter).
   **Build release first** (`swift build -c release`): `bundle.sh` copies whatever binary is in `.build/release` (a stale binary once shipped a hang).
 - Open the notch with ⌃⌥Space (`osascript -e 'tell application "System Events" to key code 49 using {control down, option down}'`), a tab with its shortcut (⌃⌥R Rapat, ⌃⌥N Catatan, …), then `screencapture -x -R355,0,760,340 out.png`.
 - Don't pass `-AppleLanguages` on the command line: `main.swift` treats unknown args as a bad command and exits. Use `defaults write io.github.lshinkuro.BateraiSafer AppleLanguages -array en`, launch, then `defaults delete …` right after.
