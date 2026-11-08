@@ -285,8 +285,11 @@ struct AgendaView: View {
                         .foregroundStyle(r == nil ? Color.gray : Palette.amber)
                 }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help(reminderLabel(r))
+                Menu { actions(e) } label: { Image(systemName: "ellipsis").font(.system(size: 12, weight: .bold)) }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().tip("Edit atau hapus")
             }
         }
+        .contextMenu { if editable { actions(e) } }
         .padding(.horizontal, 10).padding(.vertical, 8)
         .background(LinearGradient(colors: [color.opacity(0.16), color.opacity(0.05)], startPoint: .leading, endPoint: .trailing),
                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -334,7 +337,7 @@ struct AgendaView: View {
             Spacer(minLength: 0)
             HStack(spacing: 6) {
                 if let e = editing {
-                    NButton(icon: "trash", tint: Palette.red) { a.delete(e); adding = false }.help("Hapus")
+                    NButton(icon: "trash", tint: Palette.red) { remove(e) }.tip("Hapus")
                 }
                 Text("Tersimpan ke Kalender macOS").font(.system(size: 10)).foregroundStyle(.gray)
                 Spacer()
@@ -384,6 +387,17 @@ struct AgendaView: View {
         reminder = defaultReminder < 0 ? nil : defaultReminder
         adding = true
         focused = true
+    }
+
+    @ViewBuilder func actions(_ e: EKEvent) -> some View {
+        Button { startEditing(e) } label: { Label(tr("Edit"), systemImage: "pencil") }
+        Button(role: .destructive) { remove(e) } label: { Label(tr("Hapus"), systemImage: "trash") }
+    }
+
+    /// Asks first: the event disappears from macOS Calendar and synced devices too.
+    func remove(_ e: EKEvent) {
+        let info = e.hasRecurrenceRules ? "Acara berulang: hanya kejadian ini yang dihapus. Ikut terhapus di Kalender macOS dan perangkat yang tersinkron." : "Ikut terhapus di Kalender macOS dan perangkat yang tersinkron."
+        if confirm(String(format: tr("Hapus %@?"), e.title ?? tr("Rapat")), info, "Hapus") { a.delete(e); if editing == e { adding = false } }
     }
 
     func startEditing(_ e: EKEvent) {
