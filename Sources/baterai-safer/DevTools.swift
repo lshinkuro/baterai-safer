@@ -220,7 +220,17 @@ final class AIModel: ObservableObject {
         didSet { UserDefaults.standard.set(selected, forKey: "ai"); reset() }
     }
     @Published var prompt = ""
+    @Published var visual = false // ask for a drawing (SVG/HTML) instead of prose
     @Published var chat: [Exchange] = []
+    static let visualHint = """
+    Make a visual for the request below (diagram, chart, flowchart, icon or vector graphic). Reply with one \
+    self-contained SVG in a ```svg block: viewBox set, inline styles, light background, no external fonts, \
+    images or scripts. Use a ```html block only if it truly needs interactivity, still with no external \
+    resources. After the code, at most one short sentence. Answer in the request's language.
+
+    Request:
+
+    """
     @Published var running = false
     private var proc: Process?
     static let cwd = Paths.user + "/ai" // own folder, so "continue last conversation" stays ours
@@ -233,7 +243,7 @@ final class AIModel: ObservableObject {
         chat.append(Exchange(prompt: q))
         running = true
         let id = chat.last!.id
-        runAsync(cli.exe, cli.args(q, chat.count > 1), cwd: Self.cwd, started: { self.proc = $0 }) { code, out, err in
+        runAsync(cli.exe, cli.args(visual ? Self.visualHint + q : q, chat.count > 1), cwd: Self.cwd, started: { self.proc = $0 }) { code, out, err in
             self.running = false
             self.proc = nil
             guard let i = self.chat.firstIndex(where: { $0.id == id }) else { return }

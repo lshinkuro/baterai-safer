@@ -654,3 +654,11 @@
 "Ikut terhapus di Kalender macOS dan perangkat yang tersinkron." = "It is also removed from macOS Calendar and synced devices.";
 "Pilih bulan dan tahun" = "Pick month and year";
 "Putar di %lld" = "Play in %lld";
+"Visual" = "Visual";
+"Minta AI menggambar: diagram, chart, flowchart, ikon (SVG)" = "Ask the AI to draw: diagrams, charts, flowcharts, icons (SVG)";
+"Gambarkan… mis. flowchart login" = "Draw… e.g. a login flowchart";
+"Salin kode" = "Copy code";
+"Kode disalin" = "Code copied";
+"Disimpan ke Downloads · %@" = "Saved to Downloads · %@";
+"Disimpan ke Downloads · %lld" = "Saved to Downloads · %lld";
+"Gagal menyimpan" = "Couldn't save";

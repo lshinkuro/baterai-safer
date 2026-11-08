@@ -802,13 +802,19 @@ struct AIView: View {
                                         HStack(spacing: 6) { ProgressView().controlSize(.small); Text("\(ai.selected) berpikir…").foregroundStyle(.gray) }
                                             .font(.system(size: 12)).padding(.top, 3)
                                     } else {
-                                        Text((try? AttributedString(markdown: x.answer, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(x.answer))
-                                            .font(.system(size: 12)).foregroundStyle(x.failed ? Palette.red : .white.opacity(0.92))
-                                            .lineSpacing(2)
-                                            .textSelection(.enabled)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(.top, 3)
-                                            .contextMenu { Button("Salin jawaban") { copyText(x.answer) } }
+                                        let parts = x.failed ? (text: x.answer, visual: nil) : extractVisual(x.answer)
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            if !parts.text.isEmpty {
+                                                Text((try? AttributedString(markdown: parts.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(parts.text))
+                                                    .font(.system(size: 12)).foregroundStyle(x.failed ? Palette.red : .white.opacity(0.92))
+                                                    .lineSpacing(2)
+                                                    .textSelection(.enabled)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                    .contextMenu { Button("Salin jawaban") { copyText(x.answer) } }
+                                            }
+                                            if let v = parts.visual { VisualCard(v: v) }
+                                        }
+                                        .padding(.top, 3)
                                     }
                                 }
                             }
@@ -820,8 +826,10 @@ struct AIView: View {
                 HStack(spacing: 8) {
                     Picker("", selection: $ai.selected) { ForEach(ai.clis, id: \.name) { Text($0.name).tag($0.name) } }
                         .labelsHidden().fixedSize().controlSize(.small)
+                    NButton(icon: "paintbrush.pointed", title: "Visual", tint: ai.visual ? Palette.accent : .white, prominent: ai.visual) { ai.visual.toggle() }
+                        .tip("Minta AI menggambar: diagram, chart, flowchart, ikon (SVG)")
                     HStack(spacing: 6) {
-                        TextField("Tanya \(ai.selected)…", text: $ai.prompt).textFieldStyle(.plain).onSubmit { ai.ask() }
+                        TextField(ai.visual ? "Gambarkan… mis. flowchart login" : "Tanya \(ai.selected)…", text: $ai.prompt).textFieldStyle(.plain).onSubmit { ai.ask() }
                             .focused($focused).onAppear { focused = true }
                         if ai.running {
                             Button { ai.stop() } label: { Image(systemName: "stop.circle.fill").font(.system(size: 20)) }.buttonStyle(.plain).tip("Hentikan")

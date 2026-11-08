@@ -249,5 +249,12 @@ func selfTest() {
     assert(XO.bestMove(xs) == 2, "xo: blocks a win")
     let os: [Character?] = ["X", "X", nil, "O", "O", nil, "X", nil, nil]
     assert(XO.bestMove(os) == 5, "xo: takes a win")
+    let fenced = extractVisual("Ini dia:\n```svg\n<svg viewBox=\"0 0 10 10\"><rect/></svg>\n```\nSelesai.")
+    assert(fenced.visual?.kind == .svg && fenced.visual?.code == "<svg viewBox=\"0 0 10 10\"><rect/></svg>" && fenced.text == "Ini dia:\n\nSelesai.", "visual: svg fence")
+    assert(extractVisual("```html\n<div id=c></div><script>1</script>\n```").visual?.kind == .html, "visual: html fence")
+    assert(extractVisual("```swift\nlet x = \"<svg>\"\n```").visual == nil, "visual: other languages stay code")
+    let bare = extractVisual("Logo: <svg width=\"4\"></svg> ok")
+    assert(bare.visual?.kind == .svg && bare.text == "Logo:  ok", "visual: bare svg")
+    assert(Visual(kind: .svg, code: "<svg viewBox=\"0 0 1 1\"/>").file.hasPrefix("<svg xmlns=\"http://www.w3.org/2000/svg\""), "visual: svg file gets namespace")
     print("selftest ok")
 }
