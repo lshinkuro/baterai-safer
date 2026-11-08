@@ -4,7 +4,7 @@
 class BateraiSafer < Formula
   desc "Now called Poni (brew install poni)"
   homepage "https://github.com/lshinkuro/poni"
-  url "https://github.com/lshinkuro/poni.git", tag: "v0.8.0", revision: "96a3dc97beac1266030ffafb2e6e34c4334f8907"
+  url "https://github.com/lshinkuro/poni.git", tag: "v0.9.0", revision: "9b290a5d6b8b223cff4b7a3293ac22fff455131e"
   license "MIT"
   head "https://github.com/lshinkuro/poni.git", branch: "main"
 
