@@ -3,6 +3,25 @@ import Charts
 import CSMC
 import ServiceManagement
 
+/// One reading per day, kept for good: what a battery limiter is for, measured over months.
+struct HealthDay: Codable, Equatable {
+    var day: String          // yyyy-MM-dd, local
+    var maxCapacity: Int     // mAh
+    var designCapacity: Int
+    var cycles: Int
+    var health: Double { designCapacity > 0 ? Double(maxCapacity) * 100 / Double(designCapacity) : 0 }
+    var date: Date? {
+        let p = day.split(separator: "-").compactMap { Int($0) }
+        return p.count == 3 ? Calendar.current.date(from: DateComponents(year: p[0], month: p[1], day: p[2])) : nil
+    }
+}
+
+/// Health change from the first to the last reading, and the days between; nil until two days are logged.
+func healthTrend(_ log: [HealthDay]) -> (change: Double, days: Int)? {
+    guard log.count >= 2, let a = log.first, let b = log.last, let d0 = a.date, let d1 = b.date else { return nil }
+    return (b.health - a.health, max(1, Int((d1.timeIntervalSince(d0) / 86400).rounded())))
+}
+
 struct Sample: Codable {
     var t: Double
     var percent: Int
@@ -17,6 +36,8 @@ final class Model: ObservableObject {
         didSet { if config != oldValue { save(config, Paths.config); syncNative() } }
     }
     @Published var history = load(Paths.history, [Sample]())
+    @Published var healthLog = load(Model.healthFile, [HealthDay]())
+    static let healthFile = Paths.user + "/health.json"
     @Published var error = ""
     private var timer: Timer?
 
@@ -46,6 +67,13 @@ final class Model: ObservableObject {
         history = history.filter { now - $0.t < 86400 } + [Sample(t: now, percent: battery.percent, temp: battery.temp, watts: battery.watts)]
         try? FileManager.default.createDirectory(atPath: (Paths.history as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         save(history, Paths.history)
+        // Once a day: health, cycles and capacity, for the long-term chart.
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date()) // local day, not UTC
+        let today = String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
+        if battery.designCapacity > 0, healthLog.last?.day != today {
+            healthLog.append(HealthDay(day: today, maxCapacity: battery.maxCapacity, designCapacity: battery.designCapacity, cycles: battery.cycles))
+            save(healthLog, Model.healthFile)
+        }
     }
 
     // The native limit lives in the user's session, so the app (not the root daemon) sets it.
@@ -258,6 +286,10 @@ struct BatteryTab: View {
                 HistoryChart(samples: m.history, limit: limit)
             }
 
+            Card(title: "Kesehatan jangka panjang", icon: "heart.text.square") {
+                HealthChart(log: m.healthLog)
+            }
+
             if !m.helperInstalled {
                 Card(title: "Helper", icon: "lock.shield") {
                     Text("Helper (root) diperlukan untuk mengontrol pengisian.").font(.callout).foregroundStyle(.secondary)
@@ -319,6 +351,48 @@ struct BatteryTab: View {
             }
         }
         .onAppear { m.refresh() }
+    }
+}
+
+struct HealthChart: View {
+    let log: [HealthDay]
+
+    var body: some View {
+        if log.count < 2 {
+            Text(tr("Kesehatan baterai dicatat sekali sehari mulai hari ini. Grafiknya muncul besok dan makin berguna setelah beberapa minggu."))
+                .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        } else {
+            let hs = log.map(\.health), low = (hs.min() ?? 80).rounded(.down)
+            VStack(alignment: .leading, spacing: 8) {
+                if let t = healthTrend(log), let first = log.first, let last = log.last {
+                    // Tone by how fast it drops: about 0.5%/month or less is normal wear.
+                    let perMonth = -t.change / Double(t.days) * 30
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(String(format: "%.1f%%", last.health)).font(.system(size: 20, weight: .semibold)).monospacedDigit()
+                        Text(String(format: tr("%@ dalam %@ hari · %@ siklus"), String(format: "%+.1f%%", t.change), "\(t.days)", "\(last.cycles - first.cycles)"))
+                            .font(.system(size: 11)).foregroundStyle(perMonth > 1.5 ? Palette.amber : .secondary)
+                    }
+                }
+                Chart(log.compactMap { d in d.date.map { (date: $0, health: d.health) } }, id: \.date) { d in
+                    LineMark(x: .value("Hari", d.date), y: .value("%", d.health))
+                        .foregroundStyle(Palette.accent).interpolationMethod(.monotone)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                }
+                .chartYScale(domain: max(0, low - 2)...100)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                        AxisValueLabel(format: .dateTime.day().month(.abbreviated).locale(appLocale)).font(.system(size: 9))
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { v in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                        AxisValueLabel { Text("\(Int(v.as(Double.self) ?? 0))%").font(.system(size: 9)) }
+                    }
+                }
+                .frame(height: 110)
+            }
+        }
     }
 }
 

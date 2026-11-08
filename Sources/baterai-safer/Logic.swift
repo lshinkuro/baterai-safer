@@ -288,5 +288,8 @@ func selfTest() {
     }
     var stale = Status(); stale.calibration = 2; stale.updated = 1000
     assert(resumed(stale, now: 1000 + 7 * 3600).calibration == 0 && resumed(stale, now: 1000 + 60).calibration == 2, "daemon: drops a calibration left hours ago, keeps a fresh one")
+    let hl = [HealthDay(day: "2026-01-01", maxCapacity: 4500, designCapacity: 5000, cycles: 100), HealthDay(day: "2026-01-31", maxCapacity: 4450, designCapacity: 5000, cycles: 130)]
+    let ht = healthTrend(hl)
+    assert(ht?.days == 30 && abs((ht?.change ?? 0) + 1) < 0.001 && healthTrend(Array(hl.prefix(1))) == nil, "health: trend over days")
     print("selftest ok")
 }

@@ -730,3 +730,13 @@
 "Charge Limit macOS masih menahan di %@%%, tapi auto discharge, kalibrasi, proteksi panas, dan berhenti saat sleep tidak berjalan." = "macOS Charge Limit still holds at %@%%, but auto discharge, calibration, heat protection and stop-on-sleep aren't running.";
 "Pasang ulang helper supaya memakai versi ini (minta password admin)." = "Reinstall the helper so it uses this version (asks for an admin password).";
 "Helper tidak berjalan" = "Helper isn't running";
+"Kesehatan jangka panjang" = "Long-term health";
+"Kesehatan baterai dicatat sekali sehari mulai hari ini. Grafiknya muncul besok dan makin berguna setelah beberapa minggu." = "Battery health is recorded once a day starting today. The chart appears tomorrow and gets useful after a few weeks.";
+"%@ dalam %@ hari · %@ siklus" = "%@ in %@ days · %@ cycles";
+"%@ dalam %@ hari · %lld siklus" = "%@ in %@ days · %lld cycles";
+"%@ dalam %lld hari · %@ siklus" = "%@ in %lld days · %@ cycles";
+"%@ dalam %lld hari · %lld siklus" = "%@ in %lld days · %lld cycles";
+"%lld dalam %@ hari · %@ siklus" = "%lld in %@ days · %@ cycles";
+"%lld dalam %@ hari · %lld siklus" = "%lld in %@ days · %lld cycles";
+"%lld dalam %lld hari · %@ siklus" = "%lld in %lld days · %@ cycles";
+"%lld dalam %lld hari · %lld siklus" = "%lld in %lld days · %lld cycles";
