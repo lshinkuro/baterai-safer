@@ -77,6 +77,8 @@ Top up dan kalibrasi di macOS 27 membutuhkan aplikasi menu bar tetap berjalan.
 
 Panel menu bar punya 4 tab: **Baterai** (fitur di atas + grafik riwayat), **Sistem** (memori, CPU, disk, proses terberat yang bisa ditutup), **Cleaner** (bersihkan cache/log/DerivedData/DeviceSupport/npm/Trash, simulator tak terpakai, analisis disk per folder, file > 200 MB, uninstall aplikasi beserta file sisanya ke Trash), dan **Tools** (cegah sleep, file tersembunyi, ikon desktop, dark mode, screenshot area).
 
+Bahasa aplikasi mengikuti bahasa macOS: Indonesia, atau Inggris untuk bahasa lain (System Settings → General → Language & Region → Applications untuk mengatur khusus Poni). Terjemahan ada di `Resources/en.lproj/Localizable.strings`, dengan teks Indonesia sebagai kuncinya.
+
 Di menu bar Poni tampil sebagai wajah Poni dan persentase baterai; persentasenya bisa disembunyikan di Tools → Fitur → **Persen**.
 
 ## Notch

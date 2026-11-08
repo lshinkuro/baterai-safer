@@ -85,7 +85,7 @@ struct UsagePage: View {
         let r = u.report
         let days = (0..<7).reversed().map { i -> (String, Int) in
             let d = Calendar.current.date(byAdding: .day, value: -i, to: Date())!
-            return (d.formatted(.dateTime.weekday(.abbreviated).locale(Locale(identifier: "id_ID"))), r.days[dayKey(d)] ?? 0)
+            return (d.formatted(.dateTime.weekday(.abbreviated).locale(appLocale)), r.days[dayKey(d)] ?? 0)
         }
         let top = r.models.filter { $0.value > 0 }.sorted { $0.value > $1.value }.prefix(3)
         HStack(spacing: 10) {

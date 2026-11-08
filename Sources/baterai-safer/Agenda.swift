@@ -143,7 +143,7 @@ struct AgendaView: View {
         let weekdays = (0..<7).map { symbols[(cal.firstWeekday - 1 + $0) % 7] }
         return VStack(spacing: 5) {
             HStack(spacing: 4) {
-                Text(a.month.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: "id_ID"))).capitalized)
+                Text(a.month.formatted(.dateTime.month(.wide).year().locale(appLocale)).capitalized)
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
                 navButton("chevron.left") { a.shift(-1) }
@@ -215,9 +215,9 @@ struct AgendaView: View {
                 Text("\(cal.component(.day, from: a.selected))").font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(Palette.accent)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(a.selected.formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "id_ID"))).capitalized)
+                    Text(a.selected.formatted(.dateTime.weekday(.wide).locale(appLocale)).capitalized)
                         .font(.system(size: 13, weight: .bold))
-                    Text(list.isEmpty ? a.selected.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: "id_ID")))
+                    Text(list.isEmpty ? a.selected.formatted(.dateTime.month(.wide).year().locale(appLocale))
                          : "\(list.count) acara")
                         .font(.system(size: 11)).foregroundStyle(.gray)
                 }
@@ -297,7 +297,7 @@ struct AgendaView: View {
         return VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Text(editing == nil ? "Rapat baru" : "Edit rapat").font(.system(size: 13, weight: .semibold))
-                Text(when.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "id_ID"))))
+                Text(when.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(appLocale)))
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.accent)
                 Spacer()
                 Text("pilih tanggal di kalender").font(.system(size: 10)).foregroundStyle(.gray)
@@ -354,7 +354,7 @@ struct AgendaView: View {
 
     func chip(_ text: String, on: Bool, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Text(text).font(.system(size: 11, weight: .bold))
+            Text(tr(text)).font(.system(size: 11, weight: .bold))
                 .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.6))
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.white.opacity(0.07)), in: Capsule())

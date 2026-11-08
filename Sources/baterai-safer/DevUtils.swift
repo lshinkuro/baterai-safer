@@ -32,7 +32,7 @@ func base64Decode(_ s: String) -> Data? {
 
 func dateText(_ d: Date) -> String {
     let local = DateFormatter()
-    local.locale = Locale(identifier: "id_ID")
+    local.locale = appLocale
     local.dateFormat = "EEEE, d MMM yyyy HH:mm:ss zzz"
     let iso = ISO8601DateFormatter()
     return "\(local.string(from: d))\n\(iso.string(from: d))"

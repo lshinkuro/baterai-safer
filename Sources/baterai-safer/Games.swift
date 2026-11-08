@@ -218,7 +218,7 @@ struct XOView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 10) {
-                Text(result ?? "Giliranmu (X)").font(.system(size: 15, weight: .semibold))
+                Text(tr(result ?? "Giliranmu (X)")).font(.system(size: 15, weight: .semibold))
                 Text("Menang \(tally.win) · Kalah \(tally.lose) · Seri \(tally.draw)").font(.system(size: 11)).foregroundStyle(.gray).monospacedDigit()
                 NButton(icon: "arrow.counterclockwise", title: "Main lagi", tint: Palette.accent, prominent: result != nil) {
                     withAnimation(Motion.ease) { b = Array(repeating: nil, count: 9) }
@@ -270,7 +270,7 @@ struct GamesPage: View {
                 ForEach(Self.games.indices, id: \.self) { i in
                     let on = game == i
                     Button { game = i } label: {
-                        Label(Self.games[i].0, systemImage: Self.games[i].1).font(.system(size: 12, weight: .medium))
+                        Label(tr(Self.games[i].0), systemImage: Self.games[i].1).font(.system(size: 12, weight: .medium))
                             .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.85))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10).padding(.vertical, 7)

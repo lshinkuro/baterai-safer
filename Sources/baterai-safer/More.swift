@@ -290,8 +290,8 @@ struct MoreView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Image(systemName: t.icon).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.85))
                                 .frame(width: 36, height: 36).background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            Text(t.title).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.85)
-                            Text(t.subtitle).font(.system(size: 11)).foregroundStyle(.gray).lineLimit(2, reservesSpace: true)
+                            Text(tr(t.title)).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.85)
+                            Text(tr(t.subtitle)).font(.system(size: 11)).foregroundStyle(.gray).lineLimit(2, reservesSpace: true)
                         }
                         .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
                         .padding(12)

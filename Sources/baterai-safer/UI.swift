@@ -65,9 +65,15 @@ extension NSImage {
     }()
 }
 
+/// The language the app is showing (Indonesian or English), for dates and weekday names.
+let appLocale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "id")
+
+/// Translates a string that arrives at runtime (component titles, model messages); literals in `Text` translate themselves.
+func tr(_ s: String) -> String { NSLocalizedString(s, comment: "") }
+
 extension View {
     /// Tooltip that is also the VoiceOver name; for buttons that show only an icon.
-    func tip(_ text: String) -> some View { help(text).accessibilityLabel(text) }
+    func tip(_ text: String) -> some View { help(tr(text)).accessibilityLabel(tr(text)) }
 }
 
 /// The app's two animation curves; nil (instant) when Reduce Motion is on.
@@ -117,7 +123,7 @@ struct TabBar: View {
                 Button { withAnimation(Motion.snap) { tab = t.rawValue } } label: {
                     HStack(spacing: 5) {
                         Image(systemName: t.icon).font(.system(size: 10, weight: .semibold))
-                        Text(t.title).font(.system(size: 12, weight: .medium))
+                        Text(tr(t.title)).font(.system(size: 12, weight: .medium))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -174,7 +180,7 @@ struct Card<Content: View>: View {
             if let title {
                 HStack(spacing: 6) {
                     if let icon { Image(systemName: icon).font(.system(size: 10, weight: .semibold)) }
-                    Text(title.uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8)
+                    Text(tr(title).uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8)
                 }
                 .foregroundStyle(.secondary)
             }
@@ -214,9 +220,9 @@ struct Switch: View {
     var body: some View {
         HStack(spacing: 10) {
             IconBadge(icon: icon, tint: on ? Palette.accent : nil)
-            Text(title).font(.system(size: 13))
+            Text(tr(title)).font(.system(size: 13))
             Spacer()
-            Toggle(title, isOn: $on).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(Palette.accent)
+            Toggle(tr(title), isOn: $on).labelsHidden().toggleStyle(.switch).controlSize(.small).tint(Palette.accent)
         }
     }
 }
@@ -235,7 +241,7 @@ struct Tile: View {
             Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(tone ?? .secondary)
             Spacer(minLength: 6)
             Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
-            Text(title.uppercased()).font(.system(size: 9, weight: .semibold)).tracking(0.4).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
+            Text(tr(title).uppercased()).font(.system(size: 9, weight: .semibold)).tracking(0.4).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
             if let fraction {
                 Capsule().fill(Color.primary.opacity(0.08)).frame(height: 3)
                     .overlay(alignment: .leading) {
@@ -316,7 +322,7 @@ struct Ring: View {
             }
             VStack(spacing: 0) {
                 Text(label).font(.system(size: size * 0.22, weight: .semibold)).monospacedDigit()
-                if let caption { Text(caption).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary) }
+                if let caption { Text(tr(caption)).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary) }
             }
         }
         .frame(width: size - line, height: size - line)
@@ -350,7 +356,7 @@ struct StatusPill: View {
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 6, height: 6)
-            Text(text).lineLimit(1)
+            Text(tr(text)).lineLimit(1)
         }
         .font(.system(size: 11, weight: .bold))
         .padding(.horizontal, 9).padding(.vertical, 4)
@@ -385,7 +391,7 @@ struct ToggleTile: View {
                     .frame(width: 30, height: 30)
                     .background(on ? Color.black.opacity(0.1) : Color.primary.opacity(0.07), in: Circle())
                 Spacer(minLength: 0)
-                Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
+                Text(tr(title)).font(.system(size: 12, weight: .semibold)).lineLimit(2).multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(on ? "Aktif" : "Mati").font(.system(size: 10, weight: .medium)).opacity(0.65)
             }
@@ -410,7 +416,7 @@ struct Action: View {
         Button(action: run) {
             HStack(spacing: 10) {
                 IconBadge(icon: icon, size: 28)
-                Text(title).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                Text(tr(title)).font(.system(size: 12, weight: .medium)).lineLimit(1)
                 Spacer(minLength: 0)
             }
             .padding(9)

@@ -53,11 +53,11 @@ func leftovers(name: String, bundleID: String) -> [URL] {
 func confirm(_ title: String, _ info: String, _ button: String) -> Bool {
     NSApp.activate(ignoringOtherApps: true)
     let a = NSAlert()
-    a.messageText = title
-    a.informativeText = info
+    a.messageText = tr(title)
+    a.informativeText = tr(info)
     a.alertStyle = .warning
-    a.addButton(withTitle: button)
-    a.addButton(withTitle: "Batal")
+    a.addButton(withTitle: tr(button))
+    a.addButton(withTitle: tr("Batal"))
     return a.runModal() == .alertFirstButtonReturn
 }
 
@@ -205,7 +205,7 @@ struct CleanerTab: View {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Label("Bisa dibersihkan", systemImage: "sparkles").font(.system(size: 12, weight: .bold)).opacity(0.85)
-                        Text(scanning ? "Memindai…" : bytes(total)).font(.system(size: 40, weight: .semibold)).monospacedDigit()
+                        Text(scanning ? tr("Memindai…") : bytes(total)).font(.system(size: 40, weight: .semibold)).monospacedDigit()
                             .contentTransition(.numericText())
                         Text("cache, log, dan sisa build").font(.system(size: 12, weight: .semibold)).opacity(0.8)
                     }
@@ -222,7 +222,7 @@ struct CleanerTab: View {
                 ForEach(c.junk) { j in
                     HStack(spacing: 10) {
                         IconBadge(icon: j.icon)
-                        Text(j.title)
+                        Text(tr(j.title))
                         Spacer()
                         if let s = j.size {
                             Text(bytes(s)).font(.system(.callout).weight(.medium)).monospacedDigit().foregroundStyle(.secondary)

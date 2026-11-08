@@ -119,7 +119,7 @@ struct Panel: View {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Poni").font(.system(size: 15, weight: .semibold))
-                    Text("\(m.battery.percent)% · \(m.battery.ac ? "dicas" : "pakai baterai")").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                    Text("\(m.battery.percent)% · \(tr(m.battery.ac ? "dicas" : "pakai baterai"))").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { if confirm("Keluar dari Poni?", "Notch dan menu bar ditutup. Batas pengisian tetap berjalan lewat helper.", "Keluar") { NSApp.terminate(nil) } } label: {
@@ -203,7 +203,7 @@ struct BatteryTab: View {
                         .contentTransition(.numericText())
                         Group {
                             if let t = b.minutesLeft {
-                                Text("\(t / 60)j \(t % 60)m \(b.charging ? "sampai penuh" : "tersisa")")
+                                Text(b.charging ? "\(t / 60)j \(t % 60)m sampai penuh" : "\(t / 60)j \(t % 60)m tersisa")
                             } else {
                                 Text("\(b.maxCapacity * b.percent / 100) mAh tersimpan")
                             }

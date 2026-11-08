@@ -114,7 +114,7 @@ struct ToolsTab: View {
                 ForEach(Array(HotKeys.bindings.enumerated()), id: \.offset) { i, b in
                     HStack {
                         Circle().fill(Color.secondary.opacity(0.5)).frame(width: 5, height: 5)
-                        Text(b.2).font(.system(size: 13, weight: .medium))
+                        Text(tr(b.2)).font(.system(size: 13, weight: .medium))
                         Spacer()
                         Keycap(b.1)
                     }
@@ -149,7 +149,7 @@ struct FeatureChip: View {
         Button { withAnimation(Motion.ease) { on.toggle() } } label: {
             HStack(spacing: 5) {
                 Image(systemName: icon).font(.system(size: 10, weight: .bold))
-                Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                Text(tr(title)).font(.system(size: 11, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 Image(systemName: on ? "checkmark" : "xmark").font(.system(size: 9, weight: .semibold)).opacity(0.8)
             }

@@ -188,7 +188,7 @@ final class Focus: ObservableObject {
     var blocking: Bool { blockOn && running && !onBreak }
     var last7: [(day: String, minutes: Int)] {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "id_ID")
+        f.locale = appLocale
         f.dateFormat = "EEE"
         return (0..<7).reversed().map { i in
             let d = Calendar.current.date(byAdding: .day, value: -i, to: Date())!
@@ -254,7 +254,7 @@ func breakMinutes(_ focus: Int) -> Int { max(5, focus / 5) }
 
 func journalLine(_ intention: String, _ done: String, minutes: Int, at date: Date) -> String {
     let f = DateFormatter()
-    f.locale = Locale(identifier: "id_ID")
+    f.locale = appLocale
     f.dateFormat = "d MMM HH.mm"
     let task = intention.trimmingCharacters(in: .whitespaces).isEmpty ? "Sesi fokus" : intention.trimmingCharacters(in: .whitespaces)
     let result = done.trimmingCharacters(in: .whitespacesAndNewlines)

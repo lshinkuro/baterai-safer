@@ -1,0 +1,6 @@
+"NSMicrophoneUsageDescription" = "For voice chat practice in Languages. Audio is processed on this Mac.";
+"NSSpeechRecognitionUsageDescription" = "To turn your speech into text while practicing in Languages, on this Mac.";
+"NSCameraUsageDescription" = "For the Mirror in the notch: check yourself before a call. Video is never recorded or sent anywhere.";
+"NSCalendarsFullAccessUsageDescription" = "To show your next meeting and a Join button in the notch.";
+"NSCalendarsUsageDescription" = "To show your next meeting and a Join button in the notch.";
+"NSAppleEventsUsageDescription" = "To show and control music in Spotify/Music, save notes to Apple Notes, and switch dark mode.";

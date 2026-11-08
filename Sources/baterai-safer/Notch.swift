@@ -256,7 +256,7 @@ struct NButton: View {
         Button(action: run) {
             HStack(spacing: 5) {
                 Image(systemName: icon).font(.system(size: 11, weight: .bold))
-                if let title { Text(title).font(.system(size: 11, weight: .semibold)) }
+                if let title { Text(tr(title)).font(.system(size: 11, weight: .semibold)) }
             }
             .foregroundStyle(prominent ? Palette.onAccent : tint)
             .padding(.horizontal, title == nil ? 0 : 11)
@@ -277,7 +277,7 @@ struct Chip: View {
     var body: some View {
         HStack(spacing: 3) {
             if let icon { Image(systemName: icon) }
-            Text(text)
+            Text(tr(text))
         }
         .font(.system(size: 10, weight: .semibold))
         .foregroundStyle(color)
@@ -296,8 +296,8 @@ struct Placeholder: View {
                 .frame(width: 44, height: 44)
                 .background(Color.white.opacity(0.06), in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1))
-            Text(title).font(.system(size: 13, weight: .semibold))
-            if let subtitle { Text(subtitle).font(.system(size: 11)).foregroundStyle(.gray).multilineTextAlignment(.center) }
+            Text(tr(title)).font(.system(size: 13, weight: .semibold))
+            if let subtitle { Text(tr(subtitle)).font(.system(size: 11)).foregroundStyle(.gray).multilineTextAlignment(.center) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -369,7 +369,7 @@ struct NotchView: View {
                 VStack(spacing: 0) {
                     if live { collapsed.frame(width: size.width, height: n.height) } else if state.toast != nil { Color.clear.frame(height: n.height) }
                     if let t = state.toast {
-                        Label(t, systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
+                        Label(tr(t), systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Palette.green).lineLimit(1).frame(height: 26)
                     }
                 }
@@ -447,7 +447,7 @@ struct NotchView: View {
                     if let m = meet.next, m.start.timeIntervalSinceNow < 3600 {
                         MeetingChip(m: m) { meet.join() } // takes the clock's place; there isn't room for both
                     } else {
-                        Text(state.tab.title).font(.system(size: 12, weight: .bold))
+                        Text(tr(state.tab.title)).font(.system(size: 12, weight: .bold))
                         StatusClock()
                     }
                 }
@@ -744,7 +744,7 @@ struct AIView: View {
                 HStack(spacing: 2) {
                     ForEach(Array(["Chat", "Pemakaian"].enumerated()), id: \.offset) { i, title in
                         Button { withAnimation(Motion.ease) { page = i } } label: {
-                            Text(title).font(.system(size: 11, weight: .semibold))
+                            Text(tr(title)).font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(page == i ? Palette.onAccent : Color.gray)
                                 .padding(.horizontal, 11).padding(.vertical, 5)
                                 .background(page == i ? Palette.accent.opacity(0.9) : Color.clear, in: Capsule())
@@ -972,10 +972,10 @@ struct StatsView: View {
     var body: some View {
         let b = Battery.read(), mem = s.memUsed / s.memTotal, disk = s.diskTotal > 0 ? 1 - s.diskFree / s.diskTotal : 0
         HStack(spacing: 10) {
-            stat("Baterai", "battery.75percent", Double(b.percent) / 100, b.percent <= 20 && !b.ac ? Palette.red : b.ac ? Palette.green : Palette.amber, b.ac ? "dicas" : "tidak dicas")
-            stat("CPU", "cpu", s.cpu, s.cpu > 0.85 ? Palette.red : Palette.accent, "\(ProcessInfo.processInfo.activeProcessorCount) core")
-            stat("Memori", "memorychip", mem, mem > 0.85 ? Palette.red : Palette.accent, "\(bytes(s.memTotal - s.memUsed)) sisa")
-            stat("Disk", "internaldrive", disk, disk > 0.85 ? Palette.red : Palette.accent, "\(bytes(s.diskFree)) bebas")
+            stat("Baterai", "battery.75percent", Double(b.percent) / 100, b.percent <= 20 && !b.ac ? Palette.red : b.ac ? Palette.green : Palette.amber, tr(b.ac ? "dicas" : "tidak dicas"))
+            stat("CPU", "cpu", s.cpu, s.cpu > 0.85 ? Palette.red : Palette.accent, String(format: tr("%@ core"), "\(ProcessInfo.processInfo.activeProcessorCount)"))
+            stat("Memori", "memorychip", mem, mem > 0.85 ? Palette.red : Palette.accent, String(format: tr("%@ sisa"), bytes(s.memTotal - s.memUsed)))
+            stat("Disk", "internaldrive", disk, disk > 0.85 ? Palette.red : Palette.accent, String(format: tr("%@ bebas"), bytes(s.diskFree)))
         }
         .onAppear { s.start() }
         .onDisappear { s.stop() }
@@ -984,7 +984,7 @@ struct StatsView: View {
     func stat(_ title: String, _ icon: String, _ v: Double, _ color: Color, _ caption: String) -> some View {
         NCard {
             VStack(spacing: 8) {
-                Label(title, systemImage: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(.gray)
+                Label(tr(title), systemImage: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(.gray)
                 Ring(value: v, color: color, label: "\(Int(v * 100))%", size: 92, line: 9)
                 Text(caption).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7)).lineLimit(1).minimumScaleFactor(0.8)
             }
@@ -1055,7 +1055,7 @@ struct GitView: View {
     func pane(_ title: String, count: Int, on: Bool, _ run: @escaping () -> Void) -> some View {
         Button(action: { withAnimation(Motion.ease) { run() } }) {
             HStack(spacing: 5) {
-                Text(title)
+                Text(tr(title))
                 if count > 0 { Text("\(count)").font(.system(size: 10, weight: .bold)).padding(.horizontal, 5).background(Color.white.opacity(0.18), in: Capsule()) }
             }
             .font(.system(size: 11, weight: .semibold))
@@ -1421,7 +1421,7 @@ struct ConnectForm: View {
     var body: some View {
         NCard {
             VStack(alignment: .leading, spacing: 9) {
-                Label(title, systemImage: "link").font(.system(size: 13, weight: .bold))
+                Label(tr(title), systemImage: "link").font(.system(size: 13, weight: .bold))
                 Text(help).font(.system(size: 11)).foregroundStyle(.gray).fixedSize(horizontal: false, vertical: true)
                 field("globe", TextField(placeholder, text: $url))
                 field("key.fill", SecureField("Token", text: $token))
@@ -1498,7 +1498,7 @@ struct NotesView: View {
                             Button { n.selected = note.id } label: {
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(note.title).font(.system(size: 11, weight: .bold)).lineLimit(1)
-                                    Text(note.updated, format: Date.RelativeFormatStyle(presentation: .named, locale: Locale(identifier: "id_ID"))).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                                    Text(note.updated, format: Date.RelativeFormatStyle(presentation: .named, locale: appLocale)).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 9).padding(.vertical, 6)

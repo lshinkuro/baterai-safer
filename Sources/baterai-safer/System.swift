@@ -115,8 +115,8 @@ struct SystemTab: View {
                 }
             }
             HStack(spacing: 8) {
-                gauge("CPU", "cpu.fill", s.cpu, Palette.accent, "\(ProcessInfo.processInfo.activeProcessorCount) core")
-                gauge("Disk", "internaldrive.fill", disk, Palette.accent, "\(bytes(s.diskFree)) sisa")
+                gauge("CPU", "cpu.fill", s.cpu, Palette.accent, String(format: tr("%@ core"), "\(ProcessInfo.processInfo.activeProcessorCount)"))
+                gauge("Disk", "internaldrive.fill", disk, Palette.accent, String(format: tr("%@ sisa"), bytes(s.diskFree)))
             }
 
             Card(title: "Aktivitas live", icon: "waveform.path.ecg") {
@@ -124,11 +124,11 @@ struct SystemTab: View {
                     ForEach(s.live, id: \.t) { p in
                         LineMark(x: .value("Waktu", p.t), y: .value("%", p.cpu * 100), series: .value("Seri", "CPU"))
                             .foregroundStyle(by: .value("Seri", "CPU")).interpolationMethod(.monotone)
-                        LineMark(x: .value("Waktu", p.t), y: .value("%", p.mem * 100), series: .value("Seri", "Memori"))
-                            .foregroundStyle(by: .value("Seri", "Memori")).interpolationMethod(.monotone)
+                        LineMark(x: .value("Waktu", p.t), y: .value("%", p.mem * 100), series: .value("Seri", tr("Memori")))
+                            .foregroundStyle(by: .value("Seri", tr("Memori"))).interpolationMethod(.monotone)
                     }
                 }
-                .chartForegroundStyleScale(["CPU": Palette.accent, "Memori": Color.gray])
+                .chartForegroundStyleScale(["CPU": Palette.accent, tr("Memori"): Color.gray])
                 .chartYScale(domain: 0...100)
                 .chartXAxis(.hidden)
                 .chartYAxis {
@@ -180,7 +180,7 @@ struct SystemTab: View {
         HStack(spacing: 12) {
             Ring(value: v, color: v > 0.85 ? Palette.red : color, label: "\(Int(v * 100))%", size: 64, line: 8)
             VStack(alignment: .leading, spacing: 2) {
-                Label(title, systemImage: icon).font(.system(size: 13, weight: .semibold))
+                Label(tr(title), systemImage: icon).font(.system(size: 13, weight: .semibold))
                 Text(caption).font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.6)
             }
             Spacer(minLength: 0)

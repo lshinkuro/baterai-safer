@@ -362,7 +362,7 @@ final class LangModel: ObservableObject {
     var mastered: Int { deck.filter { card($0).box >= 4 }.count }
     var learning: Int { deck.filter { (1...3).contains(card($0).box) }.count }
     var week: [(day: String, n: Int)] {
-        let f = DateFormatter(); f.locale = Locale(identifier: "id_ID"); f.dateFormat = "EEE"
+        let f = DateFormatter(); f.locale = appLocale; f.dateFormat = "EEE"
         return (0..<7).reversed().map { i in
             let d = Calendar.current.date(byAdding: .day, value: -i, to: Date())!
             return (f.string(from: d), s.stats["\(s.lang.rawValue):\(dayKey(d))"]?.reviewed ?? 0)
@@ -788,7 +788,7 @@ struct LangPage: View {
                             ForEach(Array(m.tests.suffix(5).enumerated()), id: \.offset) { _, t in
                                 VStack(spacing: 1) {
                                     Text("\(t.score)/\(t.total)").font(.system(size: 12, weight: .semibold))
-                                    Text(t.date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: "id_ID")))).font(.system(size: 9)).foregroundStyle(.gray)
+                                    Text(t.date.formatted(.dateTime.day().month(.abbreviated).locale(appLocale))).font(.system(size: 9)).foregroundStyle(.gray)
                                 }
                                 .frame(maxWidth: .infinity).padding(.vertical, 4)
                                 .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -805,7 +805,7 @@ struct LangPage: View {
         NCard(padding: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(value).font(.system(size: 22, weight: .semibold)).foregroundStyle(color)
-                Text(label).font(.system(size: 10)).foregroundStyle(.gray)
+                Text(tr(label)).font(.system(size: 10)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
@@ -857,7 +857,7 @@ struct LangPage: View {
             HStack(spacing: 8) {
                 Image(systemName: on ? "largecircle.fill.circle" : "circle").foregroundStyle(on ? Palette.accent : .gray)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(title).font(.system(size: 12, weight: .bold))
+                    Text(tr(title)).font(.system(size: 12, weight: .bold))
                     Text(problem ?? note).font(.system(size: 10)).foregroundStyle(problem == nil ? Color.gray : Palette.amber)
                 }
                 Spacer()
@@ -871,7 +871,7 @@ struct LangPage: View {
 
     func pill(_ text: String, on: Bool, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            Text(text).font(.system(size: 11, weight: .bold))
+            Text(tr(text)).font(.system(size: 11, weight: .bold))
                 .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.55))
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.white.opacity(0.07)), in: Capsule())
