@@ -60,6 +60,26 @@ import SwiftUI
             }
         }
         if t == .more {
+            for (i, name) in ["hari", "kebiasaan", "minggu", "pengingat"].enumerated() {
+                UserDefaults.standard.set(i, forKey: "selfcarePage")
+                write("care-\(name)", SelfCareView().padding(.horizontal, 18).padding(.vertical, 8).foregroundStyle(.white).frame(width: 720, height: 190).background(Color.black), .dark)
+            }
+            SelfCare.shared.startBreak(.stretch)
+            write("care-istirahat", SelfCareView().padding(.horizontal, 18).padding(.vertical, 8).foregroundStyle(.white).frame(width: 720, height: 190).background(Color.black), .dark)
+            SelfCare.shared.cancelBreak()
+        }
+        if t == .more {
+            let lm = LangModel.shared
+            lm.next()
+            lm.s.mistakes.append(Mistake(lang: lm.s.lang, prompt: "She go to school every day.", answer: "She goes to school every day.", why: "Subjek she butuh goes."))
+            for (name, mode, quiz) in [("kartu", 0, 0), ("kuis", 1, 0), ("ketik", 1, 1), ("dengar", 1, 2), ("tes", 2, 0), ("ngobrol", 3, 0), ("progres", 4, 0), ("atur", 5, 0), ("salah", 6, 0), ("daftar", 7, 0)] {
+                UserDefaults.standard.set(mode, forKey: "langMode"); UserDefaults.standard.set(quiz, forKey: "langQuiz")
+                write("lang-\(name)", LangPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
+            }
+            write("lang-window", LangPage(windowed: true).padding(20).foregroundStyle(.white).frame(width: 920, height: 640).background(Color.black), .dark)
+            lm.s.mistakes.removeLast()
+        }
+        if t == .more {
             write("game-catur-window", ChessView(windowed: true).padding(20).foregroundStyle(.white).frame(width: 820, height: 584).background(Color.black), .dark)
             let g = WordGameModel.shared
             g.board.grid = [.init(x: 4, y: 5): "C", .init(x: 5, y: 5): "A", .init(x: 6, y: 5): "T"]

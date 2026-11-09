@@ -82,6 +82,19 @@ func nativeTarget(_ c: Config, _ s: Status) -> Int {
 }
 
 func selfTest() {
+    assert(abs(careScore(water: 4, goal: 8, breaks: 3, breakGoal: 3, habitsDone: 0, habits: 0) - 0.75) < 0.001 && careScore(water: 99, goal: 8, breaks: 9, breakGoal: 3, habitsDone: 2, habits: 2) == 1, "care score")
+    let oldCare = try! JSONDecoder().decode(SelfCareData.self, from: Data(#"{"water":{"2026-11-07":3},"waterGoal":10,"habits":[]}"#.utf8))
+    assert(oldCare.waterGoal == 10 && oldCare.water["2026-11-07"] == 3 && oldCare.mood.isEmpty, "old selfcare.json keeps its data")
+    assert(SelfCare.Kind.stretch.step(elapsed: 0) == "Putar bahu pelan-pelan" && SelfCare.Kind.stretch.step(elapsed: 59) == "Berdiri dan tarik napas dalam", "stretch steps")
+    let w1 = Word(word: "a", meaning: "x", example: ""), w2 = Word(word: "b", meaning: "y", example: ""), w3 = Word(word: "c", meaning: "z", example: "")
+    let t1 = Date(timeIntervalSince1970: 1000), seenCard = Flashcard(box: 2, due: t1 - 5)
+    assert(studyQueue([w1, w2, w3], seen: { $0 == w3 ? seenCard : nil }, now: t1, newLeft: 1) == [w3, w1], "reviews first, new words capped")
+    assert(studyQueue([w1], seen: { _ in nil }, now: t1, newLeft: 0).isEmpty, "no new words past the limit")
+    assert(Flashcard(box: 2).reviewed(knew: true, at: t1, promote: false).box == 2 && Flashcard(box: 2).reviewed(knew: true, at: t1).box == 3, "only typed answers promote")
+    let mizu = Word(word: "水", meaning: "air · みず (mizu)", example: "")
+    assert(typedCorrect(" Mizu ", mizu, .ja) && typedCorrect("みず", mizu, .ja) && typedCorrect("水", mizu, .ja) && !typedCorrect("", mizu, .ja) && promptMeaning(mizu, .ja) == "air", "japanese typed answers")
+    assert(typedCorrect("facil", Word(word: "fácil", meaning: "mudah", example: ""), .es) && !typedCorrect("かっこう", Word(word: "がっこう", meaning: "sekolah", example: ""), .ja), "accents")
+    assert(parseCorrection("✏️ She goes. — Subjek — butuh goes.\nNice!")! == ("She goes.", "Subjek — butuh goes.") && parseCorrection("Nice!") == nil, "chat correction")
     assert(Palette.customHue("hue:0.530") == 0.53 && Palette.customHue("mint") == nil && Palette.color("hue:x") == Palette.color("mint"), "custom accent id")
     let jakarta = TimeZone(identifier: "Asia/Jakarta")!
     func iso(_ s: String) -> Date { ISO8601DateFormatter().date(from: s)! }

@@ -9,6 +9,7 @@ struct HomeView: View {
     @ObservedObject var care = SelfCare.shared
     @ObservedObject var prayer = Ibadah.shared
     @ObservedObject var ramadan = Ramadan.shared
+    @ObservedObject var study = LangModel.shared
     @ObservedObject var notes = Notch.shared.notes
     @ObservedObject var clips = Notch.shared.clips
     @ObservedObject var git = Notch.shared.git
@@ -24,6 +25,7 @@ struct HomeView: View {
         ("clipboard", "doc.on.clipboard", "Clipboard", .clipboard), ("git", "arrow.triangle.branch", "Git", .git),
         ("stats", "gauge.medium", "Stats", .stats), ("water", "drop.fill", "Air minum", .more),
         ("shelf", "tray.full", "Shelf", .shelf), ("ai", "sparkles", "AI", .ai), ("dev", "curlybraces", "Dev Utils", .dev),
+        ("lang", "character.book.closed.fill", "Belajar Bahasa", .more),
     ]
 
     var chosen: [String] { stored.split(separator: ",").map(String.init) }
@@ -108,7 +110,7 @@ struct HomeView: View {
     }
 
     func open(_ id: String, _ tab: NTab) {
-        if tab == .more { morePage = "selfcare" } // the only cards that live under Lainnya
+        if tab == .more { morePage = id == "lang" ? "lang" : "selfcare" }
         withAnimation(Motion.snap) { Notch.shared.state.tab = tab }
     }
 
@@ -131,6 +133,7 @@ struct HomeView: View {
         case "stats": stats
         case "water": water
         case "shelf": shelfFiles
+        case "lang": language
         case "ai": launcher("sparkles", "Tanya AI", .ai)
         case "dev": launcher("curlybraces", "JSON, Base64, UUID, dan lainnya", .dev)
         default: focus
@@ -347,6 +350,20 @@ struct HomeView: View {
                 }
                 if shelf.files.count > 5 { note(String(format: tr("+%@ lainnya"), "\(shelf.files.count - 5)")) }
             }
+        }
+    }
+
+    var language: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Ring(value: min(1, Double(study.today) / Double(max(study.s.target, 1))), color: Palette.accent, label: "\(study.today)", size: 46, line: 5)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(study.s.lang.flag) \(tr(study.s.lang.title))").font(.system(size: 12, weight: .semibold))
+                    Text("\(study.dueCount) perlu diulang").font(.system(size: 11)).foregroundStyle(.gray).monospacedDigit()
+                }
+            }
+            Spacer(minLength: 0)
+            NButton(icon: "play.fill", title: "Latihan", tint: Palette.accent, prominent: true) { open("lang", .more) }
         }
     }
 

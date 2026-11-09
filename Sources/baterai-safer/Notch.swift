@@ -284,6 +284,7 @@ final class Notch {
             if NTab.music.enabled { media.start() } else { media.stop() }   // AppleScript poll every second
             if FeatureFlags.isOn("meeting") { meet.start() } else { meet.stop() }
             if NTab.ibadah.enabled { Ibadah.shared.start() } else { Ibadah.shared.stop() } // reminders
+            LangModel.shared.startReminders()
         }
         if !state.tab.enabled, let first = NTab.ordered.first(where: \.enabled) { state.tab = first }
     }
