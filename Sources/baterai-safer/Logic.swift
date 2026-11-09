@@ -285,6 +285,20 @@ func selfTest() {
     assert(movedTab([.home, .music, .focus], .home, by: 1) { $0 != .music } == [.focus, .music, .home], "tab drag steps over hidden tabs")
     assert(movedTab([.home, .music], .music, by: 1) { _ in true } == [.home, .music], "tab drag stops at the end")
     assert(placedTab([.home, .music, .focus], .home, at: .focus) == [.music, .focus, .home] && placedTab([.home, .music, .focus], .focus, at: .home) == [.focus, .home, .music], "tab drop in the feature list")
+    let dict: (String) -> Bool = { ["cat", "cats", "at", "ax"].contains($0) }
+    let t = { (x: Int, y: Int, c: Character) in WordBoard.Tile(cell: WordBoard.Cell(x: x, y: y), letter: c) }
+    var wb = WordBoard()
+    assert(wb.evaluate([t(0, 0, "C"), t(1, 0, "A"), t(2, 0, "T")], isWord: dict) == .bad("Kata pertama harus melewati tengah"), "word game: first move crosses the center")
+    assert(wb.evaluate([t(4, 5, "C"), t(5, 6, "A")], isWord: dict) == .bad("Huruf harus dalam satu garis"), "word game: one line")
+    assert(wb.evaluate([t(4, 5, "C"), t(6, 5, "T")], isWord: dict) == .bad("Huruf harus menyambung"), "word game: no gaps")
+    let cat = [t(4, 5, "C"), t(5, 5, "A"), t(6, 5, "T")]
+    assert(wb.evaluate(cat, isWord: dict) == .ok(words: ["CAT"], score: 5), "word game: score")
+    for x in cat { wb.grid[x.cell] = x.letter }
+    assert(wb.evaluate([t(7, 5, "S")], isWord: dict) == .ok(words: ["CATS"], score: 6), "word game: extending keeps the old letters' points")
+    assert(wb.evaluate([t(0, 0, "A"), t(1, 0, "T")], isWord: dict) == .bad("Kata harus menyambung ke huruf di papan"), "word game: must connect")
+    assert(wb.evaluate([t(5, 6, "X")], isWord: dict) == .ok(words: ["AX"], score: 6), "word game: a single tile reads downward")
+    if let m = wb.bestMove(["cats"], rack: ["S"], isWord: dict) { assert(m.tiles == [t(7, 5, "S")], "word game: finds the spot") } else { assert(false, "word game: no move") }
+    assert(wordsFrom(["cat", "dog"], rack: ["C", "T"], board: ["A"]) == ["cat"], "word game: borrows one board letter")
     assert(netCounters()["lo0"] != nil && ipv4("lo0") == "127.0.0.1", "jaringan: lo0 counters and address")
     // Kemenag RI schedule for Kota Jakarta on 8 Nov 2026 (api.myquran.com, id 1301), to the minute ±1.
     var jkt = Calendar(identifier: .gregorian); jkt.timeZone = TimeZone(identifier: "Asia/Jakarta")!

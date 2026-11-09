@@ -271,8 +271,9 @@ struct MoreView: View {
         ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.accent),
         ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.accent),
         ("lang", "character.book.closed.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
-        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu kembar, X-O", Palette.accent),
+        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu, X-O, kata", Palette.accent),
         ("selfcare", "heart.circle", "Self-care", "Minum air, istirahat mata, kebiasaan", Palette.accent),
+        ("update", "arrow.down.circle.fill", "Update", "Cek dan pasang versi baru", Palette.accent),
     ]
 
     var body: some View {
@@ -292,6 +293,7 @@ struct MoreView: View {
                     case "lang": LangPage()
                     case "games": GamesPage()
                     case "selfcare": SelfCareView()
+                    case "update": NotchUpdatePage()
                     default: colorPage
                     }
                 }

@@ -627,6 +627,7 @@ struct NotchView: View {
                         Text(tr(state.tab.title)).font(.system(size: 12, weight: .bold)).lineLimit(1)
                         QuickToggles(state: state)
                     }
+                    if NTab.more.enabled { UpdateChip(state: state) }
                     Button { state.pinned.toggle() } label: {
                         Image(systemName: state.pinned ? "pin.fill" : "pin").font(.system(size: 11, weight: .bold))
                             .foregroundStyle(state.pinned ? Palette.accent : Color.gray)

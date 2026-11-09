@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Lainnya → Gabut: three small games for a bored minute. Timers and key capture stop when the page closes.
+// Lainnya → Gabut: small games for a bored minute. Timers and key capture stop when the page closes.
 
 // MARK: Ular
 
@@ -262,7 +262,7 @@ struct XOView: View {
 
 struct GamesPage: View {
     @AppStorage("game") private var game = 0
-    static let games = [("Ular", "scribble.variable"), ("Kartu Kembar", "square.grid.2x2"), ("X-O", "number")]
+    static let games = [("Ular", "scribble.variable"), ("Kartu Kembar", "square.grid.2x2"), ("X-O", "number"), ("Rangkai Kata", "textformat.abc")]
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -285,6 +285,7 @@ struct GamesPage: View {
                 switch game {
                 case 0: SnakeView()
                 case 1: MemoryView()
+                case 3: WordGameIntro()
                 default: XOView()
                 }
             }

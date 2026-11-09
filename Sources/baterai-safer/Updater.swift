@@ -180,3 +180,60 @@ struct UpdateCard: View {
         }
     }
 }
+
+/// Top row of the island: lights up when a new version is out, and opens Lainnya → Update.
+struct UpdateChip: View {
+    @ObservedObject var u = Updater.shared
+    @ObservedObject var state: NotchState
+    @AppStorage("morePage") private var morePage = ""
+
+    var body: some View {
+        let ready = u.latest != nil && u.updatable
+        Button {
+            morePage = "update"
+            withAnimation(Motion.snap) { state.tab = .more }
+            if !ready && !u.busy { u.check(manual: true) }
+        } label: {
+            Group {
+                if u.busy {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: ready ? "arrow.down.circle.fill" : "arrow.down.circle").font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(ready ? Palette.accent : Color.gray)
+                }
+            }
+            .frame(width: 20, height: 22).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).tip(u.busy ? "Memasang update…" : ready ? "Update tersedia" : "Cek update")
+    }
+}
+
+/// Lainnya → Update.
+struct NotchUpdatePage: View {
+    @ObservedObject var u = Updater.shared
+
+    var body: some View {
+        NCard(padding: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Versi \(u.current)").font(.system(size: 15, weight: .semibold))
+                        if !u.status.isEmpty { Text(u.status).font(.system(size: 11)).foregroundStyle(u.latest != nil ? Palette.green : .gray) }
+                    }
+                    Spacer()
+                    if u.busy {
+                        ProgressView().controlSize(.small)
+                    } else if let v = u.latest, u.updatable {
+                        NButton(icon: "arrow.down.circle.fill", title: "Update ke v\(v)", tint: Palette.accent, prominent: true) { u.install() }
+                    } else {
+                        NButton(icon: "arrow.clockwise", title: "Cek sekarang") { u.check(manual: true) }
+                    }
+                }
+                Toggle("Pasang update otomatis", isOn: $u.auto).font(.system(size: 12)).toggleStyle(.switch).controlSize(.small).tint(Palette.accent)
+                Text(u.updatable ? (u.viaHomebrew ? "Lewat Homebrew (brew upgrade)" : "Diunduh dari GitHub Releases, diverifikasi SHA-256") : "Build lokal: update otomatis nonaktif")
+                    .font(.system(size: 10)).foregroundStyle(.gray)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}

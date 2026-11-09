@@ -49,10 +49,17 @@ import SwiftUI
         default: AnyView(MoreView())
         }
         if t == .more {
-            for (i, name) in ["ular", "kartu", "xo"].enumerated() {
+            for (i, name) in ["ular", "kartu", "xo", "kata"].enumerated() {
                 UserDefaults.standard.set(i, forKey: "game")
                 write("game-\(name)", GamesPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
             }
+        }
+        if t == .more {
+            let g = WordGameModel.shared
+            g.board.grid = [.init(x: 4, y: 5): "C", .init(x: 5, y: 5): "A", .init(x: 6, y: 5): "T"]
+            g.placed = [.init(cell: .init(x: 5, y: 6), letter: "X")]
+            g.lastAI = [.init(x: 4, y: 5)]
+            write("game-kata-window", WordGameView(g: g).padding(20).foregroundStyle(.white).frame(width: 780, height: 640).background(Color.black), .dark)
         }
         let v = content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16)

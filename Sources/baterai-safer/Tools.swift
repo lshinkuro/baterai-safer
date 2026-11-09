@@ -135,37 +135,11 @@ struct ToolsTab: View {
                     }
                 }
             }
-            Card(title: "Shortcut notch", icon: "command") {
-                ForEach(Array(HotKeys.bindings.enumerated()), id: \.offset) { i, b in
-                    HStack {
-                        Circle().fill(Color.secondary.opacity(0.5)).frame(width: 5, height: 5)
-                        Text(tr(b.2)).font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Keycap(b.1)
-                    }
-                }
-                Text("Esc menutup notch").font(.system(size: 11)).foregroundStyle(.secondary)
-            }
             UpdateCard()
         }
     }
 }
 
-struct Keycap: View {
-    let text: String
-    init(_ text: String) { self.text = text }
-
-    var body: some View {
-        Text(text).font(.system(size: 12, weight: .bold))
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.primary.opacity(0.12)).frame(height: 2).padding(.horizontal, 1)
-            }
-    }
-}
-
-/// Compact on/off pill for a feature.
 /// Dropping onto a chip in the feature list: the dragged tab takes its place as the pointer passes.
 struct TabDrop: DropDelegate {
     let target: NTab
@@ -180,6 +154,7 @@ struct TabDrop: DropDelegate {
     func performDrop(info: DropInfo) -> Bool { dragging = nil; return true }
 }
 
+/// Compact on/off pill for a feature.
 struct FeatureChip: View {
     let title: String, icon: String
     @Binding var on: Bool
