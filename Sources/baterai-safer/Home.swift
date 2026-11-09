@@ -8,6 +8,7 @@ struct HomeView: View {
     @ObservedObject var a = AgendaModel.shared
     @ObservedObject var care = SelfCare.shared
     @ObservedObject var prayer = Ibadah.shared
+    @ObservedObject var ramadan = Ramadan.shared
     @ObservedObject var notes = Notch.shared.notes
     @ObservedObject var clips = Notch.shared.clips
     @ObservedObject var git = Notch.shared.git
@@ -31,7 +32,13 @@ struct HomeView: View {
         // Features switched off in Tools don't get a card (their background work is stopped).
         let shown = chosen.compactMap { id in Self.all.first { $0.id == id && $0.tab.enabled } }
         VStack(spacing: 8) {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
+                TimelineView(.periodic(from: .now, by: 60)) { ctx in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(tr(greeting(ctx.date))).font(.system(size: 15, weight: .semibold))
+                        Text(ctx.date, format: .dateTime.weekday(.wide).day().month(.wide).locale(appLocale)).font(.system(size: 12)).foregroundStyle(.gray)
+                    }
+                }
                 Spacer()
                 Menu {
                     ForEach(Self.all, id: \.id) { w in
@@ -45,12 +52,12 @@ struct HomeView: View {
                 Placeholder(icon: "house.fill", title: "Home masih kosong", subtitle: "Pilih isinya lewat Atur")
             } else {
                 if shown.count <= 4 {
-                    HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0.id, $0.title, $0.tab) } }
+                    HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0) } }
                 } else {
                     // More than fit: the fifth card peeks in so it's clear the row scrolls.
                     GeometryReader { geo in
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0.id, $0.title, $0.tab).frame(width: 165) } }
+                            HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0).frame(width: 165) } }
                                 .frame(height: geo.size.height)
                         }
                     }
@@ -65,19 +72,38 @@ struct HomeView: View {
         .onDisappear { if Notch.shared.state.tab != .stats { sys.stop() } } // the Stats tab keeps the same poller going
     }
 
-    func widget(_ id: String, _ title: String, _ tab: NTab) -> some View {
-        NCard(padding: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                Button { open(id, tab) } label: {
-                    HStack(spacing: 3) {
-                        Text(tr(title).uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8).lineLimit(1)
+    func widget(_ w: (id: String, icon: String, title: String, tab: NTab)) -> some View {
+        NCard(padding: 12, glow: true) {
+            VStack(alignment: .leading, spacing: 10) {
+                Button { open(w.id, w.tab) } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: w.icon).font(.system(size: 10, weight: .semibold))
+                        Text(tr(w.title).uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8).lineLimit(1)
+                        Spacer(minLength: 4)
+                        if w.id == "calendar", !a.today.isEmpty { Text("\(a.today.count)").font(.system(size: 10, weight: .semibold)).monospacedDigit() }
                         Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
                     }
                     .foregroundStyle(.gray).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).tip("Buka")
-                card(id).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                card(w.id).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
+        }
+        .background {
+            // Same album-art wash as the Musik tab.
+            if w.id == "music", !m.title.isEmpty, let art = m.artwork {
+                Image(nsImage: art).resizable().aspectRatio(contentMode: .fill).blur(radius: 40).opacity(0.45).saturation(1.4)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+    }
+
+    func greeting(_ d: Date) -> String {
+        switch Calendar.current.component(.hour, from: d) {
+        case 4..<11: "Selamat pagi"
+        case 11..<15: "Selamat siang"
+        case 15..<18: "Selamat sore"
+        default: "Selamat malam"
         }
     }
 
@@ -113,17 +139,28 @@ struct HomeView: View {
 
     @ViewBuilder var music: some View {
         if m.app == nil || m.title.isEmpty {
-            note("Tidak ada musik")
+            VStack(spacing: 8) {
+                Placeholder(icon: "music.note", title: "Tidak ada musik")
+                if let p = NowPlaying.installed.first {
+                    NButton(icon: "play.fill", title: String(format: tr("Putar di %@"), p.name), tint: Palette.accent, prominent: true) { m.play(p.id) }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
-                    AlbumArt(m: m, size: 42)
+                    AlbumArt(m: m, size: 52)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(m.title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                        Text(m.artist).font(.system(size: 11)).foregroundStyle(.gray).lineLimit(1)
+                        Text(m.artist).font(.system(size: 11)).foregroundStyle(.white.opacity(0.65)).lineLimit(1)
                     }
+                    Spacer(minLength: 0)
+                    if m.playing { Equalizer(color: .white.opacity(0.8)) }
                 }
                 Spacer(minLength: 0)
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    Meter(value: m.duration > 0 ? min(1, m.now(ctx.date) / m.duration) : 0, color: .white.opacity(0.85))
+                }
                 HStack(spacing: 0) {
                     musicControl("backward.fill", 13, "Sebelumnya") { m.send("previous track") }
                     musicControl(m.playing ? "pause.fill" : "play.fill", 20, m.playing ? "Jeda" : "Putar") { m.togglePlay() }
@@ -137,47 +174,68 @@ struct HomeView: View {
     @ViewBuilder var calendar: some View {
         let events = a.today
         if a.access == false {
-            note("Izin Kalender ditolak")
-        } else if events.isEmpty {
-            note("Tidak ada acara hari ini")
+            Placeholder(icon: "calendar.badge.exclamationmark", title: "Izin Kalender ditolak")
         } else {
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(events.prefix(5), id: \.eventIdentifier) { e in
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(Date(), format: .dateTime.day().locale(appLocale)).font(.system(size: 34, weight: .semibold)).monospacedDigit()
+                    Text(Date(), format: .dateTime.weekday(.wide).locale(appLocale)).font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.accent)
+                }
+                if events.isEmpty { note("Tidak ada acara hari ini") }
+                ForEach(events.prefix(3), id: \.eventIdentifier) { e in
                     HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 2).fill(Color(cgColor: e.calendar.cgColor)).frame(width: 3, height: 26)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(e.title ?? "").font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                        RoundedRectangle(cornerRadius: 2).fill(Color(cgColor: e.calendar.cgColor)).frame(width: 3, height: 16)
+                        Text(e.title ?? "").font(.system(size: 12, weight: .medium)).lineLimit(1)
+                        Spacer(minLength: 4)
+                        Group {
                             if e.isAllDay {
-                                Text("penuh").font(.system(size: 10)).foregroundStyle(.gray)
+                                Text("penuh")
                             } else {
-                                Text(e.startDate, format: .dateTime.hour().minute().locale(appLocale)).font(.system(size: 10)).foregroundStyle(.gray)
+                                Text(e.startDate, format: .dateTime.hour().minute().locale(appLocale))
                             }
                         }
+                        .font(.system(size: 11)).foregroundStyle(.gray).monospacedDigit().fixedSize()
                     }
                 }
+                if events.count > 3 { note(String(format: tr("+%@ lainnya"), "\(events.count - 3)")) }
             }
         }
     }
 
     @ViewBuilder var habits: some View {
         if care.data.habits.isEmpty {
-            note("Tambah kebiasaan di Lainnya → Self-care")
+            Placeholder(icon: "checklist", title: "Belum ada kebiasaan", subtitle: "Tambah di Lainnya → Self-care")
         } else {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(care.data.habits) { h in
-                        let done = h.done.contains(dayKey(Date()))
-                        Button { care.toggle(h) } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: done ? "checkmark.circle.fill" : "circle").font(.system(size: 13)).foregroundStyle(done ? Palette.accent : .gray)
-                                Text(h.name).font(.system(size: 12)).lineLimit(1).strikethrough(done, color: .gray)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
+            let total = care.data.habits.count, finished = care.data.habits.filter { $0.done.contains(dayKey(Date())) }.count
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Ring(value: Double(finished) / Double(total), color: Palette.accent, label: "\(finished)/\(total)", size: 46, line: 5)
+                    Text(finished == total ? "Semua beres hari ini" : "\(total - finished) lagi hari ini").font(.system(size: 12, weight: .medium)).fixedSize(horizontal: false, vertical: true)
                 }
+                // Short lists stay still; a long one scrolls.
+                ViewThatFits(in: .vertical) {
+                    habitRows
+                    ScrollView(showsIndicators: false) { habitRows }
+                }
+            }
+        }
+    }
+
+    var habitRows: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(care.data.habits) { h in
+                let done = h.done.contains(dayKey(Date()))
+                Button { care.toggle(h) } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: done ? "checkmark.circle.fill" : "circle").font(.system(size: 13)).foregroundStyle(done ? Palette.accent : .gray)
+                        Text(h.name).font(.system(size: 12)).lineLimit(1).strikethrough(done, color: .gray)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -192,20 +250,22 @@ struct HomeView: View {
 
     var ibadah: some View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
-            let (p, t) = prayer.next(after: ctx.date)
+            let fast = ramadan.fasting(ctx.date) ? prayer.fastNext(after: ctx.date) : nil
+            let next = prayer.next(after: ctx.date), t = fast?.date ?? next.1
             let mins = Int(t.timeIntervalSince(ctx.date) / 60) + 1
             VStack(alignment: .leading, spacing: 4) {
-                Text(tr(p.title)).font(.system(size: 22, weight: .semibold))
+                Text(tr(fast?.title ?? next.0.title)).font(.system(size: 22, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
                 Text(prayer.clock(t)).font(.system(size: 13, weight: .medium)).monospacedDigit().foregroundStyle(Palette.accent)
                 Text(String(format: tr("%@ lagi"), mins >= 60 ? String(format: tr("%@j %@m"), "\(mins / 60)", "\(mins % 60)") : "\(mins)m"))
                     .font(.system(size: 11)).foregroundStyle(.gray).monospacedDigit()
             }
+            .frame(maxHeight: .infinity)
         }
     }
 
     @ViewBuilder var recentNotes: some View {
         if notes.notes.isEmpty {
-            note("Belum ada catatan")
+            Placeholder(icon: "note.text", title: "Belum ada catatan")
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(notes.notes.sorted { $0.updated > $1.updated }.prefix(5)) { n in
@@ -217,7 +277,7 @@ struct HomeView: View {
 
     @ViewBuilder var clipboard: some View {
         if clips.items.isEmpty {
-            note("Clipboard masih kosong")
+            Placeholder(icon: "doc.on.clipboard", title: "Clipboard masih kosong")
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(clips.items.prefix(5)) { c in
@@ -229,7 +289,7 @@ struct HomeView: View {
 
     @ViewBuilder var repos: some View {
         if git.repos.isEmpty {
-            note("Belum ada repo")
+            Placeholder(icon: "arrow.triangle.branch", title: "Belum ada repo")
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(git.repos.prefix(4)) { r in
@@ -251,6 +311,7 @@ struct HomeView: View {
             meter("CPU", sys.cpu)
             meter("Memori", sys.memUsed / sys.memTotal)
         }
+        .frame(maxHeight: .infinity)
     }
 
     func meter(_ title: String, _ v: Double) -> some View {
@@ -270,13 +331,15 @@ struct HomeView: View {
                 Text("\(care.waterToday)").font(.system(size: 26, weight: .semibold)).monospacedDigit()
                 Text("/ \(care.data.waterGoal) " + tr("gelas")).font(.system(size: 11)).foregroundStyle(.gray)
             }
+            Meter(value: min(1, Double(care.waterToday) / Double(max(1, care.data.waterGoal))), color: Palette.accent)
             NButton(icon: "plus", title: "Segelas", tint: Palette.accent, prominent: true) { care.addWater(1) }
         }
+        .frame(maxHeight: .infinity)
     }
 
     @ViewBuilder var shelfFiles: some View {
         if shelf.files.isEmpty {
-            note("Shelf masih kosong")
+            Placeholder(icon: "tray.full", title: "Shelf masih kosong")
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(shelf.files.prefix(5), id: \.self) { f in

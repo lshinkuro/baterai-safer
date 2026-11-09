@@ -269,7 +269,7 @@ final class Notch {
         switch meetingPause.step(meeting: live, focusing: focus.running && !focus.onBreak) {
         case .pause:
             focus.toggle()
-            flash("Fokus dijeda · \(m?.title ?? "rapat") dimulai")
+            flash(String(format: tr("Fokus dijeda · %@ dimulai"), m?.title ?? tr("rapat")))
         case .offerResume: flash("Rapat selesai · ⌃⌥S untuk lanjut fokus")
         case .none: break
         }
@@ -356,6 +356,7 @@ struct NotchShape: Shape {
 
 struct NCard<Content: View>: View {
     var padding: CGFloat = 12
+    var glow = false // a faint Hero-style wash, for cards that lead a page
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -363,7 +364,16 @@ struct NCard<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.white.opacity(0.045), in: shape)
+            .background {
+                ZStack {
+                    Color.white.opacity(0.045)
+                    if glow {
+                        LinearGradient(colors: [.white.opacity(0.06), .clear], startPoint: .top, endPoint: .bottom)
+                        RadialGradient(colors: [Palette.accent.opacity(0.16), .clear], center: .topTrailing, startRadius: 0, endRadius: 170)
+                    }
+                }
+                .clipShape(shape)
+            }
             .overlay(shape.strokeBorder(.white.opacity(0.07), lineWidth: 1))
     }
 }
@@ -447,7 +457,7 @@ struct Placeholder: View {
                 .frame(width: 44, height: 44)
                 .background(Color.white.opacity(0.06), in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1))
-            Text(tr(title)).font(.system(size: 13, weight: .semibold))
+            Text(tr(title)).font(.system(size: 13, weight: .semibold)).multilineTextAlignment(.center)
             if let subtitle { Text(tr(subtitle)).font(.system(size: 11)).foregroundStyle(.gray).multilineTextAlignment(.center) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -489,8 +499,9 @@ struct NotchView: View {
     @AppStorage(NTab.orderKey) private var tabOrder = ""
     @AppStorage("accent") private var accentID = "mint"
 
+    @ObservedObject var ramadan = Ramadan.shared
     var soon: Meeting? { meet.next.flatMap { $0.isSoon(Date()) ? $0 : nil } }
-    var live: Bool { media.playing || focus.running || ai.running || soon != nil }
+    var live: Bool { media.playing || focus.running || ai.running || soon != nil || ramadan.soon != nil }
     /// The focus intention, shown beside the camera while it's the live activity on display.
     var task: String {
         guard focus.running, !focus.onBreak, !ai.running, soon == nil else { return "" }
@@ -564,6 +575,8 @@ struct NotchView: View {
                         Image(systemName: "timer").foregroundStyle(Palette.accent)
                         if !task.isEmpty { Text(task).lineLimit(1).foregroundStyle(.white.opacity(0.85)) }
                     }
+                } else if let fast = ramadan.soon {
+                    Image(systemName: fast.icon).foregroundStyle(Palette.accent)
                 } else if let art = media.artwork {
                     Image(nsImage: art).resizable().aspectRatio(contentMode: .fill).frame(width: 20, height: 20)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -580,6 +593,8 @@ struct NotchView: View {
                     .font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
             } else if focus.running {
                 Text(focus.clock).font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
+            } else if let fast = ramadan.soon {
+                Text("\(fast.minutes)m").font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
             } else {
                 Equalizer()
             }
@@ -1046,6 +1061,7 @@ struct AIView: View {
     @FocusState private var focused: Bool
     @AppStorage("aiPage") private var page = 0
     @Local private var history = false // notch: saved conversations in place of the chat
+    @Local private var choosing = false
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when the usage page is toggled
 
     // Pages swap the whole area instead of splitting it, so each keeps the full notch size.
@@ -1139,8 +1155,18 @@ struct AIView: View {
                 }
                 }
                 HStack(spacing: 8) {
-                    Picker("", selection: $ai.selected) { ForEach(ai.clis, id: \.name) { Text($0.name).tag($0.name) } }
-                        .labelsHidden().fixedSize().controlSize(.small)
+                    Button { withAnimation(Motion.snap) { choosing.toggle() } } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "sparkles").font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.accent)
+                            Text(ai.selected).font(.system(size: 11, weight: .semibold))
+                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(.gray)
+                        }
+                        .padding(.horizontal, 11).padding(.vertical, 6)
+                        .background(Color.white.opacity(choosing ? 0.14 : 0.09), in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.08)))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain).fixedSize().tip("Pilih AI")
                     NButton(icon: "paintbrush.pointed", title: "Visual", tint: ai.visual ? Palette.accent : .white, prominent: ai.visual) { ai.visual.toggle() }
                         .tip("Minta AI menggambar: diagram, chart, flowchart, ikon (SVG)")
                     HStack(spacing: 6) {
@@ -1166,6 +1192,46 @@ struct AIView: View {
                     }
                 }
             }
+            .overlay(alignment: .bottomLeading) {
+                // Drawn here, not as a system menu, so it can be styled and a click anywhere else closes it.
+                if choosing {
+                    ZStack(alignment: .bottomLeading) {
+                        Color.white.opacity(0.001).onTapGesture { withAnimation(Motion.snap) { choosing = false } }
+                        aiChoices.padding(.bottom, 38)
+                    }
+                    .transition(.opacity)
+                }
+            }
+    }
+
+    var aiChoices: some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        return VStack(spacing: 2) {
+            ForEach(ai.clis, id: \.name) { c in
+                let on = ai.selected == c.name
+                Button {
+                    // Setting the same value would start a new conversation.
+                    if !on { ai.selected = c.name }
+                    withAnimation(Motion.snap) { choosing = false }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(c.name).font(.system(size: 12, weight: on ? .semibold : .regular))
+                        Spacer(minLength: 12)
+                        if on { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Palette.accent) }
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(on ? Color.white.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .frame(width: 140)
+        .background(Color(hex: 0x1C1D1F), in: shape)
+        .overlay(shape.strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
     }
 }
 
@@ -1937,7 +2003,7 @@ struct MeetingChip: View {
                 Text(m.title).lineLimit(1).frame(maxWidth: 60, alignment: .leading)
                 Text(m.when(Date())).foregroundStyle(.white.opacity(0.8)).fixedSize()
                 if m.link != nil {
-                    Text("Join").font(.system(size: 11, weight: .semibold)).fixedSize().padding(.horizontal, 7).padding(.vertical, 2)
+                    Text("Gabung").font(.system(size: 11, weight: .semibold)).fixedSize().padding(.horizontal, 7).padding(.vertical, 2)
                         .background(.black.opacity(0.75), in: Capsule()).foregroundStyle(Palette.accent)
                 }
             }
@@ -1947,7 +2013,7 @@ struct MeetingChip: View {
             .background(Palette.accent, in: Capsule())
         }
         .buttonStyle(.plain)
-        .help("\(m.title) — \(m.link == nil ? "buka Kalender" : "gabung rapat")")
+        .help(m.link == nil ? "\(m.title) — buka Kalender" : "\(m.title) — gabung rapat")
     }
 }
 

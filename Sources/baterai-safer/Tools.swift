@@ -91,6 +91,10 @@ struct ToolsTab: View {
                         .buttonStyle(.plain).tip(a.name)
                     }
                 }
+                HuePicker(current: Palette.customHue(accentID)) { h in
+                    let id = String(format: "hue:%.3f", h)
+                    Palette.setAccent(id); accentID = id
+                }
                 Text("Warna aksen untuk tab aktif, tombol, toggle, dan grafik.").font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Card(title: "Fitur", icon: "switch.2") {
@@ -125,9 +129,9 @@ struct ToolsTab: View {
             }
             Card(title: "Aksi cepat", icon: "bolt.fill") {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    Action(title: "Dark / Light", icon: "circle.lefthalf.filled") { t.toggleDarkMode() }
+                    Action(title: "Gelap / Terang", icon: "circle.lefthalf.filled") { t.toggleDarkMode() }
                     Action(title: "Matikan layar", icon: "display") { t.sleepDisplay() }
-                    Action(title: "Screenshot", icon: "camera.viewfinder") { t.screenshot() }
+                    Action(title: "Tangkapan layar", icon: "camera.viewfinder") { t.screenshot() }
                     Action(title: "Teks dari layar", icon: "text.viewfinder") { Notch.shared.ocr() }
                     Action(title: "Panduan awal", icon: "sparkles") { Onboarding.show() }
                     Action(title: "Activity Monitor", icon: "waveform.path.ecg") {
@@ -174,5 +178,43 @@ struct FeatureChip: View {
         }
         .buttonStyle(.plain)
         .help(on ? "Klik untuk mematikan \(title)" : "Klik untuk menyalakan \(title)")
+    }
+}
+
+/// Any hue as the accent. Commits when the drag ends: changing the accent rebuilds the views, which would cancel the drag.
+struct HuePicker: View {
+    let current: Double?
+    let pick: (Double) -> Void
+    @Local private var dragging: Double?
+
+    var body: some View {
+        let hue = dragging ?? current
+        HStack(spacing: 10) {
+            Text("Kustom").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+            GeometryReader { geo in
+                let spot = { (x: CGFloat) in Double(min(1, max(0, x / geo.size.width))) }
+                Capsule().fill(LinearGradient(colors: stride(from: 0.0, through: 1, by: 1.0 / 12).map(Palette.custom), startPoint: .leading, endPoint: .trailing))
+                    .frame(height: 10).frame(maxHeight: .infinity)
+                    .overlay(alignment: .leading) {
+                        if let hue {
+                            Circle().fill(Palette.custom(hue)).frame(width: 20, height: 20)
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.6), lineWidth: 1.5))
+                                .offset(x: CGFloat(hue) * (geo.size.width - 20))
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 0)
+                        .onChanged { dragging = spot($0.location.x) }
+                        .onEnded { pick(spot($0.location.x)); dragging = nil })
+            }
+            .frame(height: 20)
+        }
+        .accessibilityElement()
+        .accessibilityLabel(tr("Warna kustom"))
+        .accessibilityValue(hue.map { "\(Int($0 * 360))°" } ?? "")
+        .accessibilityAdjustableAction { d in
+            let step = d == .increment ? 0.05 : -0.05
+            pick(min(1, max(0, (current ?? 0) + step)))
+        }
     }
 }

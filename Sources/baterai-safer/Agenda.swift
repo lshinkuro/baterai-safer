@@ -327,7 +327,7 @@ struct AgendaView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain).help(editable ? "Klik untuk edit" : "\(e.calendar?.title ?? "Kalender") hanya bisa dibaca")
-            if let link { NButton(icon: "video.fill", title: "Join", tint: Palette.green, prominent: true) { NSWorkspace.shared.open(link) } }
+            if let link { NButton(icon: "video.fill", title: "Gabung", tint: Palette.green, prominent: true) { NSWorkspace.shared.open(link) } }
             if editable {
                 Menu {
                     ForEach(Array(reminderChoices.enumerated()), id: \.offset) { _, m in
@@ -473,6 +473,6 @@ struct AgendaView: View {
         if editing == nil { a.selected = Calendar.current.startOfDay(for: start); a.month = start; a.reload() }
         defaultReminder = reminder ?? -1 // next event starts with the same choice
         adding = false
-        Notch.shared.flash("Rapat tersimpan · \(start.formatted(date: .abbreviated, time: .shortened))")
+        Notch.shared.flash(String(format: tr("Rapat tersimpan · %@"), start.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(appLocale))))
     }
 }

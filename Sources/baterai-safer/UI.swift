@@ -44,7 +44,14 @@ enum Palette {
     ]
     /// The one brand color; everything else stays neutral. Views rebuild on change via `.id(accentID)`.
     private(set) static var accent = color(UserDefaults.standard.string(forKey: "accent"))
-    static func color(_ id: String?) -> Color { accents.first { $0.id == id }?.color ?? accents[0].color }
+    static func color(_ id: String?) -> Color {
+        if let h = customHue(id) { return custom(h) }
+        return accents.first { $0.id == id }?.color ?? accents[0].color
+    }
+    /// A custom accent is stored as "hue:0.53".
+    static func customHue(_ id: String?) -> Double? { id.flatMap { $0.hasPrefix("hue:") ? Double($0.dropFirst(4)) : nil } }
+    /// Fixed saturation and brightness keep every hue light enough for dark text on top, like `accents`.
+    static func custom(_ hue: Double) -> Color { Color(hue: hue, saturation: 0.6, brightness: 0.95) }
     static func setAccent(_ id: String) { accent = color(id); UserDefaults.standard.set(id, forKey: "accent") }
     static let onAccent = Color.black.opacity(0.85) // text and icons on an accent fill
     static let hairline = Color.primary.opacity(0.08)

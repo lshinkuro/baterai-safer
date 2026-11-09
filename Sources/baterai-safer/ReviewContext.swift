@@ -39,7 +39,7 @@ enum Guides {
         p.allowsMultipleSelection = true
         p.canChooseDirectories = false
         p.allowedContentTypes = [.plainText, .json, .xml, .init(filenameExtension: "md")!, .init(filenameExtension: "mdc")!]
-        p.message = "Pilih panduan tim / aturan Sonar untuk review \(repo)"
+        p.message = String(format: tr("Pilih panduan tim / aturan Sonar untuk review %@"), repo)
         p.prompt = "Pakai untuk review"
         if let folder { p.directoryURL = URL(fileURLWithPath: folder) }
         guard p.runModal() == .OK else { return }

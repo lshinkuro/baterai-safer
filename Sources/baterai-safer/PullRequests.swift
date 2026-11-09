@@ -266,7 +266,7 @@ final class PRModel: ObservableObject {
                 }
             }
         }
-        if pending == 0 { loading = false; error = "Pasang GitHub CLI (brew install gh) atau hubungkan Bitbucket" }
+        if pending == 0 { loading = false; error = tr("Pasang GitHub CLI (brew install gh) atau hubungkan Bitbucket") }
     }
 
     func select(_ pr: PR) {
@@ -283,7 +283,7 @@ final class PRModel: ObservableObject {
                       "body,additions,deletions,changedFiles,mergeable,headRefName,baseRefName,statusCheckRollup"]) { _, out, err in
             guard self.selected == pr else { return }
             self.detail = (try? JSONDecoder().decode(GHDetail.self, from: Data(out.utf8)))?.detail
-            if self.detail == nil { self.failed = true; self.message = "Gagal memuat PR: \(lastLine(err))" }
+            if self.detail == nil { self.failed = true; self.message = String(format: tr("Gagal memuat PR: %@"), "\(lastLine(err))") }
         }
     }
 
@@ -317,7 +317,7 @@ final class PRModel: ObservableObject {
         }
         g.notify(queue: .main) {
             guard self.selected == pr else { return }
-            guard failed.isEmpty else { self.failed = true; self.message = "Gagal memuat PR: \(failed)"; return }
+            guard failed.isEmpty else { self.failed = true; self.message = String(format: tr("Gagal memuat PR: %@"), "\(failed)"); return }
             guard !commit.isEmpty else { self.detail = d; return }
             Bitbucket.call("/rest/build-status/1.0/commits/\(commit)") { _, data in
                 let values = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["values"] as? [[String: Any]] ?? []
@@ -357,7 +357,7 @@ final class PRModel: ObservableObject {
         guard let gh else { return }
         runAsync(gh, ["pr", "diff", "\(pr.number)", "-R", pr.repo]) { code, diff, err in
             guard self.selected == pr else { return }
-            guard code == 0 else { self.reviewing = false; self.failed = true; self.message = "Gagal ambil diff: \(lastLine(err))"; return }
+            guard code == 0 else { self.reviewing = false; self.failed = true; self.message = String(format: tr("Gagal ambil diff: %@"), "\(lastLine(err))"); return }
             run(diff)
         }
     }
@@ -366,8 +366,8 @@ final class PRModel: ObservableObject {
     func post(_ event: String) {
         guard let pr = selected, !review.isEmpty else { return }
         failed = false
-        message = "Mengirim…"
-        let report = { (ok: Bool, err: String) in self.failed = !ok; self.message = ok ? "Review terkirim ✓" : "Gagal: \(err)" }
+        message = tr("Mengirim…")
+        let report = { (ok: Bool, err: String) in self.failed = !ok; self.message = ok ? tr("Review terkirim ✓") : String(format: tr("Gagal: %@"), err) }
         if pr.host == .github {
             guard let gh else { return }
             runAsync(gh, ["pr", "review", "\(pr.number)", "-R", pr.repo, "--\(event)", "--body", review]) { code, _, err in report(code == 0, lastLine(err)) }
@@ -393,10 +393,10 @@ final class PRModel: ObservableObject {
     func merge(_ method: String) {
         guard let pr = selected else { return }
         failed = false
-        message = "Merging…"
+        message = tr("Menggabungkan…")
         let done = { (ok: Bool, err: String) in
             self.failed = !ok
-            self.message = ok ? "PR #\(pr.number) di-merge ✓" : "Gagal merge: \(err)"
+            self.message = ok ? String(format: tr("PR #%@ di-merge ✓"), "\(pr.number)") : String(format: tr("Gagal merge: %@"), err)
             if ok { self.prs.removeAll { $0 == pr }; self.selected = nil }
         }
         if pr.host == .bitbucket {

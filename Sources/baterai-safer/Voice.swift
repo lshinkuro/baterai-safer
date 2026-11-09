@@ -34,7 +34,7 @@ final class VoiceChat: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
             AVCaptureDevice.requestAccess(for: .audio) { mic in
                 DispatchQueue.main.async {
                     guard status == .authorized, mic else {
-                        self.error = "Izinkan Mikrofon dan Speech Recognition di System Settings → Privacy & Security"
+                        self.error = tr("Izinkan Mikrofon dan Speech Recognition di System Settings → Privacy & Security")
                         return
                     }
                     self.listen()
@@ -54,7 +54,7 @@ final class VoiceChat: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     private func listen() {
         guard let rec = SFSpeechRecognizer(locale: Locale(identifier: lang.voice)), rec.isAvailable else {
-            error = "Pengenal suara \(lang.title) belum tersedia di Mac ini"
+            error = String(format: tr("Pengenal suara %@ belum tersedia di Mac ini"), lang.title)
             phase = .idle
             return
         }
@@ -74,7 +74,7 @@ final class VoiceChat: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
             DispatchQueue.main.async { self?.level = min(1, rms * 14) }
         }
         engine.prepare()
-        do { try engine.start() } catch { self.error = "Mikrofon tidak bisa dipakai"; phase = .idle; return }
+        do { try engine.start() } catch { self.error = tr("Mikrofon tidak bisa dipakai"); phase = .idle; return }
         heard = ""
         phase = .listening
         task = rec.recognitionTask(with: req) { [weak self] result, err in

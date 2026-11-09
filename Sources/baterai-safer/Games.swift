@@ -262,7 +262,7 @@ struct XOView: View {
 
 struct GamesPage: View {
     @AppStorage("game") private var game = 0
-    static let games = [("Ular", "scribble.variable"), ("Kartu Kembar", "square.grid.2x2"), ("X-O", "number"), ("Rangkai Kata", "textformat.abc")]
+    static let games = [("Ular", "scribble.variable"), ("Kartu Kembar", "square.grid.2x2"), ("X-O", "number"), ("Rangkai Kata", "textformat.abc"), ("Catur", "crown")]
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -286,6 +286,7 @@ struct GamesPage: View {
                 case 0: SnakeView()
                 case 1: MemoryView()
                 case 3: WordGameIntro()
+                case 4: ChessView()
                 default: XOView()
                 }
             }

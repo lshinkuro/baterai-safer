@@ -80,7 +80,7 @@ final class Model: ObservableObject {
     func syncNative() {
         guard !SMC.canInhibit, helperInstalled else { return }
         let t = nativeTarget(config, status)
-        if native_limit_get() != t && native_limit_set(Int32(t)) != 0 { error = "Gagal set Charge Limit macOS ke \(t)%" }
+        if native_limit_get() != t && native_limit_set(Int32(t)) != 0 { error = String(format: tr("Gagal set Charge Limit macOS ke %@%%"), "\(t)") }
     }
 
     func admin(_ cmd: String) {
@@ -301,7 +301,7 @@ struct BatteryTab: View {
             if !m.helperInstalled {
                 Card(title: "Helper", icon: "lock.shield") {
                     Text("Helper (root) diperlukan untuk mengontrol pengisian.").font(.callout).foregroundStyle(.secondary)
-                    Button("Install helper…") { m.admin("install-daemon") }.buttonStyle(.borderedProminent)
+                    Button("Pasang helper…") { m.admin("install-daemon") }.buttonStyle(.borderedProminent)
                 }
             } else {
                 Card(title: "Pengisian", icon: "bolt.batteryblock") {
@@ -328,7 +328,7 @@ struct BatteryTab: View {
                 }
                 Card(title: "Proteksi", icon: "shield.lefthalf.filled") {
                     if SMC.canInhibit {
-                        Switch("Heat protection", "flame.fill", $m.config.heatProtection)
+                        Switch("Perlindungan panas", "flame.fill", $m.config.heatProtection)
                     }
                     if SMC.canInhibit && m.config.heatProtection {
                         HStack(spacing: 10) {
@@ -353,7 +353,7 @@ struct BatteryTab: View {
             if !m.error.isEmpty { Text(m.error).font(.caption).foregroundStyle(Palette.red) }
 
             if m.helperInstalled {
-                Button("Uninstall helper") { m.admin("uninstall-daemon") }
+                Button("Hapus helper") { m.admin("uninstall-daemon") }
                     .buttonStyle(.borderless).font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }

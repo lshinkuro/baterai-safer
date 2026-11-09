@@ -17,7 +17,7 @@ blindly can also hit real user data (Clipboard delete buttons). So render instea
 .claude/skills/poni-ui-check/snap.sh <scratchpad>/shots-en en  # English; missing translations show in CAPITALS
 ```
 
-Output: `panel-<Tab>-light|dark.png`, `notch-<Tab>.png`, `game-ular|kartu|xo|kata.png`, `game-kata-window.png`.
+Output: `panel-<Tab>-light|dark.png`, `notch-<Tab>.png`, `game-ular|kartu|xo|kata|catur.png`, `game-kata-window.png`.
 Stack several into one image to review them in one read:
 
 ```sh

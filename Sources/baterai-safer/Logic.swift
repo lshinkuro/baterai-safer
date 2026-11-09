@@ -82,6 +82,23 @@ func nativeTarget(_ c: Config, _ s: Status) -> Int {
 }
 
 func selfTest() {
+    assert(Palette.customHue("hue:0.530") == 0.53 && Palette.customHue("mint") == nil && Palette.color("hue:x") == Palette.color("mint"), "custom accent id")
+    let jakarta = TimeZone(identifier: "Asia/Jakarta")!
+    func iso(_ s: String) -> Date { ISO8601DateFormatter().date(from: s)! }
+    assert(ramadanDay(on: iso("2027-02-08T05:00:00Z"), shift: 0, tz: jakarta) == 1, "ramadan first day")
+    assert(ramadanDay(on: iso("2027-02-08T05:00:00Z"), shift: 1, tz: jakarta) == nil, "ramadan shifted a day later")
+    assert(ramadanDay(on: iso("2026-11-09T05:00:00Z"), shift: 0, tz: jakarta) == nil, "not ramadan")
+    assert(zakatFitrah(people: 4, ricePrice: 15000) == 150000, "zakat fitrah")
+    assert(zakatMal(wealth: 100_000_000, debt: 0, goldPrice: 1_000_000).due == 2_500_000 && zakatMal(wealth: 84_000_000, debt: 0, goldPrice: 1_000_000).due == 0, "zakat mal nisab")
+    assert(zakatMal(wealth: 90_000_000, debt: 10_000_000, goldPrice: 1_000_000).due == 0 && zakatMal(wealth: 5, debt: 0, goldPrice: 0).due == 0, "zakat mal debt and empty price")
+    func perft(_ p: Chess, _ d: Int) -> Int { d == 0 ? 1 : p.legal().reduce(0) { $0 + perft(p.after($1), d - 1) } }
+    assert(perft(Chess(), 3) == 8902, "chess move generation")
+    var fools = Chess()
+    for (from, to) in [(53, 45), (12, 28), (54, 38), (3, 39)] { fools = fools.after(.init(from: from, to: to)) }
+    assert(fools.outcome(repeated: false) == "Komputer menang", "chess checkmate")
+    var mateInOne = Chess()
+    for (from, to) in [(52, 36), (12, 28), (61, 34), (1, 18), (59, 31), (6, 21)] { mateInOne = mateInOne.after(.init(from: from, to: to)) }
+    assert(mateInOne.after(mateInOne.bestMove(depth: 2)!).outcome(repeated: false) == "Kamu menang!", "chess finds mate in one")
     func run(_ c: Config, _ pct: Int, temp: Double = 30, _ s: inout Status) -> (Bool, Bool) {
         var b = Battery(); b.percent = pct; b.temp = temp
         let r = decide(c, b, &s); return (r.charge, r.adapter)

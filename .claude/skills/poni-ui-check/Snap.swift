@@ -49,12 +49,18 @@ import SwiftUI
         default: AnyView(MoreView())
         }
         if t == .more {
-            for (i, name) in ["ular", "kartu", "xo", "kata"].enumerated() {
+            for (i, name) in ["ular", "kartu", "xo", "kata", "catur"].enumerated() {
                 UserDefaults.standard.set(i, forKey: "game")
                 write("game-\(name)", GamesPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
             }
         }
+        if t == .ibadah {
+            for (name, pane) in [("notch-Ramadan", AnyView(RamadanPane())), ("notch-Zakat", AnyView(ZakatPane()))] {
+                write(name, pane.padding(.horizontal, 18).padding(.vertical, 12).foregroundStyle(.white).frame(width: 470, height: 200).background(Color.black), .dark)
+            }
+        }
         if t == .more {
+            write("game-catur-window", ChessView(windowed: true).padding(20).foregroundStyle(.white).frame(width: 820, height: 584).background(Color.black), .dark)
             let g = WordGameModel.shared
             g.board.grid = [.init(x: 4, y: 5): "C", .init(x: 5, y: 5): "A", .init(x: 6, y: 5): "T"]
             g.placed = [.init(cell: .init(x: 5, y: 6), letter: "X")]
@@ -66,5 +72,10 @@ import SwiftUI
             .foregroundStyle(.white)
             .frame(width: 720, height: 270).background(Color.black)
         write("notch-\(t.title)", v, .dark)
+        if t == .home {
+            n.media.app = "Spotify"; n.media.title = "Sample Track"; n.media.artist = "Sample Artist"; n.media.duration = 200; n.media.position = 70; n.media.playing = true
+            write("notch-Home-playing", v, .dark)
+            n.media.app = nil; n.media.title = ""; n.media.playing = false
+        }
     }
 }

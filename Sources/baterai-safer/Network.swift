@@ -141,7 +141,7 @@ struct NetCard: View {
                 }
                 .frame(height: 80)
                 VStack(spacing: 6) {
-                    info("Interface", n.kind.isEmpty ? n.iface : "\(n.kind) · \(n.iface)")
+                    info("Antarmuka", n.kind.isEmpty ? n.iface : "\(n.kind) · \(n.iface)")
                     info("IPv4", n.ipv4 ?? "—")
                     info("MAC", n.mac ?? "—")
                     info("IP publik", n.publicIP ?? "—")

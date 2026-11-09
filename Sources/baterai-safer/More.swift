@@ -266,14 +266,14 @@ struct MoreView: View {
     static let tools: [(id: String, icon: String, title: String, subtitle: String, color: Color)] = [
         ("charge", "battery.100percent.bolt", "Notif baterai penuh", "Kabari saat sampai batas", Palette.green),
         ("camera", "camera.fill", "Kamera cermin", "Cek penampilan sebelum rapat", Palette.accent),
-        ("color", "eyedropper", "Color picker", "Ambil warna dari layar", Palette.accent),
+        ("color", "eyedropper", "Pemilih warna", "Ambil warna dari layar", Palette.accent),
         ("awake", "cup.and.saucer.fill", "Tetap menyala", "Cegah Mac tidur sementara", Palette.amber),
         ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.accent),
-        ("drives", "eject.fill", "Eject USB", "Lepas flashdisk dengan aman", Palette.accent),
+        ("drives", "eject.fill", "Lepas USB", "Lepas flashdisk dengan aman", Palette.accent),
         ("lang", "character.book.closed.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
-        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu, X-O, kata", Palette.accent),
+        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu, X-O, kata, catur", Palette.accent),
         ("selfcare", "heart.circle", "Self-care", "Minum air, istirahat mata, kebiasaan", Palette.accent),
-        ("update", "arrow.down.circle.fill", "Update", "Cek dan pasang versi baru", Palette.accent),
+        ("update", "arrow.down.circle.fill", "Pembaruan", "Cek dan pasang versi baru", Palette.accent),
     ]
 
     var body: some View {
@@ -396,7 +396,7 @@ struct MoreView: View {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 26, height: 26)
                         Text(url.lastPathComponent).font(.system(size: 12, weight: .semibold)).lineLimit(1)
                         Spacer()
-                        NButton(icon: "eject.fill", title: "Eject", tint: Palette.accent, prominent: true) { volumes.eject(url) }
+                        NButton(icon: "eject.fill", title: "Lepas", tint: Palette.accent, prominent: true) { volumes.eject(url) }
                     }
                 }
             }

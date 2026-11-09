@@ -48,23 +48,23 @@ final class Updater: ObservableObject {
     }
 
     func check(manual: Bool = false) {
-        if manual { status = "Mengecek…" }
+        if manual { status = tr("Mengecek…") }
         URLSession.shared.dataTask(with: Self.api) { data, _, _ in
             let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             let tag = (json?["tag_name"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
             let asset = (json?["assets"] as? [[String: Any]])?.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
             DispatchQueue.main.async {
-                guard let tag else { if manual { self.status = "Gagal mengecek (offline?)" }; return }
+                guard let tag else { if manual { self.status = tr("Gagal mengecek (offline?)") }; return }
                 if let a = asset, let u = (a["browser_download_url"] as? String).flatMap(URL.init(string:)),
                    let d = (a["digest"] as? String)?.replacingOccurrences(of: "sha256:", with: "") { self.dmg = (u, d) }
                 guard isNewer(tag, than: self.current) else {
                     self.latest = nil
-                    if manual { self.status = "Sudah versi terbaru (v\(self.current))" }
+                    if manual { self.status = String(format: tr("Sudah versi terbaru (v%@)"), "\(self.current)") }
                     return
                 }
                 let first = self.latest != tag
                 self.latest = tag
-                self.status = "v\(tag) tersedia"
+                self.status = String(format: tr("v%@ tersedia"), tag)
                 if first { Notch.shared.flash("Poni v\(tag) tersedia" + (self.auto && self.updatable ? " · memasang…" : "")) }
                 // Don't restart under someone mid-session; the next check tries again.
                 if self.auto, self.updatable, !Notch.shared.focus.running { self.install() }
@@ -76,7 +76,7 @@ final class Updater: ObservableObject {
         guard let v = latest, updatable, !busy else { return }
         busy = true
         if viaHomebrew {
-            status = "Memperbarui lewat Homebrew… (1–2 menit)"
+            status = tr("Memperbarui lewat Homebrew… (1–2 menit)")
             let brew = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"].first(where: FileManager.default.isExecutableFile) ?? "/opt/homebrew/bin/brew"
             runAsync(brew, ["update", "--quiet"]) { _, _, _ in
                 runAsync(brew, ["upgrade", self.formula]) { code, _, err in
@@ -87,7 +87,7 @@ final class Updater: ObservableObject {
             return
         }
         guard let dmg else { fail("Rilis ini tidak punya DMG"); return }
-        status = "Mengunduh v\(v)…"
+        status = String(format: tr("Mengunduh v%@…"), "\(v)")
         URLSession.shared.downloadTask(with: dmg.url) { file, _, error in
             guard let file else { DispatchQueue.main.async { self.fail(error?.localizedDescription ?? "Unduhan gagal") }; return }
             do {
@@ -122,7 +122,7 @@ final class Updater: ObservableObject {
     }
 
     private func relaunch(_ app: URL, _ v: String) {
-        status = "Diperbarui ke v\(v), memulai ulang…"
+        status = String(format: tr("Diperbarui ke v%@, memulai ulang…"), "\(v)")
         Notch.shared.flash("Diperbarui ke v\(v) · memulai ulang")
         // A detached shell outlives us and opens the new copy once we've quit.
         let p = Process()
@@ -158,7 +158,7 @@ struct UpdateCard: View {
     @ObservedObject var u = Updater.shared
 
     var body: some View {
-        Card(title: "Update", icon: "arrow.down.circle") {
+        Card(title: "Pembaruan", icon: "arrow.down.circle") {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Versi \(u.current)").font(.system(size: 12, weight: .semibold))

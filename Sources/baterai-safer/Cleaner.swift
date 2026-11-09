@@ -137,8 +137,8 @@ final class CleanerModel: ObservableObject {
     func trash(_ item: Sized) {
         NSWorkspace.shared.recycle([item.url]) { _, err in
             DispatchQueue.main.async {
-                if let err { self.message = "Gagal: \(err.localizedDescription)"; return }
-                self.message = "\(item.url.lastPathComponent) dipindah ke Trash (\(bytes(item.size)))"
+                if let err { self.message = String(format: tr("Gagal: %@"), err.localizedDescription); return }
+                self.message = String(format: tr("%@ dipindah ke Trash (%@)"), "\(item.url.lastPathComponent)", "\(bytes(item.size))")
                 self.folders.removeAll { $0.id == item.id }
                 self.bigFiles.removeAll { $0.id == item.id }
                 self.duCache = [:] // parent sizes changed
@@ -157,7 +157,7 @@ final class CleanerModel: ObservableObject {
                     let after = dirSize(devices)
                     DispatchQueue.main.async {
                         self.simulatorsBusy = false
-                        self.message = code == 0 ? "Simulator tak terpakai dihapus: \(bytes(max(0, before - after))) dibebaskan" : "Gagal: \(lastLine(err))"
+                        self.message = code == 0 ? String(format: tr("Simulator tak terpakai dihapus: %@ dibebaskan"), "\(bytes(max(0, before - after)))") : String(format: tr("Gagal: %@"), "\(lastLine(err))")
                     }
                 }
             }
@@ -172,23 +172,23 @@ final class CleanerModel: ObservableObject {
             do { try fm.removeItem(at: u) } catch { failed += 1 }
         }
         let after = dirSize(dir)
-        message = "\(j.title): \(bytes(max(0, (j.size ?? 0) - after))) dibebaskan" + (failed > 0 ? ", \(failed) item dilewati (sedang dipakai/terlindungi)" : "")
+        message = String(format: tr("%@: %@ dibebaskan"), tr(j.title), bytes(max(0, (j.size ?? 0) - after))) + (failed > 0 ? String(format: tr(", %@ item dilewati (sedang dipakai/terlindungi)"), "\(failed)") : "")
         if let i = junk.firstIndex(where: { $0.id == j.id }) { junk[i].size = after }
     }
 
     // Moves the app and its leftovers to the Trash, so it can still be restored.
     func uninstall(_ a: AppItem, confirmed: ([URL]) -> Bool = { _ in true }) {
         if !NSRunningApplication.runningApplications(withBundleIdentifier: a.bundleID).isEmpty {
-            message = "Tutup \(a.name) dulu sebelum menghapus."
+            message = String(format: tr("Tutup %@ dulu sebelum menghapus."), a.name)
             return
         }
         let extra = leftovers(name: a.name, bundleID: a.bundleID)
         guard confirmed(extra) else { return }
         NSWorkspace.shared.recycle([a.url] + extra) { _, err in
             DispatchQueue.main.async {
-                if let err { self.message = "Gagal: \(err.localizedDescription)"; return }
+                if let err { self.message = String(format: tr("Gagal: %@"), err.localizedDescription); return }
                 self.apps.removeAll { $0.id == a.id }
-                self.message = "\(a.name) dipindah ke Trash"
+                self.message = String(format: tr("%@ dipindah ke Trash"), a.name)
             }
         }
     }

@@ -129,8 +129,9 @@ final class Ibadah: NSObject, ObservableObject, CLLocationManagerDelegate, UNUse
         UNUserNotificationCenter.current().delegate = self
         if auto { locate() }
         schedule()
-        // Reschedule once a day so reminders always cover the next few days.
-        timer = .scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in self?.schedule() }
+        Ramadan.shared.tick()
+        // Reschedule once a day so reminders always cover the next few days; the fasting countdown needs the short interval.
+        timer = .scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.schedule(); Ramadan.shared.tick() }
     }
 
     func stop() {
@@ -138,6 +139,7 @@ final class Ibadah: NSObject, ObservableObject, CLLocationManagerDelegate, UNUse
         guard bundled else { return }
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: Self.ids)
         scheduledDay = ""
+        Ramadan.shared.clearSoon()
     }
 
     func useAutomatic() { auto = true; UserDefaults.standard.set(true, forKey: "ibadahAuto"); locate() }
@@ -190,31 +192,38 @@ final class Ibadah: NSObject, ObservableObject, CLLocationManagerDelegate, UNUse
 
     // MARK: Reminders
 
-    static let ids = (0..<3).flatMap { d in Prayer.allCases.map { "sholat-\(d)-\($0.rawValue)" } }
+    static let ids = (0..<3).flatMap { d in Prayer.allCases.map { "sholat-\(d)-\($0.rawValue)" } + ["sahur-\(d)"] }
 
     /// Today and the next two days, so reminders arrive even if Poni isn't running.
     func schedule() {
-        let key = "\(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)-\(place.name)-\(reminders.count)"
+        let key = "\(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)-\(place.name)-\(reminders.count)-\(Ramadan.shared.scheduleKey)"
         guard bundled, key != scheduledDay else { return }
         scheduledDay = key
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: Self.ids)
-        guard !reminders.isEmpty else { return }
+        let start = Date()
+        let sahurDays = (0..<3).filter { Ramadan.shared.sahur && Ramadan.shared.fasting(start.addingTimeInterval(Double($0) * 86400)) }
+        guard !reminders.isEmpty || !sahurDays.isEmpty else { return }
         center.requestAuthorization(options: [.alert, .sound]) { ok, _ in
             guard ok else { return }
             DispatchQueue.main.async {
                 let now = Date()
+                func add(_ id: String, _ title: String, _ body: String, at t: Date) {
+                    let content = UNMutableNotificationContent()
+                    content.title = title
+                    content.body = body
+                    content.sound = .default
+                    let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: t)
+                    center.add(UNNotificationRequest(identifier: id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
+                }
                 for d in 0..<3 {
                     let times = self.times(now.addingTimeInterval(Double(d) * 86400))
                     for p in Prayer.allCases where self.reminders.contains(p) {
                         guard let t = times[p], t > now else { continue }
-                        let content = UNMutableNotificationContent()
-                        content.title = String(format: tr(p == .imsak ? "Imsak · %@" : "Waktu %@ · %@"), p == .imsak ? self.clock(t) : tr(p.title), self.clock(t))
-                        content.body = self.place.name
-                        content.sound = .default
-                        let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: t)
-                        center.add(UNNotificationRequest(identifier: "sholat-\(d)-\(p.rawValue)", content: content,
-                                                         trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
+                        add("sholat-\(d)-\(p.rawValue)", String(format: tr(p == .imsak ? "Imsak · %@" : "Waktu %@ · %@"), p == .imsak ? self.clock(t) : tr(p.title), self.clock(t)), self.place.name, at: t)
+                    }
+                    if sahurDays.contains(d), let imsak = times[.imsak], imsak.addingTimeInterval(-Ramadan.sahurLead) > now {
+                        add("sahur-\(d)", tr("Waktunya sahur"), String(format: tr("Imsak %@ · %@"), self.clock(imsak), self.place.name), at: imsak.addingTimeInterval(-Ramadan.sahurLead))
                     }
                 }
             }
@@ -237,18 +246,22 @@ final class Ibadah: NSObject, ObservableObject, CLLocationManagerDelegate, UNUse
 
 struct IbadahView: View {
     @ObservedObject var m = Ibadah.shared
+    @ObservedObject var r = Ramadan.shared
     @Local private var picking = false
+    @Local private var pane: Int? // nil follows the calendar: Ramadan's page during Ramadan
 
     var body: some View {
         HStack(spacing: 12) {
             NCard(padding: 14) {
                 TimelineView(.periodic(from: .now, by: 30)) { ctx in
-                    let (p, t) = m.next(after: ctx.date)
+                    let fast = r.fasting(ctx.date) ? m.fastNext(after: ctx.date) : nil
+                    let prayer = m.next(after: ctx.date), t = fast?.date ?? prayer.1
                     let mins = Int(t.timeIntervalSince(ctx.date) / 60) + 1
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(tr("SHOLAT BERIKUTNYA")).font(.system(size: 10, weight: .semibold)).tracking(0.8).foregroundStyle(.gray)
+                        Text(fast == nil ? tr("SHOLAT BERIKUTNYA") : r.day(ctx.date).map { String(format: tr("RAMADAN HARI KE-%@"), "\($0)") } ?? tr("PUASA"))
+                            .font(.system(size: 10, weight: .semibold)).tracking(0.8).foregroundStyle(.gray)
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(tr(p.title)).font(.system(size: 26, weight: .semibold))
+                            Text(tr(fast?.title ?? prayer.0.title)).font(.system(size: 26, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
                             Text(m.clock(t)).font(.system(size: 15, weight: .medium)).monospacedDigit().foregroundStyle(Palette.accent)
                         }
                         Text(String(format: tr("%@ lagi"), mins >= 60 ? String(format: tr("%@j %@m"), "\(mins / 60)", "\(mins % 60)") : "\(mins)m"))
@@ -269,7 +282,31 @@ struct IbadahView: View {
                 }
             }
             .frame(width: 230)
-            if picking { cities } else { schedule }
+            if picking {
+                cities
+            } else {
+                let shown = pane ?? (r.day() != nil ? 1 : 0)
+                VStack(spacing: 6) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(["Jadwal", "Ramadan", "Zakat"].enumerated()), id: \.offset) { i, title in
+                            Button { withAnimation(Motion.ease) { pane = i } } label: {
+                                Text(tr(title)).font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(shown == i ? Palette.onAccent : .gray)
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .background(shown == i ? Palette.accent : Color.white.opacity(0.05), in: Capsule())
+                                    .contentShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    switch shown {
+                    case 1: RamadanPane()
+                    case 2: ZakatPane()
+                    default: schedule
+                    }
+                }
+            }
         }
         .onAppear { m.start() }
     }
@@ -279,7 +316,7 @@ struct IbadahView: View {
             // After Isya the day is done: show tomorrow's times instead of a list of past ones.
             let tomorrow = ctx.date >= m.times(ctx.date)[.isya]!
             let times = m.times(tomorrow ? ctx.date.addingTimeInterval(86400) : ctx.date), next = m.next(after: ctx.date).0
-            VStack(spacing: 3) {
+            VStack(spacing: 2) {
                 if tomorrow {
                     Text(tr("BESOK")).font(.system(size: 10, weight: .semibold)).tracking(0.8).foregroundStyle(.gray)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12)
@@ -300,7 +337,7 @@ struct IbadahView: View {
                         .buttonStyle(.plain).tip(m.reminders.contains(p) ? "Matikan pengingat" : "Nyalakan pengingat")
                     }
                     .foregroundStyle(on ? Palette.onAccent : past ? .white.opacity(0.4) : .white.opacity(0.9))
-                    .padding(.horizontal, 12).padding(.vertical, 4)
+                    .padding(.horizontal, 12).padding(.vertical, 3)
                     .background(on ? Palette.accent : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
             }
