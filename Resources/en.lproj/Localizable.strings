@@ -795,3 +795,5 @@
 "Total sejak nyala" = "Total since startup";
 "IPv4" = "IPv4";
 "MAC" = "MAC";
+"Semua project" = "All projects";
+"Filter PR per project" = "Filter PRs by project";

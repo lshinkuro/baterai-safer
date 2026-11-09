@@ -969,6 +969,11 @@ enum AppWindow {
     }
 }
 
+/// Git and PR review in a resizable window: same models as the notch.
+enum GitWindow {
+    static func show() { AppWindow.show("git", title: "Git", size: NSSize(width: 980, height: 640)) { GitView(g: Notch.shared.git, pr: Notch.shared.pr, ai: Notch.shared.ai, windowed: true) } }
+}
+
 /// The AI chat in a window: same AIModel as the notch, so the conversation carries over both ways.
 enum AIWindow {
     static func show() { AppWindow.show("ai", title: "Poni AI", size: NSSize(width: 920, height: 680)) { AIView(ai: Notch.shared.ai, windowed: true) } }
@@ -1141,6 +1146,7 @@ struct GitView: View {
     @ObservedObject var g: GitModel
     @ObservedObject var pr: PRModel
     let ai: AIModel
+    var windowed = false // shown in GitWindow instead of the notch
     @AppStorage("gitPane") private var showPR = false
     @Local private var composing: Repo?
     @Local private var connecting: String? // "bitbucket" / "sonar"
@@ -1170,6 +1176,9 @@ struct GitView: View {
                     NButton(icon: "arrow.clockwise") { g.refresh() }.tip("Segarkan status")
                     NButton(icon: "plus", title: "Tambah repo") { g.add() }
                 }
+                if !windowed {
+                    NButton(icon: "arrow.up.left.and.arrow.down.right") { GitWindow.show() }.tip("Buka di jendela besar")
+                }
             }
             if showPR {
                 if connecting == "bitbucket" {
@@ -1185,7 +1194,7 @@ struct GitView: View {
                                 done: { connecting = nil; pr.sonarConnected = Sonar.connected },
                                 url: Sonar.base ?? "")
                 } else {
-                    PRPane(pr: pr, ai: ai, repos: g.repos.map(\.path)) { connecting = "sonar" }
+                    PRPane(pr: pr, ai: ai, repos: g.repos.map(\.path), listWidth: windowed ? 300 : 200) { connecting = "sonar" }
                 }
             } else if let r = composing {
                 CommitPane(g: g, ai: ai, repo: r) { composing = nil }
@@ -1271,8 +1280,10 @@ struct PRPane: View {
     @ObservedObject var pr: PRModel
     let ai: AIModel
     let repos: [String]
+    var listWidth: CGFloat = 200
     let connectSonar: () -> Void
     @Local private var editing = false
+    @AppStorage("prRepoFilter") private var repoFilter = "" // "" = all projects
 
     var body: some View {
         if !pr.error.isEmpty && pr.prs.isEmpty {
@@ -1281,15 +1292,35 @@ struct PRPane: View {
             Placeholder(icon: "checkmark.seal.fill", title: pr.loading ? "Memuat PR…" : "Tidak ada PR terbuka",
                         subtitle: "PR yang minta review-mu, PR milikmu, dan PR di repo yang dipantau")
         } else {
+            let projects = Array(Set(pr.prs.map(\.repo))).sorted()
+            let shown = pr.prs.filter { repoFilter.isEmpty || $0.repo == repoFilter }
             HStack(spacing: 10) {
-                ScrollView {
-                    VStack(spacing: 4) {
-                        ForEach(pr.prs) { p in listRow(p) }
+                VStack(spacing: 6) {
+                    if projects.count > 1 {
+                        Menu {
+                            Button(tr("Semua project")) { repoFilter = "" }
+                            Divider()
+                            ForEach(projects, id: \.self) { r in
+                                Button("\(r) (\(pr.prs.filter { $0.repo == r }.count))") { repoFilter = r }
+                            }
+                        } label: {
+                            Label(repoFilter.isEmpty ? tr("Semua project") : repoFilter, systemImage: "line.3.horizontal.decrease.circle")
+                        }
+                        .menuStyle(.borderlessButton).font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(Color.white.opacity(0.07), in: Capsule())
+                        .tip("Filter PR per project")
+                    }
+                    ScrollView {
+                        VStack(spacing: 4) {
+                            ForEach(shown) { p in listRow(p) }
+                        }
                     }
                 }
-                .frame(width: 200)
+                .frame(width: listWidth)
                 detail
             }
+            .onAppear { if !repoFilter.isEmpty && !projects.contains(repoFilter) { repoFilter = "" } } // project has no open PRs anymore
         }
     }
 
@@ -1316,7 +1347,7 @@ struct PRPane: View {
     }
 
     @ViewBuilder var detail: some View {
-        if let p = pr.selected {
+        if let p = pr.selected, repoFilter.isEmpty || p.repo == repoFilter {
             NCard(padding: 10) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top) {
