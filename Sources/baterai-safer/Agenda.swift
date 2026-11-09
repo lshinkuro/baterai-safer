@@ -60,6 +60,15 @@ final class AgendaModel: ObservableObject {
             .sorted { $0.startDate < $1.startDate }
     }
 
+    /// Today's events, whichever month the calendar page is showing.
+    var today: [EKEvent] {
+        guard access == true else { return [] }
+        let start = Calendar.current.startOfDay(for: Date())
+        return store.events(matching: store.predicateForEvents(withStart: start, end: start.addingTimeInterval(86400), calendars: nil))
+            .filter { $0.status != .canceled }
+            .sorted { $0.startDate < $1.startDate }
+    }
+
     func shift(_ months: Int) {
         month = Calendar.current.date(byAdding: .month, value: months, to: month) ?? month
         reload()

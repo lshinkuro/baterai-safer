@@ -170,7 +170,12 @@ func selfTest() {
     FeatureFlags.set("music", true)
     assert(NTab.music.enabled && FeatureFlags.off() == ["panel.cleaner"], "feature flags on")
     UserDefaults.standard.set(savedFlags, forKey: FeatureFlags.key)
+    assert(orderedTabs("git,music,bogus") == [.git, .music] + NTab.allCases.filter { $0 != .git && $0 != .music } && orderedTabs("") == NTab.allCases, "tab order")
+    assert(scrollGesture(dx: 0, dy: 40, inverted: true) == .down && scrollGesture(dx: 0, dy: -40, inverted: false) == .down, "scroll down either setting")
+    assert(scrollGesture(dx: 40, dy: 5, inverted: true) == .right && scrollGesture(dx: -40, dy: 5, inverted: true) == .left && scrollGesture(dx: 5, dy: 5, inverted: true) == nil, "scroll sideways / too small")
     // Focus
+    assert(!earnedLongBreak(0) && !earnedLongBreak(3) && earnedLongBreak(4), "long break after 4 sessions")
+    assert(fullChargeMessage(percent: 80, own: " Cabut! ") == "Cabut!" && fullChargeMessage(percent: 80, own: "  ") == "Baterai 80% · boleh cabut charger", "charge message")
     assert(breakMinutes(25) == 5 && breakMinutes(50) == 10 && breakMinutes(90) == 18 && breakMinutes(10) == 5, "break length")
     let jd = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 7, hour: 14, minute: 5))!
     assert(journalLine(" Laporan Q3 ", "draft selesai\n", minutes: 50, at: jd) == "- 7 Nov 14.05 · 50m · **Laporan Q3** — draft selesai", "journal line")
@@ -277,6 +282,9 @@ func selfTest() {
     assert(AIModel.known[1].2("q", .last).contains("--resume") && !AIModel.known[1].2("q", .none).contains("--resume"), "ai: kiro resume flag")
     let saved = try! JSONDecoder().decode([AISession].self, from: JSONEncoder().encode([AISession(id: sid, cli: "Claude", chat: talk)]))
     assert(saved.first?.title == "hai" && saved.first?.chat.count == 3, "ai: sessions round-trip")
+    assert(movedTab([.home, .music, .focus], .home, by: 1) { $0 != .music } == [.focus, .music, .home], "tab drag steps over hidden tabs")
+    assert(movedTab([.home, .music], .music, by: 1) { _ in true } == [.home, .music], "tab drag stops at the end")
+    assert(placedTab([.home, .music, .focus], .home, at: .focus) == [.music, .focus, .home] && placedTab([.home, .music, .focus], .focus, at: .home) == [.focus, .home, .music], "tab drop in the feature list")
     assert(netCounters()["lo0"] != nil && ipv4("lo0") == "127.0.0.1", "jaringan: lo0 counters and address")
     // Kemenag RI schedule for Kota Jakarta on 8 Nov 2026 (api.myquran.com, id 1301), to the minute ±1.
     var jkt = Calendar(identifier: .gregorian); jkt.timeZone = TimeZone(identifier: "Asia/Jakarta")!

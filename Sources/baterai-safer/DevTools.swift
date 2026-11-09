@@ -182,6 +182,23 @@ final class GitModel: ObservableObject {
         }
     }
 
+    static let openerKey = "gitOpenApp", terminal = "com.apple.Terminal"
+
+    static func appName(_ bundleID: String) -> String {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") } ?? "Terminal"
+    }
+
+    /// Asks for the app that "Buka di …" uses; returns its bundle id.
+    func chooseOpener() -> String? {
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.prompt = tr("Pilih")
+        guard panel.runModal() == .OK, let id = panel.url.flatMap({ Bundle(url: $0)?.bundleIdentifier }) else { return nil }
+        return id
+    }
+
     func open(_ r: Repo, app bundleID: String) {
         guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
         NSWorkspace.shared.open([URL(fileURLWithPath: r.path)], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())

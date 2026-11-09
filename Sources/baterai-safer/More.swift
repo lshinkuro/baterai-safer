@@ -16,46 +16,57 @@ struct FullChargeAlert {
     }
 }
 
-// MARK: Mic mute (system-wide: mutes the default input device itself, so every meeting app goes quiet)
+/// What the charge alert says: the user's own text if they wrote one.
+func fullChargeMessage(percent: Int, own: String = UserDefaults.standard.string(forKey: "fullChargeMessage") ?? "") -> String {
+    let text = own.trimmingCharacters(in: .whitespaces)
+    return text.isEmpty ? "Baterai \(percent)% · boleh cabut charger" : text
+}
 
-enum Mic {
-    private static var mute = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute, mScope: kAudioDevicePropertyScopeInput, mElement: kAudioObjectPropertyElementMain)
-    private static var volume = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar, mScope: kAudioDevicePropertyScopeInput, mElement: kAudioObjectPropertyElementMain)
-    private static let savedVolume = "micVolume"
+// MARK: Mic and speaker mute (system-wide: mutes the default device itself, so every app goes quiet)
 
-    static var device: AudioDeviceID? {
+struct AudioSwitch {
+    static let mic = AudioSwitch(scope: kAudioDevicePropertyScopeInput, defaultDevice: kAudioHardwarePropertyDefaultInputDevice, savedVolume: "micVolume")
+    static let speaker = AudioSwitch(scope: kAudioDevicePropertyScopeOutput, defaultDevice: kAudioHardwarePropertyDefaultOutputDevice, savedVolume: "speakerVolume")
+
+    let scope: AudioObjectPropertyScope, defaultDevice: AudioObjectPropertySelector, savedVolume: String
+
+    private func address(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+    }
+
+    var device: AudioDeviceID? {
         var id = AudioDeviceID(0), size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var addr = AudioObjectPropertyAddress(mSelector: defaultDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &id) == noErr, id != 0 else { return nil }
         return id
     }
 
-    private static func canMute(_ d: AudioDeviceID) -> Bool {
-        var settable = DarwinBoolean(false)
+    private func canMute(_ d: AudioDeviceID) -> Bool {
+        var mute = address(kAudioDevicePropertyMute), settable = DarwinBoolean(false)
         return AudioObjectHasProperty(d, &mute) && AudioObjectIsPropertySettable(d, &mute, &settable) == noErr && settable.boolValue
     }
 
-    static var muted: Bool {
+    var muted: Bool {
         guard let d = device else { return false }
         if canMute(d) {
-            var v = UInt32(0), size = UInt32(MemoryLayout<UInt32>.size)
+            var mute = address(kAudioDevicePropertyMute), v = UInt32(0), size = UInt32(MemoryLayout<UInt32>.size)
             AudioObjectGetPropertyData(d, &mute, 0, nil, &size, &v)
             return v != 0
         }
-        var v = Float32(1), size = UInt32(MemoryLayout<Float32>.size)
+        var volume = address(kAudioDevicePropertyVolumeScalar), v = Float32(1), size = UInt32(MemoryLayout<Float32>.size)
         AudioObjectGetPropertyData(d, &volume, 0, nil, &size, &v)
         return v == 0
     }
 
-    /// Uses the device's mute switch; mics without one get their input volume zeroed (and restored).
+    /// Uses the device's mute switch; devices without one get their volume zeroed (and restored).
     @discardableResult
-    static func set(_ on: Bool) -> Bool {
+    func set(_ on: Bool) -> Bool {
         guard let d = device else { return false }
         if canMute(d) {
-            var v: UInt32 = on ? 1 : 0
+            var mute = address(kAudioDevicePropertyMute), v: UInt32 = on ? 1 : 0
             return AudioObjectSetPropertyData(d, &mute, 0, nil, UInt32(MemoryLayout<UInt32>.size), &v) == noErr
         }
-        var v = Float32(0), size = UInt32(MemoryLayout<Float32>.size)
+        var volume = address(kAudioDevicePropertyVolumeScalar), v = Float32(0), size = UInt32(MemoryLayout<Float32>.size)
         if on {
             AudioObjectGetPropertyData(d, &volume, 0, nil, &size, &v)
             if v > 0 { UserDefaults.standard.set(v, forKey: savedVolume) }
@@ -66,7 +77,7 @@ enum Mic {
         return AudioObjectSetPropertyData(d, &volume, 0, nil, size, &v) == noErr
     }
 
-    static func toggle() -> Bool? { let on = !muted; return set(on) ? on : nil }
+    func toggle() -> Bool? { let on = !muted; return set(on) ? on : nil }
 }
 
 // MARK: Camera mirror
@@ -74,6 +85,7 @@ enum Mic {
 final class CameraBox: ObservableObject {
     let session = AVCaptureSession()
     @Published var denied = false
+    @Published var aspect: CGFloat = 16 / 9 // of the camera's actual picture
     private var configured = false
 
     func start() {
@@ -84,6 +96,9 @@ final class CameraBox: ObservableObject {
                 if !self.configured, let cam = AVCaptureDevice.default(for: .video), let input = try? AVCaptureDeviceInput(device: cam),
                    self.session.canAddInput(input) {
                     self.session.addInput(input)
+                    if self.session.canSetSessionPreset(.hd1920x1080) { self.session.sessionPreset = .hd1920x1080 }
+                    let d = CMVideoFormatDescriptionGetDimensions(cam.activeFormat.formatDescription)
+                    if d.height > 0 { self.aspect = CGFloat(d.width) / CGFloat(d.height) }
                     self.configured = true
                 }
                 DispatchQueue.global(qos: .userInitiated).async { self.session.startRunning() }
@@ -101,7 +116,7 @@ struct CameraPreview: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         let layer = AVCaptureVideoPreviewLayer(session: session)
-        layer.videoGravity = .resizeAspectFill
+        layer.videoGravity = .resizeAspect
         if let c = layer.connection, c.isVideoMirroringSupported {
             c.automaticallyAdjustsVideoMirroring = false
             c.isVideoMirrored = true
@@ -238,7 +253,7 @@ final class Volumes: ObservableObject {
 struct MoreView: View {
     @AppStorage("morePage") private var page = ""
     @AppStorage("fullChargeAlert") private var fullCharge = true
-    @Local private var micMuted = Mic.muted
+    @AppStorage("fullChargeMessage") private var chargeMessage = ""
     @Local private var colors = ColorPick.recent
     @Local private var hoveredColor: String?
     @StateObject private var camera = CameraBox()
@@ -250,7 +265,6 @@ struct MoreView: View {
 
     static let tools: [(id: String, icon: String, title: String, subtitle: String, color: Color)] = [
         ("charge", "battery.100percent.bolt", "Notif baterai penuh", "Kabari saat sampai batas", Palette.green),
-        ("mic", "mic.slash.fill", "Mic Mute", "Semua aplikasi · ⌃⌥M", Palette.red),
         ("camera", "camera.fill", "Kamera cermin", "Cek penampilan sebelum rapat", Palette.accent),
         ("color", "eyedropper", "Color picker", "Ambil warna dari layar", Palette.accent),
         ("awake", "cup.and.saucer.fill", "Tetap menyala", "Cegah Mac tidur sementara", Palette.amber),
@@ -271,7 +285,6 @@ struct MoreView: View {
                 Group {
                     switch tool.id {
                     case "charge": chargePage
-                    case "mic": micPage
                     case "camera": cameraPage
                     case "awake": awakePage
                     case "downloads": downloadsPage
@@ -287,7 +300,8 @@ struct MoreView: View {
             .transition(.opacity)
         } else {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
-                ForEach(Self.tools, id: \.id) { t in
+                // The camera opens from the switches at the top of the island.
+                ForEach(Self.tools.filter { $0.id != "camera" }, id: \.id) { t in
                     Button { withAnimation(Motion.ease) { page = t.id } } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             Image(systemName: t.icon).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.85))
@@ -395,30 +409,20 @@ struct MoreView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Kabari saat baterai mencapai batas", isOn: $fullCharge).toggleStyle(.switch).controlSize(.small)
                     .font(.system(size: 12, weight: .semibold))
-                Text("Saat charger tercolok dan baterai mencapai \(limit)%, notch menampilkan \"Baterai \(limit)% · boleh cabut charger\". Batasnya mengikuti pengaturan di tab Baterai.")
+                Text("Saat charger tercolok dan baterai mencapai \(limit)%, notch menampilkan pesan di bawah. Batasnya mengikuti pengaturan di tab Baterai.")
                     .font(.system(size: 11)).foregroundStyle(.gray)
+                HStack(spacing: 6) {
+                    Image(systemName: "text.bubble").foregroundStyle(.gray)
+                    TextField(fullChargeMessage(percent: limit, own: ""), text: $chargeMessage).textFieldStyle(.plain)
+                }
+                .font(.system(size: 12))
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .background(Color.white.opacity(0.09), in: Capsule())
                 Spacer()
-                NButton(icon: "bell.fill", title: "Coba notifikasi", tint: Palette.green, prominent: true) { Notch.shared.flash("Baterai \(limit)% · boleh cabut charger") }
+                NButton(icon: "bell.fill", title: "Coba notifikasi", tint: Palette.green, prominent: true) { Notch.shared.flash(fullChargeMessage(percent: limit)) }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-    }
-
-    var micPage: some View {
-        let color = micMuted ? Palette.red : Palette.green
-        return VStack(spacing: 12) {
-            Button {
-                if let on = Mic.toggle() { micMuted = on }
-            } label: {
-                Image(systemName: micMuted ? "mic.slash.fill" : "mic.fill").font(.system(size: 34, weight: .bold)).foregroundStyle(.white)
-                    .frame(width: 96, height: 96).background(color.gradient, in: Circle()).shadow(color: color.opacity(0.6), radius: 16)
-            }
-            .buttonStyle(.plain)
-            Text(micMuted ? "Mic dibisukan" : "Mic aktif").font(.system(size: 14, weight: .bold))
-            Text(Mic.device == nil ? "Tidak ada mikrofon" : "Berlaku untuk semua aplikasi (Zoom, Meet, Teams). Shortcut ⌃⌥M.")
-                .font(.system(size: 11)).foregroundStyle(.gray)
-        }
-        .onAppear { micMuted = Mic.muted }
     }
 
     var cameraPage: some View {
@@ -426,7 +430,9 @@ struct MoreView: View {
             if camera.denied {
                 Placeholder(icon: "camera.fill", title: "Izin kamera ditolak", subtitle: "System Settings → Privacy & Security → Camera")
             } else {
+                // Whole picture at the camera's own shape, not cropped to the wide notch.
                 CameraPreview(session: camera.session)
+                    .aspectRatio(camera.aspect, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }

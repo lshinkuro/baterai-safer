@@ -35,6 +35,7 @@ import SwiftUI
     let n = Notch.shared
     for t in NTab.allCases where t != .agenda {
         let content: AnyView = switch t {
+        case .home: AnyView(HomeView(m: n.media, f: n.focus))
         case .music: AnyView(MusicView(m: n.media))
         case .focus: AnyView(FocusView(f: n.focus, n: n.notes))
         case .ai: AnyView(AIView(ai: n.ai))

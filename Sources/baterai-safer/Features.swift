@@ -30,6 +30,9 @@ final class NowPlaying: ObservableObject {
     @Published var artwork: NSImage?
     @Published var lyrics: [Lyric] = []
     @Published var lyricsStatus = ""
+    @Published var shuffle = false
+    @Published var repeatMode = "off"       // off, all or one
+    private var spotifyRepeatOne = false
     private var bundleID = "", trackKey = ""
     private var timer: Timer?
     private let q = DispatchQueue(label: "nowplaying")
@@ -62,7 +65,9 @@ final class NowPlaying: ObservableObject {
             if player state is stopped then return ""
             set d to character id 31
             set t to current track
-            return (player state as text) & d & (name of t) & d & (artist of t) & d & (album of t) & d & ((duration of t) as text) & d & (player position as text)\(spotify ? " & d & (artwork url of t)" : "")
+            set r to "off"
+            \(spotify ? "if repeating then set r to \"all\"" : "if song repeat is one then set r to \"one\"\n            if song repeat is all then set r to \"all\"")
+            return ((player state is playing) as text) & d & (name of t) & d & (artist of t) & d & (album of t) & d & ((duration of t) as text) & d & (player position as text) & d & (\(spotify ? "shuffling" : "shuffle enabled") as text) & d & r\(spotify ? " & d & (artwork url of t)" : "")
         end tell
         """
         q.async {
@@ -74,16 +79,20 @@ final class NowPlaying: ObservableObject {
     private func apply(id: String, name: String, _ f: [String]) {
         bundleID = id
         app = name
-        guard f.count >= 6 else { playing = false; return }
+        guard f.count >= 8 else { playing = false; return }
         let num = { (s: String) in Double(s.replacingOccurrences(of: ",", with: ".")) ?? 0 }
-        playing = f[0] == "playing"
+        playing = f[0] == "true" // a comparison: `player state as text` can come back as a raw «constant» code
         title = f[1]; artist = f[2]; album = f[3]
         duration = num(f[4]) / (id == "com.spotify.client" ? 1000 : 1) // Spotify reports ms
         position = num(f[5])
         polledAt = Date()
+        shuffle = f[6] == "true"
+        repeatMode = spotifyRepeatOne ? "one" : f[7]
+        // shortcut: Spotify's scripting only has repeat on/off, so "one" rewinds near the end; a 1 s poll can show the next track's first moment.
+        if spotifyRepeatOne, playing, duration > 0, duration - position < 1.5 { seek(0) }
         if title + artist != trackKey {
             trackKey = title + artist
-            loadArtwork(f.count > 6 ? f[6] : "")
+            loadArtwork(f.count > 8 ? f[8] : "")
             loadLyrics()
         }
     }
@@ -131,7 +140,38 @@ final class NowPlaying: ObservableObject {
         let id = bundleID
         q.async {
             _ = self.run("tell application id \"\(id)\" to \(cmd)")
-            DispatchQueue.main.async { self.poll() }
+            // Right after a command the players still report the old state.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.poll() }
+        }
+    }
+
+    /// Flips the icon now rather than at the next poll.
+    func togglePlay() {
+        position = now(Date())
+        polledAt = Date()
+        playing.toggle()
+        send("playpause")
+    }
+
+    func seek(_ t: Double) {
+        position = t
+        polledAt = Date()
+        send(String(format: "set player position to %.2f", t))
+    }
+
+    func toggleShuffle() {
+        shuffle.toggle()
+        send("set \(bundleID == "com.spotify.client" ? "shuffling" : "shuffle enabled") to \(shuffle)")
+    }
+
+    /// off → all → one → off.
+    func cycleRepeat() {
+        repeatMode = ["off": "all", "all": "one"][repeatMode] ?? "off"
+        if bundleID == "com.spotify.client" {
+            spotifyRepeatOne = repeatMode == "one"
+            send("set repeating to \(repeatMode == "all")")
+        } else {
+            send("set song repeat to \(repeatMode)")
         }
     }
 }
@@ -156,11 +196,13 @@ func focusStreak(_ log: [String: Int], today: Date) -> Int {
 
 final class Focus: ObservableObject {
     static let durations = [25, 50, 90]
+    static let sessionsPerCycle = 4, longBreakMinutes = 30
     static let defaultBlock = ["com.tinyspeck.slackmacgap", "net.whatsapp.WhatsApp", "com.hnc.Discord", "ru.keepcoder.Telegram", "com.apple.MobileSMS"]
     @Published var minutes = UserDefaults.standard.object(forKey: "focusMinutes") as? Int ?? 25 {
         didSet { UserDefaults.standard.set(minutes, forKey: "focusMinutes"); if !running { left = total } }
     }
     @Published var onBreak = false
+    @Published var finished = 0 // focus sessions finished since the last long break
     @Published var endAt: Date? // set while running
     @Published var left = Double(UserDefaults.standard.object(forKey: "focusMinutes") as? Int ?? 25) * 60
     @Published var log = load(Paths.focus, [String: Int]()) // day → focus minutes
@@ -188,7 +230,8 @@ final class Focus: ObservableObject {
 
     var running: Bool { endAt != nil }
     var focusLen: Double { Double(minutes) * 60 }
-    var breakLen: Double { Double(breakMinutes(minutes)) * 60 }
+    var breakLen: Double { Double(earnedLongBreak(finished) ? Self.longBreakMinutes : breakMinutes(minutes)) * 60 }
+    var longBreak: Bool { onBreak && earnedLongBreak(finished) }
     var total: Double { onBreak ? breakLen : focusLen }
     var remaining: Double { endAt.map { max(0, $0.timeIntervalSinceNow) } ?? left }
     var clock: String { let r = Int(remaining.rounded(.up)); return String(format: "%02d:%02d", r / 60, r % 60) }
@@ -233,9 +276,11 @@ final class Focus: ObservableObject {
                 log[dayKey(Date()), default: 0] += minutes
                 save(log, Paths.focus)
                 reflecting = intention
+                finished += 1
             }
             NSSound(named: "Glass")?.play()
         }
+        if longBreak { finished = 0 }
         onBreak.toggle()
         left = total
         applyBlock()
@@ -260,6 +305,8 @@ final class Focus: ObservableObject {
 
 /// Break grows with the session: 25 → 5, 50 → 10, 90 → 18 minutes.
 func breakMinutes(_ focus: Int) -> Int { max(5, focus / 5) }
+
+func earnedLongBreak(_ completed: Int) -> Bool { completed >= Focus.sessionsPerCycle }
 
 func journalLine(_ intention: String, _ done: String, minutes: Int, at date: Date) -> String {
     let f = DateFormatter()
@@ -384,13 +431,26 @@ final class Shelf: ObservableObject {
 
     func add(_ providers: [NSItemProvider]) -> Bool {
         for p in providers {
-            _ = p.loadObject(ofClass: URL.self) { url, _ in
-                guard let url, url.isFileURL else { return }
+            _ = p.loadObject(ofClass: URL.self) { dropped, _ in
+                // Finder hands over /.file/id=… references, which AirDrop and drags out can't use.
+                guard let dropped, dropped.isFileURL else { return }
+                let url = (dropped as NSURL).filePathURL ?? dropped
                 DispatchQueue.main.async { if !self.files.contains(url) { self.files.append(url) } }
             }
         }
         return true
     }
 
-    func airDrop(_ urls: [URL]) { NSSharingService(named: .sendViaAirDrop)?.perform(withItems: urls) }
+    /// AirDrop needs the app in front, and the island's high window level would sit over its sheet.
+    func airDrop(_ urls: [URL]) {
+        guard let service = NSSharingService(named: .sendViaAirDrop), service.canPerform(withItems: urls) else {
+            Notch.shared.flash("AirDrop tidak tersedia · cek Wi-Fi dan Bluetooth", icon: "exclamationmark.triangle.fill")
+            return
+        }
+        if Notch.shared.state.expanded { Notch.shared.toggle(nil) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            NSApp.activate(ignoringOtherApps: true)
+            service.perform(withItems: urls)
+        }
+    }
 }

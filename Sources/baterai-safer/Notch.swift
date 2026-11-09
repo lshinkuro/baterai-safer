@@ -2,15 +2,82 @@ import SwiftUI
 import Charts
 
 enum NTab: Int, CaseIterable {
-    case music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, ibadah, more
-    var icon: String { ["music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "moon.stars.fill", "square.grid.2x2.fill"][rawValue] }
-    var title: String { ["Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Ibadah", "Lainnya"][rawValue] }
+    case home, music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, ibadah, more
+    var icon: String { ["house.fill", "music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "moon.stars.fill", "square.grid.2x2.fill"][rawValue] }
+    var title: String { ["Home", "Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Ibadah", "Lainnya"][rawValue] }
     var enabled: Bool { FeatureFlags.isOn("\(self)") }
+
+    static let orderKey = "tabOrder"
+    static var ordered: [NTab] { orderedTabs(UserDefaults.standard.string(forKey: orderKey) ?? "") }
+
+    /// Dragging an icon in the island (which only sees the tabs that are on); VoiceOver in Tools → Fitur.
+    func move(by d: Int, showing: (NTab) -> Bool = { _ in true }) { Self.save(movedTab(Self.ordered, self, by: d, showing: showing)) }
+
+    /// Dragging a chip in Tools → Fitur.
+    func place(at target: NTab) { Self.save(placedTab(Self.ordered, self, at: target)) }
+
+    private static func save(_ o: [NTab]) { UserDefaults.standard.set(o.map { "\($0)" }.joined(separator: ","), forKey: orderKey) }
+}
+
+/// Takes a tab out and puts it where `target` was; the ones between close the gap.
+func placedTab(_ tabs: [NTab], _ t: NTab, at target: NTab) -> [NTab] {
+    var o = tabs
+    guard let i = o.firstIndex(of: t), let j = o.firstIndex(of: target) else { return o }
+    o.insert(o.remove(at: i), at: j)
+    return o
+}
+
+/// Swaps a tab with its neighbor on that side, stepping over tabs that aren't showing.
+func movedTab(_ tabs: [NTab], _ t: NTab, by d: Int, showing: (NTab) -> Bool) -> [NTab] {
+    var o = tabs
+    guard let i = o.firstIndex(of: t) else { return o }
+    var j = i + d
+    while o.indices.contains(j), !showing(o[j]) { j += d }
+    if o.indices.contains(j) { o.swapAt(i, j) }
+    return o
+}
+
+/// The saved tab order; tabs it doesn't name (added in a later version) go at the end.
+func orderedTabs(_ saved: String) -> [NTab] {
+    let s = saved.split(separator: ",").compactMap { n in NTab.allCases.first { "\($0)" == n } }
+    return s + NTab.allCases.filter { !s.contains($0) }
+}
+
+/// An icon being dragged along a strip of tabs: neighbors swap as it passes them.
+struct TabDrag {
+    var tab: NTab?
+    var offset: CGFloat = 0 // from the slot the icon has swapped into
+    private var moved = 0   // slots swapped across so far
+
+    /// `x` is the whole drag so far, in a coordinate space that doesn't move with the icon.
+    mutating func update(_ t: NTab, _ x: CGFloat, step: CGFloat, showing: @escaping (NTab) -> Bool) {
+        tab = t
+        let want = Int((x / step).rounded())
+        if want != moved {
+            let d = want > moved ? 1 : -1, tabs = NTab.ordered.filter(showing)
+            if let i = tabs.firstIndex(of: t), tabs.indices.contains(i + d) {
+                withAnimation(Motion.snap) { t.move(by: d, showing: showing) }
+                moved += d
+            }
+        }
+        offset = max(-step, min(step, x - CGFloat(moved) * step)) // stops at either end of the strip
+    }
+}
+
+enum ScrollGesture { case up, down, left, right }
+
+/// Which way the fingers went, whatever the natural-scrolling setting; nil until it's a clear swipe.
+func scrollGesture(dx: CGFloat, dy: CGFloat, inverted: Bool) -> ScrollGesture? {
+    guard max(abs(dx), abs(dy)) >= 30 else { return nil }
+    let sign: CGFloat = inverted ? 1 : -1
+    return abs(dx) > abs(dy) ? (dx * sign > 0 ? .right : .left) : (dy * sign > 0 ? .down : .up)
 }
 
 final class NotchState: ObservableObject {
     @Published var expanded = false
-    @Published var tab = NTab.music
+    @Published var mini = false             // mini music player below the notch (scroll down)
+    @Published var pinned = false           // stays open when the pointer leaves
+    @Published var tab = NTab.home
     @Published var toast: String?           // short message dropped below the notch
     var toastIcon = "checkmark.circle.fill"
     var notch = CGSize(width: 185, height: 32)
@@ -35,6 +102,8 @@ final class Notch {
     private var meetingTimer: Timer?
     private var meetingPause = MeetingPause()
     private var fullCharge = FullChargeAlert()
+    private var scrollSum = CGSize.zero
+    private var scrollLocked = Date.distantPast
     /// Open on click instead of hover (Tools → Fitur).
     static var clickToOpen: Bool { UserDefaults.standard.bool(forKey: "notchClick") }
 
@@ -63,6 +132,9 @@ final class Notch {
         // Mouse-move monitoring needs no Accessibility permission (only key monitoring does).
         let handle: (NSEvent) -> Void = { [weak self] e in self?.track(dragging: e.type == .leftMouseDragged) }
         monitors = [NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: handle),
+                    NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] e in self?.scrolled(e) },
+                    NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] e in self?.scrolled(e); return e },
+                    NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] e in self?.focusTextField(e); return e },
                     // While collapsed the panel ignores the mouse, so clicks reach other apps; watch them globally.
                     NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in self?.click() },
                     NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { handle($0); return $0 },
@@ -92,32 +164,78 @@ final class Notch {
         clips.stop()
     }
 
-    private var areas: (hot: NSRect, open: NSRect)? {
+    private var areas: (hot: NSRect, open: NSRect, mini: NSRect)? {
         guard let panel else { return nil }
-        let f = panel.frame, n = state.notch, o = NotchView.open
+        let f = panel.frame, n = state.notch, o = NotchView.open, m = NotchView.mini(n)
         return (NSRect(x: f.midX - n.width / 2 - 50, y: f.maxY - n.height - 4, width: n.width + 100, height: n.height + 4),
-                NSRect(x: f.midX - o.width / 2, y: f.maxY - o.height, width: o.width, height: o.height).insetBy(dx: -14, dy: -14))
+                NSRect(x: f.midX - o.width / 2, y: f.maxY - o.height, width: o.width, height: o.height).insetBy(dx: -14, dy: -14),
+                NSRect(x: f.midX - m.width / 2, y: f.maxY - m.height, width: m.width, height: m.height).insetBy(dx: -14, dy: -14))
     }
 
     private func track(dragging: Bool) {
-        guard let (hot, open) = areas else { return }
+        guard let (hot, open, mini) = areas else { return }
         let p = NSEvent.mouseLocation
+        if state.mini {
+            if !mini.contains(p) { setMini(false) }
+            return
+        }
         // Dragging a file in opens straight to the shelf, in either mode.
         if !state.expanded, hot.contains(p), dragging || !Self.clickToOpen {
             if dragging && NTab.shelf.enabled { state.tab = .shelf }
             set(true)
         } else if state.expanded, open.contains(p) {
             heldOpen = false
-        } else if state.expanded, !heldOpen, !Self.clickToOpen {
+        } else if state.expanded, !heldOpen, !Self.clickToOpen, !state.pinned, !dragging { // closing mid-drag cancels a file dragged out of the shelf
             set(false)
         }
     }
 
+    /// Over the notch: down opens the mini player, up goes from it to the full island, left/right change track.
+    private func scrolled(_ e: NSEvent) {
+        guard e.momentumPhase.isEmpty, NTab.music.enabled, let (hot, _, mini) = areas,
+              (state.mini ? mini : hot).contains(NSEvent.mouseLocation) else { return }
+        if e.phase == .began { scrollSum = .zero }
+        let scale: CGFloat = e.hasPreciseScrollingDeltas ? 1 : 10 // a mouse wheel reports lines, not points
+        scrollSum.width += e.scrollingDeltaX * scale
+        scrollSum.height += e.scrollingDeltaY * scale
+        guard Date() > scrollLocked else { scrollSum = .zero; return }
+        guard let g = scrollGesture(dx: scrollSum.width, dy: scrollSum.height, inverted: e.isDirectionInvertedFromDevice) else { return }
+        scrollSum = .zero
+        scrollLocked = Date().addingTimeInterval(0.7) // one swipe, one action
+        switch g {
+        case .left: media.send("previous track")
+        case .right: media.send("next track")
+        case .down:
+            guard !state.mini else { return }
+            guard media.app != nil, !media.title.isEmpty else { flash("Tidak ada musik", icon: "music.note"); return }
+            if state.expanded { set(false) }
+            setMini(true)
+        case .up:
+            guard state.mini else { return }
+            state.tab = .music
+            set(true)
+        }
+    }
+
+    private func setMini(_ on: Bool) {
+        withAnimation(Motion.snap) { state.mini = on }
+        panel?.ignoresMouseEvents = !on
+    }
+
+    /// A non-activating panel doesn't get the keyboard from a plain click, so typing would go to the app in front.
+    private func focusTextField(_ e: NSEvent) {
+        guard let panel, e.window === panel, state.expanded else { return }
+        let hit = panel.contentView?.hitTest(e.locationInWindow)
+        guard hit is NSTextField || hit is NSTextView else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKey()
+    }
+
     /// Click mode: a click on the notch opens it, a click anywhere outside the island closes it.
     private func click() {
-        guard Self.clickToOpen, let (hot, open) = areas else { return }
+        guard Self.clickToOpen, let (hot, open, _) = areas else { return }
         let p = NSEvent.mouseLocation
-        if !state.expanded, hot.contains(p) { set(true) } else if state.expanded, !open.contains(p) { set(false) }
+        if !state.expanded, hot.contains(p) { set(true) } else if state.expanded, !open.contains(p), !state.pinned { set(false) }
     }
 
     /// ⌃⌥S: start or pause a focus session without opening the island.
@@ -133,14 +251,14 @@ final class Notch {
         guard UserDefaults.standard.object(forKey: "fullChargeAlert") as? Bool ?? true else { return }
         let b = Battery.read(), limit = load(Paths.config, Config()).limit
         if fullCharge.step(percent: b.percent, ac: b.ac, target: limit) {
-            flash("Baterai \(b.percent)% · boleh cabut charger")
+            flash(fullChargeMessage(percent: b.percent))
             NSSound(named: "Glass")?.play()
         }
     }
 
     /// ⌃⌥M: mute or unmute the default microphone for every app.
     func toggleMic() {
-        guard let on = Mic.toggle() else { flash("Tidak ada mikrofon"); return }
+        guard let on = AudioSwitch.mic.toggle() else { flash("Tidak ada mikrofon"); return }
         flash(on ? "Mic dibisukan" : "Mic aktif")
     }
 
@@ -167,7 +285,7 @@ final class Notch {
             if FeatureFlags.isOn("meeting") { meet.start() } else { meet.stop() }
             if NTab.ibadah.enabled { Ibadah.shared.start() } else { Ibadah.shared.stop() } // reminders
         }
-        if !state.tab.enabled, let first = NTab.allCases.first(where: \.enabled) { state.tab = first }
+        if !state.tab.enabled, let first = NTab.ordered.first(where: \.enabled) { state.tab = first }
     }
 
     /// Select an area of the screen; its text lands on the clipboard.
@@ -200,7 +318,7 @@ final class Notch {
     }
 
     private func set(_ open: Bool) {
-        withAnimation(Motion.snap) { state.expanded = open }
+        withAnimation(Motion.snap) { state.expanded = open; if open { state.mini = false } }
         panel?.ignoresMouseEvents = !open
         if open {
             if let front = NSWorkspace.shared.frontmostApplication, front != .current { previous = front }
@@ -248,6 +366,33 @@ struct NCard<Content: View>: View {
             .background(Color.white.opacity(0.045), in: shape)
             .overlay(shape.strokeBorder(.white.opacity(0.07), lineWidth: 1))
     }
+}
+
+/// The system tooltip needs an active window, and the island usually isn't one.
+private struct HoverTip: ViewModifier {
+    let text: String
+    @Local private var hover = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { hover = $0 }
+            .overlay(alignment: .top) {
+                if hover {
+                    Text(tr(text)).font(.system(size: 10, weight: .semibold)).foregroundStyle(.white).fixedSize()
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Color(white: 0.2), in: Capsule())
+                        .offset(y: -24)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Motion.ease, value: hover)
+            .accessibilityLabel(tr(text))
+    }
+}
+
+extension View {
+    func hoverTip(_ text: String) -> some View { modifier(HoverTip(text: text)) }
 }
 
 struct NButton: View {
@@ -330,6 +475,7 @@ struct Equalizer: View {
 
 struct NotchView: View {
     static let open = CGSize(width: 720, height: 300)
+    static func mini(_ n: CGSize) -> CGSize { CGSize(width: n.width + 210, height: n.height + 66) }
     @ObservedObject var state: NotchState
     @ObservedObject var media: NowPlaying
     @ObservedObject var focus: Focus
@@ -337,8 +483,10 @@ struct NotchView: View {
     @ObservedObject var meet: MeetingModel
     let clips: ClipboardModel, shelf: Shelf, sys: SystemModel, git: GitModel, pr: PRModel, notes: NotesModel
     @Local private var dropping = false
+    @Local private var drag = TabDrag()
     @Namespace private var ns
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
+    @AppStorage(NTab.orderKey) private var tabOrder = ""
     @AppStorage("accent") private var accentID = "mint"
 
     var soon: Meeting? { meet.next.flatMap { $0.isSoon(Date()) ? $0 : nil } }
@@ -351,7 +499,9 @@ struct NotchView: View {
 
     var body: some View {
         let n = state.notch
+        let radius: CGFloat = state.expanded ? 26 : state.mini ? 18 : 10
         let size = state.expanded ? Self.open
+            : state.mini ? Self.mini(n)
             : state.toast != nil ? CGSize(width: n.width + 200, height: n.height + 30)
             : CGSize(width: n.width + (live ? 96 : 0) + (task.isEmpty ? 0 : 160), height: n.height)
         ZStack(alignment: .top) {
@@ -364,26 +514,37 @@ struct NotchView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .clipShape(NotchShape(radius: state.expanded ? 26 : 10))
-            .overlay(NotchShape(radius: state.expanded ? 26 : 10).stroke(Color.white.opacity(state.expanded ? 0.08 : 0), lineWidth: 1))
+            .clipShape(NotchShape(radius: radius))
+            .overlay(NotchShape(radius: radius).stroke(Color.white.opacity(state.expanded ? 0.08 : 0), lineWidth: 1))
             .shadow(color: .black.opacity(state.expanded ? 0.55 : 0), radius: 18, y: 8)
 
-            if state.expanded {
-                expanded(n)
-                    .id(accentID)
-                    .frame(width: Self.open.width, height: Self.open.height)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-            } else {
-                VStack(spacing: 0) {
-                    if live { collapsed.frame(width: size.width, height: n.height) } else if state.toast != nil { Color.clear.frame(height: n.height) }
-                    if let t = state.toast {
-                        // A check means "done" (green); anything else is a nudge, in the accent.
-                        Label(tr(t), systemImage: state.toastIcon).font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(state.toastIcon == "checkmark.circle.fill" ? Palette.green : Palette.accent).lineLimit(1).frame(height: 26)
+            // Sized and clipped out here, so content on its way out shrinks with the island.
+            ZStack(alignment: .top) {
+                if state.expanded {
+                    expanded(n)
+                        .id(accentID)
+                        .frame(width: Self.open.width, height: Self.open.height)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                } else if state.mini {
+                    MiniPlayer(m: media)
+                        .frame(width: size.width, height: size.height - n.height)
+                        .padding(.top, n.height)
+                        .foregroundStyle(.white)
+                        .transition(.opacity)
+                } else {
+                    VStack(spacing: 0) {
+                        if live { collapsed.frame(width: size.width, height: n.height) } else if state.toast != nil { Color.clear.frame(height: n.height) }
+                        if let t = state.toast {
+                            // A check means "done" (green); anything else is a nudge, in the accent.
+                            Label(tr(t), systemImage: state.toastIcon).font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(state.toastIcon == "checkmark.circle.fill" ? Palette.green : Palette.accent).lineLimit(1).frame(height: 26)
+                        }
                     }
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
             }
+            .frame(width: size.width, height: size.height, alignment: .top)
+            .clipShape(NotchShape(radius: radius))
         }
         .frame(width: Notch.size.width, height: Notch.size.height, alignment: .top)
         .onDrop(of: [.fileURL], isTargeted: $dropping) { shelf.add($0) }
@@ -432,14 +593,13 @@ struct NotchView: View {
             // Top row sits beside the camera housing: tabs left, status right.
             HStack(spacing: 0) {
                 HStack(spacing: 1) {
-                    let tabs = NTab.allCases.filter(\.enabled)
+                    let tabs = NTab.ordered.filter(\.enabled)
                     // Narrow the buttons when many tabs are on, so none slide under the camera housing.
                     let w = min(26, ((Self.open.width - n.width) / 2 - 26) / CGFloat(max(tabs.count, 1)) - 1)
                     ForEach(tabs, id: \.self) { t in
-                        let on = state.tab == t
+                        let on = state.tab == t, grabbed = drag.tab == t
                         Button { withAnimation(Motion.snap) { state.tab = t } } label: {
-                            Image(systemName: t.icon).font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(on ? Palette.onAccent : Color.gray)
+                            PinchIcon(icon: t.icon, color: on ? Palette.onAccent : Color.gray, grabbed: grabbed)
                                 .frame(width: w, height: 22)
                                 .background {
                                     if on { Capsule().fill(Palette.accent).matchedGeometryEffect(id: "tab", in: ns) }
@@ -447,18 +607,32 @@ struct NotchView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).tip(t.title)
+                        .offset(x: grabbed ? drag.offset : 0)
+                        .zIndex(grabbed ? 1 : 0)
+                        // Press and slide: the icon pops up and neighbors swap as it passes them.
+                        .simultaneousGesture(DragGesture(minimumDistance: 6, coordinateSpace: .named("tabs"))
+                            .onChanged { drag.update(t, $0.translation.width, step: w + 1, showing: \.enabled) }
+                            .onEnded { _ in withAnimation(Motion.snap) { drag = TabDrag() } })
                     }
                 }
+                .coordinateSpace(name: "tabs")
                 .padding(2)
                 .background(Color.white.opacity(0.07), in: Capsule())
                 Spacer(minLength: n.width + 12)
                 HStack(spacing: 8) {
                     if let m = meet.next, m.start.timeIntervalSinceNow < 3600 {
-                        MeetingChip(m: m) { meet.join() } // takes the clock's place; there isn't room for both
+                        MeetingChip(m: m) { meet.join() } // takes the title's place; there isn't room for all
+                        QuickToggles(state: state, micOnly: true)
                     } else {
-                        Text(tr(state.tab.title)).font(.system(size: 12, weight: .bold))
-                        StatusClock()
+                        Text(tr(state.tab.title)).font(.system(size: 12, weight: .bold)).lineLimit(1)
+                        QuickToggles(state: state)
                     }
+                    Button { state.pinned.toggle() } label: {
+                        Image(systemName: state.pinned ? "pin.fill" : "pin").font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(state.pinned ? Palette.accent : Color.gray)
+                            .frame(width: 20, height: 22).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).tip(state.pinned ? "Lepas kunci" : "Kunci agar tidak tertutup otomatis")
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -467,6 +641,7 @@ struct NotchView: View {
 
             Group {
                 switch state.tab {
+                case .home: HomeView(m: media, f: focus)
                 case .music: MusicView(m: media)
                 case .focus: FocusView(f: focus, n: notes)
                 case .agenda: AgendaView()
@@ -490,18 +665,64 @@ struct NotchView: View {
     }
 }
 
-struct StatusClock: View {
+/// Lifts under the pointer with a little spring, like the Dock; further while it's being dragged.
+struct PinchIcon: View {
+    let icon: String
+    let color: Color
+    var grabbed = false
+    @Local private var hover = false
+
     var body: some View {
-        TimelineView(.everyMinute) { ctx in
-            let b = Battery.read()
-            HStack(spacing: 5) {
-                Image(systemName: b.ac ? "battery.100percent.bolt" : "battery.\(min(100, (b.percent + 12) / 25 * 25))percent")
-                    .foregroundStyle(b.percent <= 20 && !b.ac ? Palette.red : Palette.green)
-                Text("\(b.percent)%")
-                Text(ctx.date, format: .dateTime.hour().minute()).foregroundStyle(.gray)
+        Image(systemName: icon).font(.system(size: 11, weight: .bold))
+            .foregroundStyle(color)
+            .scaleEffect(grabbed ? 1.45 : hover ? 1.28 : 1)
+            .animation(Motion.snap, value: hover)
+            .animation(Motion.snap, value: grabbed)
+            .onHover { hover = $0 }
+    }
+}
+
+/// Mic, speaker and camera switches beside the camera housing.
+struct QuickToggles: View {
+    @ObservedObject var state: NotchState
+    var micOnly = false
+    @AppStorage("morePage") private var morePage = ""
+    @Local private var tick = 0 // shows a tap right away instead of at the next timeline beat
+
+    var body: some View {
+        // Polled because ⌃⌥M and other apps change these too.
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            HStack(spacing: 0) {
+                let mic = AudioSwitch.mic.muted, speaker = AudioSwitch.speaker.muted
+                button(mic ? "mic.slash.fill" : "mic.fill", mic ? "Aktifkan mic" : "Bisukan mic", mic ? Palette.red : .gray) {
+                    Notch.shared.toggleMic(); tick += 1
+                }
+                if !micOnly {
+                    button(speaker ? "speaker.slash.fill" : "speaker.wave.2.fill", speaker ? "Aktifkan speaker" : "Bisukan speaker", speaker ? Palette.red : .gray) {
+                        if AudioSwitch.speaker.toggle() == nil { Notch.shared.flash("Speaker ini tidak bisa dibisukan", icon: "speaker.slash.fill") }
+                        tick += 1
+                    }
+                    if NTab.more.enabled { camera }
+                }
             }
-            .font(.system(size: 11, weight: .semibold)).monospacedDigit()
         }
+        .id(tick)
+    }
+
+    // macOS has no switch that turns the camera off for every app; this one is Poni's own mirror.
+    var camera: some View {
+        let on = state.tab == .more && morePage == "camera"
+        return button("video.fill", on ? "Matikan kamera" : "Nyalakan kamera", on ? Palette.accent : .gray) {
+            if on { morePage = "" } else { morePage = "camera"; state.tab = .more }
+        }
+    }
+
+    func button(_ icon: String, _ tip: String, _ color: Color, run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            Image(systemName: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(color)
+                .frame(width: 20, height: 22).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).tip(tip)
     }
 }
 
@@ -509,8 +730,56 @@ func mmss(_ t: Double) -> String { String(format: "%d:%02d", Int(t) / 60, Int(t)
 
 // MARK: Tabs
 
+struct AlbumArt: View {
+    @ObservedObject var m: NowPlaying
+    var size: CGFloat
+    var radius: CGFloat = 10
+
+    var body: some View {
+        Group {
+            if let art = m.artwork {
+                Image(nsImage: art).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: "music.note").font(.system(size: size * 0.23)).foregroundStyle(.white.opacity(0.5))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.white.opacity(0.08))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+    }
+}
+
+func musicControl(_ icon: String, _ size: CGFloat, _ name: String, tint: Color = .white, _ run: @escaping () -> Void) -> some View {
+    Button(action: run) { Image(systemName: icon).font(.system(size: size)).foregroundStyle(tint).frame(width: 36, height: 30).contentShape(Rectangle()) }
+        .buttonStyle(.plain).tip(name)
+}
+
+/// Scrolled down from the notch; moving the pointer away closes it.
+struct MiniPlayer: View {
+    @ObservedObject var m: NowPlaying
+
+    var body: some View {
+        HStack(spacing: 10) {
+            AlbumArt(m: m, size: 46)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(m.title).font(.system(size: 13, weight: .bold)).lineLimit(1)
+                Text(m.artist).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 0) {
+                musicControl("backward.fill", 13, "Sebelumnya") { m.send("previous track") }
+                musicControl(m.playing ? "pause.fill" : "play.fill", 18, m.playing ? "Jeda" : "Putar") { m.togglePlay() }
+                musicControl("forward.fill", 13, "Berikutnya") { m.send("next track") }
+            }
+        }
+        .padding(.horizontal, 12)
+    }
+}
+
 struct MusicView: View {
     @ObservedObject var m: NowPlaying
+    @Local private var scrub: Double? // 0...1 while the progress bar is being dragged
+    @Local private var readingLyrics = false // pointer over the lyrics: don't scroll them away
 
     var body: some View {
         if m.app == nil || m.title.isEmpty {
@@ -528,19 +797,10 @@ struct MusicView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
-                let pos = m.now(ctx.date)
+                let pos = scrub.map { $0 * m.duration } ?? m.now(ctx.date)
                 let i = m.lyrics.lastIndex { $0.t <= pos + 0.3 }
                 HStack(spacing: 18) {
-                    Group {
-                        if let art = m.artwork {
-                            Image(nsImage: art).resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            Image(systemName: "music.note").font(.system(size: 34)).foregroundStyle(.white.opacity(0.5))
-                                .frame(maxWidth: .infinity, maxHeight: .infinity).background(Color.white.opacity(0.08))
-                        }
-                    }
-                    .frame(width: 150, height: 150)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    AlbumArt(m: m, size: 150, radius: 16)
                     .shadow(color: .black.opacity(0.6), radius: 14, y: 6)
 
                     VStack(alignment: .leading, spacing: 0) {
@@ -553,40 +813,46 @@ struct MusicView: View {
                             if m.playing { Equalizer(color: .white.opacity(0.8)) }
                         }
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let i {
-                                Text(m.lyrics[i].line.isEmpty ? "♪" : m.lyrics[i].line)
-                                    .font(.system(size: 15, weight: .semibold)).lineLimit(2)
-                                    .id(i).transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 10)), removal: .opacity))
-                                if i + 1 < m.lyrics.count {
-                                    Text(m.lyrics[i + 1].line).font(.system(size: 12)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
-                                }
+                        Group {
+                            if m.lyrics.isEmpty {
+                                Text(m.lyricsStatus).font(.system(size: 12)).foregroundStyle(.white.opacity(0.45))
                             } else {
-                                Text(m.lyrics.isEmpty ? m.lyricsStatus : "♪").font(.system(size: 12)).foregroundStyle(.white.opacity(0.45))
+                                lyrics(i)
                             }
                         }
+                        .padding(.vertical, 4)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                        .animation(Motion.ease, value: i)
 
                         GeometryReader { g in
                             ZStack(alignment: .leading) {
-                                Capsule().fill(Color.white.opacity(0.18))
-                                Capsule().fill(Color.white).frame(width: g.size.width * (m.duration > 0 ? pos / m.duration : 0))
+                                Capsule().fill(Color.white.opacity(0.18)).frame(height: 4)
+                                Capsule().fill(Color.white).frame(width: g.size.width * (m.duration > 0 ? pos / m.duration : 0), height: 4)
                             }
+                            .frame(maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            .gesture(DragGesture(minimumDistance: 0)
+                                .onChanged { scrub = min(1, max(0, $0.location.x / g.size.width)) }
+                                .onEnded { _ in
+                                    if let scrub { m.seek(scrub * m.duration) }
+                                    scrub = nil
+                                })
                         }
-                        .frame(height: 4)
+                        .frame(height: 12)
                         HStack {
                             Text(mmss(pos))
                             Spacer()
                             Text("-" + mmss(max(0, m.duration - pos)))
                         }
                         .font(.system(size: 10, weight: .medium)).monospacedDigit().foregroundStyle(.white.opacity(0.5))
-                        .padding(.top, 4)
+                        .padding(.top, 2)
 
-                        HStack(spacing: 34) {
-                            control("backward.fill", 17, "Sebelumnya") { m.send("previous track") }
-                            control(m.playing ? "pause.fill" : "play.fill", 26, m.playing ? "Jeda" : "Putar") { m.send("playpause") }
-                            control("forward.fill", 17, "Berikutnya") { m.send("next track") }
+                        HStack(spacing: 18) {
+                            musicControl("shuffle", 13, m.shuffle ? "Matikan acak" : "Putar acak", tint: m.shuffle ? Palette.accent : .gray) { m.toggleShuffle() }
+                            musicControl("backward.fill", 17, "Sebelumnya") { m.send("previous track") }
+                            musicControl(m.playing ? "pause.fill" : "play.fill", 26, m.playing ? "Jeda" : "Putar") { m.togglePlay() }
+                            musicControl("forward.fill", 17, "Berikutnya") { m.send("next track") }
+                            musicControl(m.repeatMode == "one" ? "repeat.1" : "repeat", 13, m.repeatMode == "off" ? "Ulangi semua" : m.repeatMode == "all" ? "Ulangi satu lagu" : "Matikan ulangi",
+                                         tint: m.repeatMode == "off" ? .gray : Palette.accent) { m.cycleRepeat() }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 6)
@@ -596,9 +862,31 @@ struct MusicView: View {
         }
     }
 
-    func control(_ icon: String, _ size: CGFloat, _ name: String, _ run: @escaping () -> Void) -> some View {
-        Button(action: run) { Image(systemName: icon).font(.system(size: size)).frame(width: 36, height: 30).contentShape(Rectangle()) }
-            .buttonStyle(.plain).tip(name)
+    /// Scrollable; clicking a line jumps the song there.
+    func lyrics(_ current: Int?) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(m.lyrics.indices, id: \.self) { l in
+                        Button { m.seek(m.lyrics[l].t) } label: {
+                            Text(m.lyrics[l].line.isEmpty ? "♪" : m.lyrics[l].line)
+                                .font(.system(size: l == current ? 15 : 12, weight: l == current ? .semibold : .regular))
+                                .foregroundStyle(.white.opacity(l == current ? 1 : 0.45))
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .id(l)
+                    }
+                }
+            }
+            .onHover { readingLyrics = $0 }
+            .onAppear { if let current { proxy.scrollTo(current, anchor: .top) } }
+            .onChange(of: current) { i in
+                if let i, !readingLyrics { withAnimation(Motion.ease) { proxy.scrollTo(i, anchor: .top) } }
+            }
+        }
     }
 }
 
@@ -612,7 +900,7 @@ struct FocusView: View {
         HStack(spacing: 14) {
             NCard {
                 VStack(spacing: 12) {
-                    Ring(value: f.remaining / f.total, color: color, label: f.clock, caption: f.onBreak ? "istirahat" : "fokus", size: 128, line: 10)
+                    Ring(value: f.remaining / f.total, color: color, label: f.clock, caption: f.onBreak ? (f.longBreak ? "istirahat panjang" : "istirahat") : String(format: tr("fokus %@/4"), "\(f.finished + 1)"), size: 128, line: 10)
                     HStack(spacing: 8) {
                         NButton(icon: "arrow.counterclockwise") { f.reset() }.tip("Ulang")
                         NButton(icon: f.running ? "pause.fill" : "play.fill", title: f.running ? "Jeda" : "Mulai", tint: color, prominent: true) { f.toggle() }
@@ -1107,7 +1395,7 @@ struct ShelfView: View {
             }
         }
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+        .onDrag { NSItemProvider(object: url as NSURL) } // a file URL, which Finder and other apps accept as the file itself
         .contextMenu {
             Button("AirDrop") { s.airDrop([url]) }
             Button("Tampilkan di Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
@@ -1150,6 +1438,7 @@ struct GitView: View {
     @AppStorage("gitPane") private var showPR = false
     @Local private var composing: Repo?
     @Local private var connecting: String? // "bitbucket" / "sonar"
+    @AppStorage(GitModel.openerKey) private var opener = GitModel.terminal
 
     var body: some View {
         VStack(spacing: 10) {
@@ -1202,7 +1491,11 @@ struct GitView: View {
                 repoList
             }
         }
-        .onAppear { g.refresh() }
+        .onAppear {
+            g.refresh()
+            // The pane is remembered between launches, so it can open without a click on the PR tab.
+            if showPR, pr.prs.isEmpty, !pr.loading { pr.refresh(repos: g.repos.map(\.path)) }
+        }
     }
 
     func pane(_ title: String, count: Int, on: Bool, _ run: @escaping () -> Void) -> some View {
@@ -1263,8 +1556,9 @@ struct GitView: View {
                 NButton(icon: "arrow.up") { g.run(r, "push") }.tip("Push")
             }
             Menu {
-                Button("Buka di Terminal") { g.open(r, app: "com.apple.Terminal") }
+                Button(String(format: tr("Buka di %@"), GitModel.appName(opener))) { g.open(r, app: opener) }
                 Button("Buka di VS Code") { g.open(r, app: "com.microsoft.VSCode") }
+                Button("Ganti aplikasi terminal…") { if let id = g.chooseOpener() { opener = id } }
                 Button("Tampilkan di Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.path)]) }
                 Divider()
                 Button("Hapus dari daftar") { g.remove(r) }
@@ -1639,7 +1933,7 @@ struct MeetingChip: View {
         Button(action: join) {
             HStack(spacing: 5) {
                 Image(systemName: m.link == nil ? "calendar" : "video.fill")
-                Text(m.title).lineLimit(1).frame(maxWidth: 110, alignment: .leading)
+                Text(m.title).lineLimit(1).frame(maxWidth: 60, alignment: .leading)
                 Text(m.when(Date())).foregroundStyle(.white.opacity(0.8)).fixedSize()
                 if m.link != nil {
                     Text("Join").font(.system(size: 11, weight: .semibold)).fixedSize().padding(.horizontal, 7).padding(.vertical, 2)
@@ -1757,10 +2051,11 @@ struct DevView: View {
                 }
                 HStack(spacing: 6) {
                     NButton(icon: "doc.on.clipboard", title: "Tempel", tint: Palette.accent) { input = NSPasteboard.general.string(forType: .string) ?? "" }
-                    NButton(icon: "clock") { input = String(Int(Date().timeIntervalSince1970)) }.tip("Timestamp sekarang")
-                    NButton(icon: "number") { input = UUID().uuidString; copyText(input); copied = "UUID" }.tip("Buat & salin UUID baru")
+                        .hoverTip("Tempel dari clipboard")
+                    NButton(icon: "clock") { input = String(Int(Date().timeIntervalSince1970)) }.hoverTip("Timestamp sekarang")
+                    NButton(icon: "number") { input = UUID().uuidString; copyText(input); copied = "UUID" }.hoverTip("Buat & salin UUID baru")
                     Spacer()
-                    if !input.isEmpty { NButton(icon: "xmark") { input = "" }.tip("Kosongkan") }
+                    if !input.isEmpty { NButton(icon: "xmark") { input = "" }.hoverTip("Kosongkan") }
                 }
             }
             .frame(width: 290)
@@ -1778,6 +2073,7 @@ struct DevView: View {
                                 Spacer()
                                 Button(copied == r.title ? "Disalin ✓" : "Salin") { copyText(r.output); copied = r.title }
                                     .buttonStyle(.plain).font(.system(size: 11, weight: .bold)).foregroundStyle(copied == r.title ? Palette.green : .white.opacity(0.7))
+                                    .hoverTip("Salin hasil ini")
                             }
                             Text(r.output).font(.system(size: 11, design: .monospaced)).lineLimit(8).textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)

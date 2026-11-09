@@ -1,5 +1,6 @@
 import SwiftUI
 import IOKit.pwr_mgt
+import UniformTypeIdentifiers
 
 func finderBool(_ key: String, _ fallback: Bool) -> Bool {
     UserDefaults(suiteName: "com.apple.finder")?.object(forKey: key) as? Bool ?? fallback
@@ -61,6 +62,8 @@ struct ToolsTab: View {
     @ObservedObject var t: ToolsModel
     @AppStorage(FeatureFlags.key) private var featuresOff = ""
     @AppStorage("notchClick") private var notchClick = false
+    @AppStorage(NTab.orderKey) private var tabOrder = ""
+    @Local private var draggingTab: NTab?
     @AppStorage("accent") private var accentID = "mint"
 
     func feature(_ id: String) -> Binding<Bool> {
@@ -101,13 +104,18 @@ struct ToolsTab: View {
                         .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                    ForEach(NTab.allCases, id: \.self) { tab in
+                    ForEach(NTab.ordered, id: \.self) { tab in
                         FeatureChip(title: tab.title, icon: tab.icon, on: feature("\(tab)"))
+                            .onDrag { draggingTab = tab; return NSItemProvider(object: "\(tab)" as NSString) }
+                            .onDrop(of: [.plainText], delegate: TabDrop(target: tab, dragging: $draggingTab))
+                            .accessibilityAction(named: tr("Geser ke kiri")) { tab.move(by: -1) } // VoiceOver can't drag
+                            .accessibilityAction(named: tr("Geser ke kanan")) { tab.move(by: 1) }
                     }
                     FeatureChip(title: "Join rapat", icon: "video.fill", on: feature("meeting"))
                     FeatureChip(title: "Token AI β", icon: "chart.bar.fill", on: feature("ailab"))
                 }
                 .disabled(!t.notch).opacity(t.notch ? 1 : 0.45)
+                Text("Seret untuk mengatur urutan tab").font(.system(size: 11)).foregroundStyle(.secondary)
                 Text("Menu bar").font(.system(size: 11, weight: .bold))
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     FeatureChip(title: "Sistem", icon: Tab.system.icon, on: feature("panel.system"))
@@ -158,6 +166,20 @@ struct Keycap: View {
 }
 
 /// Compact on/off pill for a feature.
+/// Dropping onto a chip in the feature list: the dragged tab takes its place as the pointer passes.
+struct TabDrop: DropDelegate {
+    let target: NTab
+    @Binding var dragging: NTab?
+
+    func validateDrop(info: DropInfo) -> Bool { dragging != nil } // text dragged in from elsewhere isn't a tab
+    func dropEntered(info: DropInfo) {
+        guard let d = dragging, d != target else { return }
+        withAnimation(Motion.snap) { d.place(at: target) }
+    }
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+    func performDrop(info: DropInfo) -> Bool { dragging = nil; return true }
+}
+
 struct FeatureChip: View {
     let title: String, icon: String
     @Binding var on: Bool
