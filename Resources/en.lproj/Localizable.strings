@@ -786,3 +786,12 @@
 "Belum" = "Not yet";
 "Selesai hari ini" = "Done today";
 "Catatan dan streak kebiasaan ini ikut terhapus." = "Its record and streak are deleted too.";
+"Jaringan" = "Network";
+"Tidak terhubung ke jaringan" = "Not connected to a network";
+"Unduh" = "Download";
+"Unggah" = "Upload";
+"Interface" = "Interface";
+"IP publik" = "Public IP";
+"Total sejak nyala" = "Total since startup";
+"IPv4" = "IPv4";
+"MAC" = "MAC";

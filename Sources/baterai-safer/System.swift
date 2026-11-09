@@ -43,6 +43,7 @@ final class SystemModel: ObservableObject {
     @Published var diskTotal = 0.0
     @Published var procs: [Proc] = []
     @Published var live: [(t: Date, cpu: Double, mem: Double)] = [] // last ~3 minutes
+    let net = NetModel()
     private var lastTicks: [UInt32] = []
     private var timer: Timer?
 
@@ -76,6 +77,7 @@ final class SystemModel: ObservableObject {
         }
 
         live = live.suffix(59) + [(Date(), cpu, memUsed / memTotal)]
+        net.refresh()
         procs = parsePS(capture("/bin/ps", "-Aceo", "pid=,pcpu=,rss=,user=,comm="))
     }
 
@@ -140,6 +142,8 @@ struct SystemTab: View {
                 .chartLegend(position: .top, alignment: .leading)
                 .frame(height: 90)
             }
+
+            NetCard(n: s.net)
 
             Card(title: "Proses terberat", icon: "flame") {
                 Picker("", selection: $byMemory) { Text("CPU").tag(false); Text("Memori").tag(true) }
