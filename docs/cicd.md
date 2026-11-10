@@ -153,6 +153,40 @@ Di Mac yang akan menandatangani:
 
 Kalau baru ingin mengecek tanpa mengirim build, pakai `make appstore-validate`.
 
+### Cara memakai perintah `make`
+
+Jalankan dari root repo. `make` tanpa argumen menampilkan daftar perintah. Kalau muncul `No rule to make target`, berarti `Makefile` belum ada di Mac itu, karena file ini tidak ikut ter-commit.
+
+Tiap perintah `appstore-*` otomatis menjalankan tahap sebelumnya, jadi tidak perlu dijalankan satu per satu.
+
+| Perintah | Kapan dipakai | Butuh | Hasil |
+|---|---|---|---|
+| `make check` | Memastikan versi penuh masih lolos build dan selftest | Tidak ada | Build debug di `.build/debug` |
+| `make lite` | Mencoba Lite di Mac sendiri | Tidak ada | `.build/Poni.app`, belum sandbox dan belum ditandatangani untuk App Store |
+| `make appstore-app` | Mengecek sandbox dan tanda tangan app tanpa `.pkg` | `BUNDLE_ID`, `TEAM_ID`, `APPSTORE_SIGN_ID`, `PROVISION_PROFILE` | `.build/appstore/Poni.app` |
+| `make appstore-pkg` | Membuat installer tanpa menghubungi Apple | Semua di atas, `INSTALLER_SIGN_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID` | `.build/appstore/Poni.pkg` |
+| `make appstore-validate` | Bertanya ke Apple apakah build akan diterima, tanpa mengirimnya | Semua di atas, file `.p8`, internet | Hasil validasi di terminal |
+| `make appstore-upload` | Mengirim build ke App Store Connect | Semua di atas, git bersih | Build masuk ke App Store Connect |
+
+Urutan yang disarankan untuk rilis:
+
+```
+make check
+make lite && open .build/Poni.app
+make appstore-validate
+make appstore-upload
+```
+
+Tutup Poni yang terpasang sebelum membuka hasil `make lite`.
+
+Nilai `VERSION` dan `BUILD_NUMBER` bisa ditimpa untuk satu kali jalan:
+
+```
+make appstore-upload VERSION=0.18.2 BUILD_NUMBER=90
+```
+
+`make appstore-app` selalu menghapus isi `.build/appstore` lebih dulu, jadi salin `Poni.pkg` ke tempat lain kalau ingin menyimpannya.
+
 ## Kalau gagal
 
 | Pesan | Penyebab dan solusi |
