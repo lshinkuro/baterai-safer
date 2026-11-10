@@ -1,7 +1,7 @@
 class Poni < Formula
   desc "Notch & menu bar for Apple Silicon Macs: battery limiter, focus, meetings, notes"
   homepage "https://github.com/lshinkuro/poni"
-  url "https://github.com/lshinkuro/poni.git", tag: "v0.18.1", revision: "b0dcf3d5f77aeda9a6db27c3011d37582d4b7339"
+  url "https://github.com/lshinkuro/poni.git", tag: "v0.18.2", revision: "9a069de2da5d0627f4265dec77024aede412e1a8"
   license "MIT"
   head "https://github.com/lshinkuro/poni.git", branch: "main"
 
