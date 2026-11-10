@@ -69,6 +69,57 @@ security find-identity -v | grep -i installer
 
 Baris yang muncul adalah nilai untuk `INSTALLER_SIGN_ID`. Jangan tambahkan `-p codesigning`, karena opsi itu menyembunyikan sertifikat installer. Kalau kosong padahal sertifikatnya terlihat di Keychain Access, berarti private key-nya tidak ada di Mac ini.
 
+### Mengatur API key (`.p8`)
+
+1. Di App Store Connect → Users and Access → Integrations → App Store Connect API, buka **Team Keys** dan klik **+**. Beri peran **App Manager**.
+2. Klik **Download API Key**. File `AuthKey_<KEY_ID>.p8` hanya bisa diunduh sekali.
+3. Pindahkan file-nya ke tempat yang dicari `altool`, lalu batasi izinnya:
+
+   ```
+   mkdir -p ~/.appstoreconnect/private_keys
+   mv ~/Downloads/AuthKey_<KEY_ID>.p8 ~/.appstoreconnect/private_keys/
+   chmod 600 ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8
+   ```
+
+4. Salin **Key ID** dan **Issuer ID** dari halaman yang sama ke `.env.appstore`:
+
+   ```
+   ASC_KEY_ID=<KEY_ID>
+   ASC_ISSUER_ID=<ISSUER_ID>
+   ```
+
+5. Uji dengan `make appstore-validate`, setelah sertifikat installer juga siap.
+
+Kalau file `.p8` hilang, revoke key itu di halaman yang sama lalu buat key baru. Jangan pernah menaruh `.p8` di dalam repo.
+
+### Mengatur sertifikat dari `.p12`
+
+Di Mac pembuat sertifikat:
+
+1. Buka Keychain Access, pilih keychain **login**, lalu tab **My Certificates**.
+2. Pastikan sertifikatnya punya panah yang berisi private key. Kalau tidak ada, Mac itu bukan pemegang key-nya.
+3. Klik kanan sertifikat, pilih **Export**, simpan sebagai `.p12`, lalu buat password.
+4. Kirim file dan password-nya lewat jalur terpisah.
+
+Di Mac yang akan menandatangani:
+
+1. Impor file-nya, lalu masukkan password `.p12` saat diminta:
+
+   ```
+   security import ~/Downloads/<NAMA>.p12 -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign -T /usr/bin/productbuild
+   ```
+
+2. Cek dengan `security find-identity -v`, lalu salin namanya ke `.env.appstore`:
+
+   ```
+   APPSTORE_SIGN_ID=<nama atau SHA-1 sertifikat Apple Distribution>
+   INSTALLER_SIGN_ID=<nama sertifikat installer>
+   ```
+
+3. Kalau ada dua sertifikat Apple Distribution bernama sama, isi `APPSTORE_SIGN_ID` dengan SHA-1 sertifikat yang tercantum di provisioning profile.
+4. Kalau macOS meminta izin Keychain saat tanda tangan pertama, pilih **Always Allow**.
+5. Hapus `.p12` dari Downloads setelah diimpor, atau simpan di password manager. Jangan pernah menaruhnya di dalam repo.
+
 | Variabel | Isi |
 |---|---|
 | `BUNDLE_ID` | App ID, harus sama dengan di App Store Connect |
