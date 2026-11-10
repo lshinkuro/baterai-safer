@@ -92,10 +92,14 @@ final class Model: ObservableObject {
 
 /// Runs `poni <cmd> <user>` as root through the macOS admin prompt; returns the error, or "".
 func runAsAdmin(_ cmd: String) -> String {
+    #if LITE
+    return ""
+    #else
     let src = "do shell script \"'\(Daemon.stableBinary())' \(cmd) '\(NSUserName())'\" with administrator privileges"
     var err: NSDictionary?
     NSAppleScript(source: src)?.executeAndReturnError(&err)
     return err?[NSAppleScript.errorMessage] as? String ?? ""
+    #endif
 }
 
 struct BateraiApp: App {
@@ -115,14 +119,14 @@ struct BateraiApp: App {
         }
         // DMG installs have no `brew services`; start at login once (user can turn it off in Login Items).
         let homebrew = URL(fileURLWithPath: Bundle.main.bundlePath).resolvingSymlinksInPath().path.contains("/Cellar/")
-        if Bundle.main.bundleIdentifier != nil, !homebrew, !d.bool(forKey: "loginItemRegistered") {
+        if !Lite.on, Bundle.main.bundleIdentifier != nil, !homebrew, !d.bool(forKey: "loginItemRegistered") { // App Store: no login item without asking
             try? SMAppService.mainApp.register()
             d.set(true, forKey: "loginItemRegistered")
         }
         DispatchQueue.main.async { if UserDefaults.standard.object(forKey: "notch") as? Bool ?? true { Notch.shared.show() } }
         DispatchQueue.main.async { Onboarding.showIfNeeded() }
         DispatchQueue.main.async { SelfCare.shared.start() } // idle until a reminder is switched on
-        DispatchQueue.main.async { Updater.shared.start() }
+        if !Lite.on { DispatchQueue.main.async { Updater.shared.start() } } // the App Store updates that build
     }
 
     var body: some Scene {
@@ -170,12 +174,12 @@ struct Panel: View {
             }
             .padding(.horizontal, 16).padding(.top, 14)
 
-            TabBar(tab: $tab, tabs: Tab.allCases.filter(\.enabled)).padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
+            if !Lite.on { TabBar(tab: $tab, tabs: Tab.allCases.filter(\.enabled)).padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4) }
 
             // Fixed panel size: the menu bar window doesn't resize cleanly between tabs of different heights.
             ScrollView {
                 Group {
-                    switch Tab(rawValue: tab).flatMap({ $0.enabled ? $0 : nil }) ?? .battery {
+                    switch Tab(rawValue: tab).flatMap({ $0.enabled ? $0 : nil }) ?? (Lite.on ? .tools : .battery) {
                     case .battery: BatteryTab(m: m)
                     case .system: SystemTab(s: sys)
                     case .cleaner: CleanerTab(c: cleaner)

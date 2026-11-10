@@ -47,7 +47,7 @@ struct HomeView: View {
                 }
                 Spacer()
                 Menu {
-                    ForEach(Self.all, id: \.id) { w in
+                    ForEach(Self.all.filter { !Lite.cutTabs.contains($0.tab) }, id: \.id) { w in
                         Button { toggle(w.id) } label: { Label(tr(w.title), systemImage: chosen.contains(w.id) ? "checkmark" : w.icon) }
                     }
                 } label: { Label("Atur", systemImage: "slider.horizontal.3") }

@@ -1,7 +1,12 @@
+#include "smc.h"
+
+#ifdef LITE
+int native_limit_get(void) { return -1; }
+int native_limit_set(int limit) { (void)limit; return -1; }
+#else
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #import <objc/message.h>
-#include "smc.h"
 
 // macOS 27 firmware gates SMC charge-inhibit keys; the native "Charge Limit" (PowerUI, private) still works.
 static id client(void) {
@@ -38,3 +43,4 @@ int native_limit_set(int limit) {
         : ((BOOL (*)(id, SEL, unsigned char, NSError **))objc_msgSend)(c, sel_registerName("setMCLLimit:error:"), (unsigned char)limit, &e);
     return ok && !e ? 0 : -1;
 }
+#endif

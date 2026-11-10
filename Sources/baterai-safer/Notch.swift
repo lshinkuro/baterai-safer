@@ -5,10 +5,10 @@ enum NTab: Int, CaseIterable {
     case home, music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, ibadah, more
     var icon: String { ["house.fill", "music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "moon.stars.fill", "square.grid.2x2.fill"][rawValue] }
     var title: String { ["Home", "Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Ibadah", "Lainnya"][rawValue] }
-    var enabled: Bool { FeatureFlags.isOn("\(self)") }
+    var enabled: Bool { !Lite.cutTabs.contains(self) && FeatureFlags.isOn("\(self)") }
 
     static let orderKey = "tabOrder"
-    static var ordered: [NTab] { orderedTabs(UserDefaults.standard.string(forKey: orderKey) ?? "") }
+    static var ordered: [NTab] { orderedTabs(UserDefaults.standard.string(forKey: orderKey) ?? "").filter { !Lite.cutTabs.contains($0) } }
 
     /// Dragging an icon in the island (which only sees the tabs that are on); VoiceOver in Tools → Fitur.
     func move(by d: Int, showing: (NTab) -> Bool = { _ in true }) { Self.save(movedTab(Self.ordered, self, by: d, showing: showing)) }
@@ -251,7 +251,7 @@ final class Notch {
 
     /// "Unplug" cue when the battery reaches the charge limit (Lainnya → Notif baterai penuh).
     private func checkCharge() {
-        guard UserDefaults.standard.object(forKey: "fullChargeAlert") as? Bool ?? true else { return }
+        guard !Lite.on, UserDefaults.standard.object(forKey: "fullChargeAlert") as? Bool ?? true else { return }
         let b = Battery.read(), limit = load(Paths.config, Config()).limit
         if fullCharge.step(percent: b.percent, ac: b.ac, target: limit) {
             flash(fullChargeMessage(percent: b.percent))
@@ -294,6 +294,7 @@ final class Notch {
 
     /// Select an area of the screen; its text lands on the clipboard.
     func ocr() {
+        guard !Lite.on else { return } // runs screencapture, which the sandbox blocks
         if state.expanded { set(false) }
         captureText { text in
             self.flash(text.isEmpty ? "Tidak ada teks terbaca" : "Teks disalin · \(text.split(separator: "\n").count) baris")
@@ -648,7 +649,7 @@ struct NotchView: View {
                         Text(tr(state.tab.title)).font(.system(size: 12, weight: .bold)).lineLimit(1)
                         QuickToggles(state: state)
                     }
-                    if NTab.more.enabled { UpdateChip(state: state) }
+                    if NTab.more.enabled, !Lite.on { UpdateChip(state: state) }
                     Button { state.pinned.toggle() } label: {
                         Image(systemName: state.pinned ? "pin.fill" : "pin").font(.system(size: 11, weight: .bold))
                             .foregroundStyle(state.pinned ? Palette.accent : Color.gray)
@@ -2091,17 +2092,17 @@ struct NotesView: View {
                                 Image(systemName: "lock.fill")
                                 Text("Ada gambar atau tabel: edit di Notes supaya tidak rusak").lineLimit(1)
                                 Spacer()
-                                NButton(icon: "arrow.up.forward.app", title: "Buka di Notes", tint: Palette.accent) { n.openInNotes(note.id) }
+                                if !Lite.on { NButton(icon: "arrow.up.forward.app", title: "Buka di Notes", tint: Palette.accent) { n.openInNotes(note.id) } }
                             }
                             .font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.accent)
                         }
                         TextEditor(text: Binding(get: { n.current?.text ?? "" }, set: { n.update($0) }))
                             .font(.system(size: 12)).scrollContentBackground(.hidden).focused($focused).disabled(note.readOnly)
                         HStack(spacing: 6) {
-                            syncStatus(note)
+                            if !Lite.on { syncStatus(note) }
                             Spacer()
                             if n.thinking { ProgressView().controlSize(.small) }
-                            NButton(icon: "sparkles", title: "Rapikan dengan AI", tint: Palette.accent) { n.tidy(ai) }.disabled(n.thinking)
+                            if !Lite.on { NButton(icon: "sparkles", title: "Rapikan dengan AI", tint: Palette.accent) { n.tidy(ai) }.disabled(n.thinking) }
                             NButton(icon: "doc.on.doc") { copyText(note.text) }.tip("Salin catatan")
                             NButton(icon: "trash", tint: Palette.red) { n.delete(note.id) }.help("Hapus catatan")
                         }

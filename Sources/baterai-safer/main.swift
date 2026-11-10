@@ -2,9 +2,11 @@ import Foundation
 
 let args = CommandLine.arguments.dropFirst()
 switch args.first {
+#if !LITE
 case "daemon": Daemon.run()
 case "install-daemon": Daemon.install(user: args.dropFirst().first ?? ProcessInfo.processInfo.environment["SUDO_USER"] ?? "root")
 case "uninstall-daemon": Daemon.uninstall()
+#endif
 case "selftest": selfTest()
 case "ai-usage":
     let t = Date()

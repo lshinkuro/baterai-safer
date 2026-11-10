@@ -800,7 +800,7 @@ struct LangPage: View {
                 VStack(alignment: .leading, spacing: 7) {
                     heading(tr("TEMAN NGOBROL & PEMBUAT SOAL"))
                     engine("apple", "Apple Intelligence", "Di Mac, offline, gratis", LangModel.appleStatus)
-                    engine("claude", "Claude", "Lebih pintar, lewat Claude Code", LangModel.claude == nil ? "Claude Code belum terpasang" : nil)
+                    if !Lite.on { engine("claude", "Claude", "Lebih pintar, lewat Claude Code", LangModel.claude == nil ? "Claude Code belum terpasang" : nil) }
                     HStack {
                         Text("Target harian").font(.system(size: 11))
                         Spacer()

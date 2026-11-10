@@ -278,7 +278,7 @@ struct LangState: Codable {
 final class LangModel: ObservableObject {
     static let shared = LangModel()
     static let path = Paths.user + "/lang.json"
-    static let claude = ["/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"]
+    static let claude = Lite.on ? nil : ["/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.local/bin"]
         .map { $0 + "/claude" }.first(where: FileManager.default.isExecutableFile)
     @Published var s = load(LangModel.path, LangState())
     @Published var revealed = false

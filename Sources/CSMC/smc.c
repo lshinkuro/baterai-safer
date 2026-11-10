@@ -1,4 +1,10 @@
 #include "smc.h"
+
+#ifdef LITE
+int smc_read(const char *key, uint8_t *buf, uint32_t *size, uint32_t *type) { (void)key; (void)buf; (void)size; (void)type; return -1; }
+int smc_write(const char *key, const uint8_t *buf, uint32_t size) { (void)key; (void)buf; (void)size; return -1; }
+int smc_has_key(const char *key) { (void)key; return 0; }
+#else
 #include <IOKit/IOKitLib.h>
 #include <string.h>
 
@@ -78,3 +84,4 @@ int smc_write(const char *key, const uint8_t *buf, uint32_t size) {
     memcpy(in.bytes, buf, size);
     return call(&in, &out);
 }
+#endif

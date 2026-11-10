@@ -75,8 +75,10 @@ struct ToolsTab: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 ToggleTile(title: "Notch", icon: "rectangle.topthird.inset.filled", on: $t.notch)
                 ToggleTile(title: "Tetap menyala", icon: "cup.and.saucer.fill", on: $t.awake)
-                ToggleTile(title: "File tersembunyi", icon: "eye.fill", on: $t.hiddenFiles)
-                ToggleTile(title: "Ikon desktop", icon: "menubar.dock.rectangle", on: $t.desktopIcons)
+                if !Lite.on {
+                    ToggleTile(title: "File tersembunyi", icon: "eye.fill", on: $t.hiddenFiles)
+                    ToggleTile(title: "Ikon desktop", icon: "menubar.dock.rectangle", on: $t.desktopIcons)
+                }
             }
             Card(title: "Tampilan", icon: "paintpalette") {
                 HStack(spacing: 10) {
@@ -116,30 +118,34 @@ struct ToolsTab: View {
                             .accessibilityAction(named: tr("Geser ke kanan")) { tab.move(by: 1) }
                     }
                     FeatureChip(title: "Join rapat", icon: "video.fill", on: feature("meeting"))
-                    FeatureChip(title: "Token AI β", icon: "chart.bar.fill", on: feature("ailab"))
+                    if !Lite.on { FeatureChip(title: "Token AI β", icon: "chart.bar.fill", on: feature("ailab")) }
                 }
                 .disabled(!t.notch).opacity(t.notch ? 1 : 0.45)
                 Text("Seret untuk mengatur urutan tab").font(.system(size: 11)).foregroundStyle(.secondary)
                 Text("Menu bar").font(.system(size: 11, weight: .bold))
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                    FeatureChip(title: "Sistem", icon: Tab.system.icon, on: feature("panel.system"))
-                    FeatureChip(title: "Cleaner", icon: Tab.cleaner.icon, on: feature("panel.cleaner"))
+                    if !Lite.on {
+                        FeatureChip(title: "Sistem", icon: Tab.system.icon, on: feature("panel.system"))
+                        FeatureChip(title: "Cleaner", icon: Tab.cleaner.icon, on: feature("panel.cleaner"))
+                    }
                     FeatureChip(title: "Persen", icon: "percent", on: feature("menuPercent"))
                 }
             }
             Card(title: "Aksi cepat", icon: "bolt.fill") {
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    Action(title: "Gelap / Terang", icon: "circle.lefthalf.filled") { t.toggleDarkMode() }
-                    Action(title: "Matikan layar", icon: "display") { t.sleepDisplay() }
-                    Action(title: "Tangkapan layar", icon: "camera.viewfinder") { t.screenshot() }
-                    Action(title: "Teks dari layar", icon: "text.viewfinder") { Notch.shared.ocr() }
+                    if !Lite.on { // these run system tools the sandbox blocks
+                        Action(title: "Gelap / Terang", icon: "circle.lefthalf.filled") { t.toggleDarkMode() }
+                        Action(title: "Matikan layar", icon: "display") { t.sleepDisplay() }
+                        Action(title: "Tangkapan layar", icon: "camera.viewfinder") { t.screenshot() }
+                        Action(title: "Teks dari layar", icon: "text.viewfinder") { Notch.shared.ocr() }
+                    }
                     Action(title: "Panduan awal", icon: "sparkles") { Onboarding.show() }
                     Action(title: "Activity Monitor", icon: "waveform.path.ecg") {
                         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
                     }
                 }
             }
-            UpdateCard()
+            if !Lite.on { UpdateCard() }
         }
     }
 }

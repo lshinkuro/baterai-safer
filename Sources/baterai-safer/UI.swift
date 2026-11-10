@@ -102,6 +102,17 @@ extension EnvironmentValues {
     }
 }
 
+/// The App Store build (`-DLITE`): no root helper, private API or other apps' data, so it can live in the sandbox.
+enum Lite {
+    #if LITE
+    static let on = true
+    #else
+    static let on = false
+    #endif
+    static let cutTabs: Set<NTab> = on ? [.music, .ai, .clipboard, .shelf, .git, .stats] : []
+    static let cutTools: Set<String> = on ? ["charge", "downloads", "drives", "update"] : []
+}
+
 /// Features switched off by the user, stored comma-separated so `@AppStorage(FeatureFlags.key)` can observe it.
 enum FeatureFlags {
     static let key = "featuresOff"
@@ -119,7 +130,7 @@ enum Tab: Int, CaseIterable {
     var title: String { ["Baterai", "Sistem", "Cleaner", "Tools"][rawValue] }
     var icon: String { ["bolt.fill", "cpu.fill", "sparkles", "square.grid.2x2.fill"][rawValue] }
         /// Baterai and Tools (where features are switched back on) can't be turned off.
-    var enabled: Bool { self == .battery || self == .tools || FeatureFlags.isOn("panel.\(self)") }
+    var enabled: Bool { Lite.on ? self == .tools : self == .battery || self == .tools || FeatureFlags.isOn("panel.\(self)") }
 }
 
 struct TabBar: View {

@@ -312,7 +312,7 @@ struct MoreView: View {
         } else {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
                 // The camera opens from the switches at the top of the island.
-                ForEach(Self.tools.filter { $0.id != "camera" }, id: \.id) { t in
+                ForEach(Self.tools.filter { $0.id != "camera" && !Lite.cutTools.contains($0.id) }, id: \.id) { t in
                     Button { withAnimation(Motion.ease) { page = t.id } } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             Image(systemName: t.icon).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.85))

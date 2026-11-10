@@ -186,6 +186,7 @@ final class NotesModel: ObservableObject {
 
     /// Pushes new and edited notes, then pulls the folder.
     func sync() {
+        guard !Lite.on else { return } // Apple Notes needs Automation; that build keeps notes on this Mac
         guard !syncing else { scheduleFlush(); return }
         let pending = notes.filter { $0.dirty || (!$0.synced && !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
         syncing = true

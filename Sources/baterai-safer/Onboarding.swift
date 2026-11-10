@@ -49,34 +49,36 @@ struct WelcomeView: View {
                     Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 56, height: 56)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(tr("Selamat datang di Poni")).font(.system(size: 22, weight: .semibold))
-                        Text(tr("Jaga kesehatan baterai, plus notch yang berguna. Tiga langkah singkat.")).font(.system(size: 12)).foregroundStyle(.gray)
+                        Text(tr(Lite.on ? "Notch yang berguna. Dua langkah singkat." : "Jaga kesehatan baterai, plus notch yang berguna. Tiga langkah singkat.")).font(.system(size: 12)).foregroundStyle(.gray)
                     }
                 }
                 .padding(.bottom, 4)
 
-                step(1, "Pasang helper", "Helper membatasi pengisian baterai dan tetap jalan saat Poni ditutup. macOS meminta password admin sekali.") {
-                    if helperInstalled {
-                        Label(tr("Helper terpasang"), systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.accent)
-                    } else {
-                        NButton(icon: "lock.shield", title: "Pasang helper…", tint: Palette.accent, prominent: true) {
-                            helperError = runAsAdmin("install-daemon")
-                            checked = Date()
+                if !Lite.on {
+                    step(1, "Pasang helper", "Helper membatasi pengisian baterai dan tetap jalan saat Poni ditutup. macOS meminta password admin sekali.") {
+                        if helperInstalled {
+                            Label(tr("Helper terpasang"), systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.accent)
+                        } else {
+                            NButton(icon: "lock.shield", title: "Pasang helper…", tint: Palette.accent, prominent: true) {
+                                helperError = runAsAdmin("install-daemon")
+                                checked = Date()
+                            }
+                            if !helperError.isEmpty { Text(helperError).font(.system(size: 11)).foregroundStyle(Palette.red) }
                         }
-                        if !helperError.isEmpty { Text(helperError).font(.system(size: 11)).foregroundStyle(Palette.red) }
                     }
                 }
 
-                step(2, "Pilih fitur notch", "Matikan yang tidak kamu pakai. Bisa diubah kapan saja di Tools → Fitur.") {
+                step(Lite.on ? 1 : 2, "Pilih fitur notch", "Matikan yang tidak kamu pakai. Bisa diubah kapan saja di Tools → Fitur.") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                        ForEach(NTab.allCases.filter { $0 != .more }, id: \.self) { tab in
+                        ForEach(NTab.allCases.filter { $0 != .more && !Lite.cutTabs.contains($0) }, id: \.self) { tab in
                             FeatureChip(title: tab.title, icon: tab.icon,
                                         on: Binding(get: { FeatureFlags.isOn("\(tab)") }, set: { FeatureFlags.set("\(tab)", $0) }))
                         }
                     }
                 }
 
-                step(3, "Izin macOS", "Diminta satu per satu saat fiturnya pertama dipakai, bukan sekarang semua. Semua diproses di Mac ini.") {
-                    let needed = Self.permissions.filter { $0.0.enabled }
+                step(Lite.on ? 2 : 3, "Izin macOS", "Diminta satu per satu saat fiturnya pertama dipakai, bukan sekarang semua. Semua diproses di Mac ini.") {
+                    let needed = Self.permissions.filter { $0.0.enabled && !(Lite.on && $0.0 == .notes) }
                     if needed.isEmpty {
                         Text(tr("Fitur yang kamu pilih tidak butuh izin tambahan.")).font(.system(size: 12)).foregroundStyle(.gray)
                     }

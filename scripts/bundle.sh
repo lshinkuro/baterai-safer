@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 APP=".build/Poni.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/baterai-safer "$APP/Contents/MacOS/"
+cp "${BIN:-.build/release/baterai-safer}" "$APP/Contents/MacOS/baterai-safer" # BIN: the App Store build lives elsewhere
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 # Indonesian is the source language; macOS picks en.lproj when the system language is English.
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
