@@ -82,6 +82,28 @@ func nativeTarget(_ c: Config, _ s: Status) -> Int {
 }
 
 func selfTest() {
+    var hm = Hangman(word: "CAT")
+    for c in "XCA" { hm.guess(c) }
+    assert(hm.misses == 1 && !hm.won && !hm.lost, "hangman: counts misses")
+    hm.guess("T")
+    assert(hm.won && { var h = hm; h.guess("Q"); return h.misses == 1 }(), "hangman: no guesses after the end")
+    var hanged = Hangman(word: "CAT")
+    for c in "BDEFGH" { hanged.guess(c) }
+    assert(hanged.lost, "hangman: six misses lose")
+    assert(hangmanWordIsUsable("TIGER", recent: [], isWord: { _ in true }) && !hangmanWordIsUsable("TIGER", recent: ["TIGER"], isWord: { _ in true }) && !hangmanWordIsUsable("ICE", recent: [], isWord: { _ in true }) && !hangmanWordIsUsable("CAFÉS", recent: [], isWord: { _ in true }) && !hangmanWordIsUsable("ZZZZ", recent: [], isWord: { _ in false }), "hangman: word checks")
+    let sd = Sudoku.generate()
+    var sdCopy = sd.cells, sdFilled = sd.cells, sdCount = 0, sdFirst = 0
+    _ = Sudoku.solve(&sdCopy, limit: 2, found: &sdCount)
+    _ = Sudoku.solve(&sdFilled, limit: 1, found: &sdFirst)
+    assert(sdCount == 1 && sdFilled == sd.solution && sd.cells.filter { $0 == 0 }.count == Sudoku.blanks, "sudoku: one solution, right number of blanks")
+    assert((0..<81).allSatisfy { i in var b = sd.solution; let v = b[i]; b[i] = 0; return Sudoku.options(b, i) == [v] }, "sudoku: solution is valid")
+    var sdWrong = sd
+    if let i = sd.cells.firstIndex(of: 0), let given = (0..<9).map({ i / 9 * 9 + $0 }).first(where: { sd.cells[$0] != 0 }) {
+        sdWrong.cells[i] = sd.solution[i]
+        assert(!sdWrong.conflict(i), "sudoku: right digit is no conflict")
+        sdWrong.cells[i] = sd.cells[given]
+        assert(sdWrong.conflict(i), "sudoku: repeat in a row is a conflict")
+    }
     assert(abs(careScore(water: 4, goal: 8, breaks: 3, breakGoal: 3, habitsDone: 0, habits: 0) - 0.75) < 0.001 && careScore(water: 99, goal: 8, breaks: 9, breakGoal: 3, habitsDone: 2, habits: 2) == 1, "care score")
     let oldCare = try! JSONDecoder().decode(SelfCareData.self, from: Data(#"{"water":{"2026-11-07":3},"waterGoal":10,"habits":[]}"#.utf8))
     assert(oldCare.waterGoal == 10 && oldCare.water["2026-11-07"] == 3 && oldCare.mood.isEmpty, "old selfcare.json keeps its data")
@@ -315,20 +337,6 @@ func selfTest() {
     assert(movedTab([.home, .music, .focus], .home, by: 1) { $0 != .music } == [.focus, .music, .home], "tab drag steps over hidden tabs")
     assert(movedTab([.home, .music], .music, by: 1) { _ in true } == [.home, .music], "tab drag stops at the end")
     assert(placedTab([.home, .music, .focus], .home, at: .focus) == [.music, .focus, .home] && placedTab([.home, .music, .focus], .focus, at: .home) == [.focus, .home, .music], "tab drop in the feature list")
-    let dict: (String) -> Bool = { ["cat", "cats", "at", "ax"].contains($0) }
-    let t = { (x: Int, y: Int, c: Character) in WordBoard.Tile(cell: WordBoard.Cell(x: x, y: y), letter: c) }
-    var wb = WordBoard()
-    assert(wb.evaluate([t(0, 0, "C"), t(1, 0, "A"), t(2, 0, "T")], isWord: dict) == .bad("Kata pertama harus melewati tengah"), "word game: first move crosses the center")
-    assert(wb.evaluate([t(4, 5, "C"), t(5, 6, "A")], isWord: dict) == .bad("Huruf harus dalam satu garis"), "word game: one line")
-    assert(wb.evaluate([t(4, 5, "C"), t(6, 5, "T")], isWord: dict) == .bad("Huruf harus menyambung"), "word game: no gaps")
-    let cat = [t(4, 5, "C"), t(5, 5, "A"), t(6, 5, "T")]
-    assert(wb.evaluate(cat, isWord: dict) == .ok(words: ["CAT"], score: 5), "word game: score")
-    for x in cat { wb.grid[x.cell] = x.letter }
-    assert(wb.evaluate([t(7, 5, "S")], isWord: dict) == .ok(words: ["CATS"], score: 6), "word game: extending keeps the old letters' points")
-    assert(wb.evaluate([t(0, 0, "A"), t(1, 0, "T")], isWord: dict) == .bad("Kata harus menyambung ke huruf di papan"), "word game: must connect")
-    assert(wb.evaluate([t(5, 6, "X")], isWord: dict) == .ok(words: ["AX"], score: 6), "word game: a single tile reads downward")
-    if let m = wb.bestMove(["cats"], rack: ["S"], isWord: dict) { assert(m.tiles == [t(7, 5, "S")], "word game: finds the spot") } else { assert(false, "word game: no move") }
-    assert(wordsFrom(["cat", "dog"], rack: ["C", "T"], board: ["A"]) == ["cat"], "word game: borrows one board letter")
     assert(netCounters()["lo0"] != nil && ipv4("lo0") == "127.0.0.1", "jaringan: lo0 counters and address")
     // Kemenag RI schedule for Kota Jakarta on 8 Nov 2026 (api.myquran.com, id 1301), to the minute ±1.
     var jkt = Calendar(identifier: .gregorian); jkt.timeZone = TimeZone(identifier: "Asia/Jakarta")!

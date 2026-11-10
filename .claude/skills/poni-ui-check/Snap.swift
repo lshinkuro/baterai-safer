@@ -49,7 +49,8 @@ import SwiftUI
         default: AnyView(MoreView())
         }
         if t == .more {
-            for (i, name) in ["ular", "kartu", "xo", "kata", "catur"].enumerated() {
+            HangmanGame.shared.game = Hangman(word: "PENGUIN", guessed: ["P", "N", "A", "S"])
+            for (i, name) in [(0, "ular"), (1, "kartu"), (2, "xo"), (4, "catur"), (5, "hangman"), (6, "sudoku")] {
                 UserDefaults.standard.set(i, forKey: "game")
                 write("game-\(name)", GamesPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
             }
@@ -81,11 +82,6 @@ import SwiftUI
         }
         if t == .more {
             write("game-catur-window", ChessView(windowed: true).padding(20).foregroundStyle(.white).frame(width: 820, height: 584).background(Color.black), .dark)
-            let g = WordGameModel.shared
-            g.board.grid = [.init(x: 4, y: 5): "C", .init(x: 5, y: 5): "A", .init(x: 6, y: 5): "T"]
-            g.placed = [.init(cell: .init(x: 5, y: 6), letter: "X")]
-            g.lastAI = [.init(x: 4, y: 5)]
-            write("game-kata-window", WordGameView(g: g).padding(20).foregroundStyle(.white).frame(width: 780, height: 640).background(Color.black), .dark)
         }
         let v = content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16)
@@ -93,6 +89,12 @@ import SwiftUI
             .frame(width: 720, height: 270).background(Color.black)
         write("notch-\(t.title)", v, .dark)
         if t == .home {
+            UserDefaults.standard.set("stats,todo,water", forKey: "homeWidgets")
+            write("notch-Home-stats", v, .dark)
+            UserDefaults.standard.removeObject(forKey: "homeWidgets")
+            UserDefaults.standard.set(true, forKey: "downloadAlert")
+            write("notch-toggles", QuickToggles(state: n.state).padding(8).foregroundStyle(.white).background(Color.black), .dark)
+            UserDefaults.standard.removeObject(forKey: "downloadAlert")
             n.media.app = "Spotify"; n.media.title = "Sample Track"; n.media.artist = "Sample Artist"; n.media.duration = 200; n.media.position = 70; n.media.playing = true
             write("notch-Home-playing", v, .dark)
             n.media.app = nil; n.media.title = ""; n.media.playing = false

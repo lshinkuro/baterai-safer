@@ -83,7 +83,7 @@ Di menu bar Poni tampil sebagai wajah Poni dan persentase baterai; persentasenya
 
 ## Notch
 
-Arahkan kursor ke notch (atau tengah atas layar tanpa notch) untuk membuka, atau pilih **Klik** di Tools → Fitur → Buka notch:
+Klik notch (atau tengah atas layar tanpa notch) untuk membuka. Scroll ke bawah sekali memunculkan mini player, scroll sekali lagi membuka Poni. Kalau lebih suka terbuka saat disentuh kursor, pilih **Hover** di Tools → Fitur → Buka notch:
 
 | Tab | Isi |
 |---|---|

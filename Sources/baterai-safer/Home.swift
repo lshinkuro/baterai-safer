@@ -10,17 +10,19 @@ struct HomeView: View {
     @ObservedObject var prayer = Ibadah.shared
     @ObservedObject var ramadan = Ramadan.shared
     @ObservedObject var study = LangModel.shared
+    @ObservedObject var todos = TodoModel.shared
+    @Local private var newTodo = ""
     @ObservedObject var notes = Notch.shared.notes
     @ObservedObject var clips = Notch.shared.clips
     @ObservedObject var git = Notch.shared.git
     @ObservedObject var shelf = Notch.shared.shelf
     @ObservedObject var sys = Notch.shared.sys
     @AppStorage("morePage") private var morePage = ""
-    @AppStorage("homeWidgets") private var stored = "music,calendar,habits"
+    @AppStorage("homeWidgets") private var stored = "music,calendar,todo"
 
     static let all: [(id: String, icon: String, title: String, tab: NTab)] = [
         ("music", "music.note", "Musik", .music), ("calendar", "calendar", "Kalender", .agenda),
-        ("habits", "checklist", "Kebiasaan", .more), ("focus", "timer", "Fokus", .focus),
+        ("todo", "checkmark.circle", "Todo", .more), ("habits", "checklist", "Kebiasaan", .more), ("focus", "timer", "Fokus", .focus),
         ("ibadah", "moon.stars.fill", "Ibadah", .ibadah), ("notes", "note.text", "Catatan", .notes),
         ("clipboard", "doc.on.clipboard", "Clipboard", .clipboard), ("git", "arrow.triangle.branch", "Git", .git),
         ("stats", "gauge.medium", "Stats", .stats), ("water", "drop.fill", "Air minum", .more),
@@ -82,7 +84,7 @@ struct HomeView: View {
                         Image(systemName: w.icon).font(.system(size: 10, weight: .semibold))
                         Text(tr(w.title).uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8).lineLimit(1)
                         Spacer(minLength: 4)
-                        if w.id == "calendar", !a.today.isEmpty { Text("\(a.today.count)").font(.system(size: 10, weight: .semibold)).monospacedDigit() }
+                        if let n = w.id == "calendar" ? a.today.count : w.id == "todo" ? todos.open.count : nil, n > 0 { Text("\(n)").font(.system(size: 10, weight: .semibold)).monospacedDigit() }
                         Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold))
                     }
                     .foregroundStyle(.gray).contentShape(Rectangle())
@@ -110,7 +112,7 @@ struct HomeView: View {
     }
 
     func open(_ id: String, _ tab: NTab) {
-        if tab == .more { morePage = id == "lang" ? "lang" : "selfcare" }
+        if tab == .more { morePage = ["lang", "todo"].contains(id) ? id : "selfcare" }
         withAnimation(Motion.snap) { Notch.shared.state.tab = tab }
     }
 
@@ -134,6 +136,7 @@ struct HomeView: View {
         case "water": water
         case "shelf": shelfFiles
         case "lang": language
+        case "todo": todo
         case "ai": launcher("sparkles", "Tanya AI", .ai)
         case "dev": launcher("curlybraces", "JSON, Base64, UUID, dan lainnya", .dev)
         default: focus
@@ -310,21 +313,24 @@ struct HomeView: View {
     }
 
     var stats: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let b = Battery.read()
+        return VStack(alignment: .leading, spacing: 7) {
+            meter("Baterai", Double(b.percent) / 100, color: b.percent <= 20 && !b.ac ? Palette.red : Palette.accent)
             meter("CPU", sys.cpu)
             meter("Memori", sys.memUsed / sys.memTotal)
+            meter("Disk", sys.diskTotal > 0 ? 1 - sys.diskFree / sys.diskTotal : 0)
         }
         .frame(maxHeight: .infinity)
     }
 
-    func meter(_ title: String, _ v: Double) -> some View {
+    func meter(_ title: String, _ v: Double, color: Color? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(tr(title)).font(.system(size: 11)).foregroundStyle(.gray)
                 Spacer()
                 Text("\(Int(v * 100))%").font(.system(size: 12, weight: .semibold)).monospacedDigit()
             }
-            Meter(value: v, color: v > 0.85 ? Palette.red : Palette.accent)
+            Meter(value: v, color: color ?? (v > 0.85 ? Palette.red : Palette.accent))
         }
     }
 
@@ -349,6 +355,45 @@ struct HomeView: View {
                     Text(f.lastPathComponent).font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
                 }
                 if shelf.files.count > 5 { note(String(format: tr("+%@ lainnya"), "\(shelf.files.count - 5)")) }
+            }
+        }
+    }
+
+    var todo: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if todos.open.isEmpty {
+                Placeholder(icon: "checkmark.circle", title: todos.items.isEmpty ? "Belum ada tugas" : "Semua beres")
+            } else {
+                ViewThatFits(in: .vertical) {
+                    todoRows
+                    ScrollView(showsIndicators: false) { todoRows }
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
+            HStack(spacing: 4) {
+                TextField(tr("Tugas baru…"), text: $newTodo).textFieldStyle(.plain).font(.system(size: 12)).onSubmit { todos.add(newTodo); newTodo = "" }
+                Button { todos.add(newTodo); newTodo = "" } label: { Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Palette.accent) }
+                    .buttonStyle(.plain).tip("Tambah tugas").disabled(newTodo.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.leading, 10).padding(.trailing, 3).padding(.vertical, 3)
+            .background(Color.white.opacity(0.07), in: Capsule())
+        }
+    }
+
+    var todoRows: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(todos.open) { t in
+                Button { withAnimation(Motion.ease) { todos.toggle(t) } } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "circle").font(.system(size: 13)).foregroundStyle(.gray)
+                        Text(t.text).font(.system(size: 12)).lineLimit(1)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }

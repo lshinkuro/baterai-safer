@@ -61,7 +61,7 @@ final class ToolsModel: ObservableObject {
 struct ToolsTab: View {
     @ObservedObject var t: ToolsModel
     @AppStorage(FeatureFlags.key) private var featuresOff = ""
-    @AppStorage("notchClick") private var notchClick = false
+    @AppStorage("notchClick") private var notchClick = true
     @AppStorage(NTab.orderKey) private var tabOrder = ""
     @Local private var draggingTab: NTab?
     @AppStorage("accent") private var accentID = "mint"

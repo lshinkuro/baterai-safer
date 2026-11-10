@@ -262,15 +262,16 @@ struct XOView: View {
 
 struct GamesPage: View {
     @AppStorage("game") private var game = 0
-    static let games = [("Ular", "scribble.variable"), ("Kartu Kembar", "square.grid.2x2"), ("X-O", "number"), ("Rangkai Kata", "textformat.abc"), ("Catur", "crown")]
+    // Only games that fit the notch belong here. The first value is what "game" stores, so don't renumber.
+    static let games = [(0, "Ular", "scribble.variable"), (1, "Kartu Kembar", "square.grid.2x2"), (2, "X-O", "number"), (4, "Catur", "crown"), (5, "Hangman", "textformat.abc"), (6, "Sudoku", "square.grid.3x3")]
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 4) {
-                ForEach(Self.games.indices, id: \.self) { i in
-                    let on = game == i
-                    Button { game = i } label: {
-                        Label(tr(Self.games[i].0), systemImage: Self.games[i].1).font(.system(size: 12, weight: .medium))
+                ForEach(Self.games, id: \.0) { g in
+                    let on = game == g.0
+                    Button { game = g.0 } label: {
+                        Label(tr(g.1), systemImage: g.2).font(.system(size: 12, weight: .medium))
                             .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.85))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 10).padding(.vertical, 7)
@@ -285,8 +286,9 @@ struct GamesPage: View {
                 switch game {
                 case 0: SnakeView()
                 case 1: MemoryView()
-                case 3: WordGameIntro()
                 case 4: ChessView()
+                case 5: HangmanView()
+                case 6: SudokuView()
                 default: XOView()
                 }
             }

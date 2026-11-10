@@ -78,6 +78,7 @@ final class NotchState: ObservableObject {
     @Published var mini = false             // mini music player below the notch (scroll down)
     @Published var pinned = false           // stays open when the pointer leaves
     @Published var tab = NTab.home
+    @Published var touched = false          // pointer resting on the closed notch
     @Published var toast: String?           // short message dropped below the notch
     var toastIcon = "checkmark.circle.fill"
     var notch = CGSize(width: 185, height: 32)
@@ -88,7 +89,7 @@ final class NotchPanel: NSPanel {
 }
 
 /// Island window at the top-center of the notched (or main) screen. It ignores clicks while
-/// collapsed, so the menu bar under it keeps working; hovering the notch expands it.
+/// collapsed, so the menu bar under it keeps working; a click or a second scroll opens it.
 final class Notch {
     static let shared = Notch()
     static let size = CGSize(width: 760, height: 340) // window; the visible island is smaller
@@ -104,8 +105,8 @@ final class Notch {
     private var fullCharge = FullChargeAlert()
     private var scrollSum = CGSize.zero
     private var scrollLocked = Date.distantPast
-    /// Open on click instead of hover (Tools → Fitur).
-    static var clickToOpen: Bool { UserDefaults.standard.bool(forKey: "notchClick") }
+    /// Open on click (the default) instead of hover (Tools → Fitur).
+    static var clickToOpen: Bool { UserDefaults.standard.object(forKey: "notchClick") as? Bool ?? true }
 
     func show() {
         guard panel == nil, let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main else { return }
@@ -175,6 +176,9 @@ final class Notch {
     private func track(dragging: Bool) {
         guard let (hot, open, mini) = areas else { return }
         let p = NSEvent.mouseLocation
+        // `hot` has margins for opening; the touch response is for the notch itself.
+        let touching = hot.insetBy(dx: 50, dy: 0).contains(p) && !state.expanded && !state.mini
+        if touching != state.touched { withAnimation(Motion.snap) { state.touched = touching } }
         if state.mini {
             if !mini.contains(p) { setMini(false) }
             return
@@ -190,9 +194,9 @@ final class Notch {
         }
     }
 
-    /// Over the notch: down opens the mini player, up goes from it to the full island, left/right change track.
+    /// Over the notch: down opens the mini player, down again the full island, up steps back, left/right change track.
     private func scrolled(_ e: NSEvent) {
-        guard e.momentumPhase.isEmpty, NTab.music.enabled, let (hot, _, mini) = areas,
+        guard e.momentumPhase.isEmpty, let (hot, _, mini) = areas,
               (state.mini ? mini : hot).contains(NSEvent.mouseLocation) else { return }
         if e.phase == .began { scrollSum = .zero }
         let scale: CGFloat = e.hasPreciseScrollingDeltas ? 1 : 10 // a mouse wheel reports lines, not points
@@ -203,19 +207,18 @@ final class Notch {
         scrollSum = .zero
         scrollLocked = Date().addingTimeInterval(0.7) // one swipe, one action
         switch g {
-        case .left: media.send("previous track")
-        case .right: media.send("next track")
+        case .left: if NTab.music.enabled { media.send("previous track") }
+        case .right: if NTab.music.enabled { media.send("next track") }
         case .down:
-            guard !state.mini else { return }
-            guard media.app != nil, !media.title.isEmpty else { flash("Tidak ada musik", icon: "music.note"); return }
-            if state.expanded { set(false) }
-            setMini(true)
+            guard !state.expanded else { return }
+            // Nothing playing: there's no mini player to stop at, so go straight to the island.
+            if state.mini || !NTab.music.enabled || media.app == nil || media.title.isEmpty { set(true) } else { setMini(true) }
         case .up:
-            guard state.mini else { return }
-            state.tab = .music
-            set(true)
+            if state.mini { setMini(false) } else if state.expanded, !state.pinned { set(false) }
         }
     }
+
+    func openFromMini() { set(true) }
 
     private func setMini(_ on: Bool) {
         withAnimation(Motion.snap) { state.mini = on }
@@ -515,7 +518,7 @@ struct NotchView: View {
         let size = state.expanded ? Self.open
             : state.mini ? Self.mini(n)
             : state.toast != nil ? CGSize(width: n.width + 200, height: n.height + 30)
-            : CGSize(width: n.width + (live ? 96 : 0) + (task.isEmpty ? 0 : 160), height: n.height)
+            : CGSize(width: n.width + (live ? 96 : 0) + (task.isEmpty ? 0 : 160) + (state.touched ? 16 : 0), height: n.height + (state.touched ? 6 : 0))
         ZStack(alignment: .top) {
             ZStack {
                 Color.black
@@ -542,6 +545,8 @@ struct NotchView: View {
                         .frame(width: size.width, height: size.height - n.height)
                         .padding(.top, n.height)
                         .foregroundStyle(.white)
+                        .contentShape(Rectangle())
+                        .onTapGesture { Notch.shared.openFromMini() }
                         .transition(.opacity)
                 } else {
                     VStack(spacing: 0) {
@@ -707,29 +712,32 @@ struct QuickToggles: View {
     @Local private var tick = 0 // shows a tap right away instead of at the next timeline beat
 
     var body: some View {
-        // Polled because ⌃⌥M and other apps change these too.
-        TimelineView(.periodic(from: .now, by: 1)) { _ in
-            HStack(spacing: 0) {
-                let mic = AudioSwitch.mic.muted, speaker = AudioSwitch.speaker.muted
-                button(mic ? "mic.slash.fill" : "mic.fill", mic ? "Aktifkan mic" : "Bisukan mic", mic ? Palette.red : .gray) {
-                    Notch.shared.toggleMic(); tick += 1
-                }
-                if !micOnly {
-                    button(speaker ? "speaker.slash.fill" : "speaker.wave.2.fill", speaker ? "Aktifkan speaker" : "Bisukan speaker", speaker ? Palette.red : .gray) {
-                        if AudioSwitch.speaker.toggle() == nil { Notch.shared.flash("Speaker ini tidak bisa dibisukan", icon: "speaker.slash.fill") }
-                        tick += 1
+        HStack(spacing: 0) {
+            ActiveFeatures(state: state)
+            // Polled because ⌃⌥M and other apps change these too.
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                HStack(spacing: 0) {
+                    let mic = AudioSwitch.mic.muted, speaker = AudioSwitch.speaker.muted
+                    if !micOnly {
+                        button(speaker ? "speaker.slash.fill" : "speaker.wave.2.fill", speaker ? "Aktifkan speaker" : "Bisukan speaker", speaker ? Palette.red : .gray) {
+                            if AudioSwitch.speaker.toggle() == nil { Notch.shared.flash("Speaker ini tidak bisa dibisukan", icon: "speaker.slash.fill") }
+                            tick += 1
+                        }
                     }
-                    if NTab.more.enabled { camera }
+                    button(mic ? "mic.slash.fill" : "mic.fill", mic ? "Aktifkan mic" : "Bisukan mic", mic ? Palette.red : .gray) {
+                        Notch.shared.toggleMic(); tick += 1
+                    }
+                    if !micOnly, NTab.more.enabled { camera }
                 }
             }
+            .id(tick)
         }
-        .id(tick)
     }
 
     // macOS has no switch that turns the camera off for every app; this one is Poni's own mirror.
     var camera: some View {
         let on = state.tab == .more && morePage == "camera"
-        return button("video.fill", on ? "Matikan kamera" : "Nyalakan kamera", on ? Palette.accent : .gray) {
+        return button(on ? "video.fill" : "video.slash.fill", on ? "Matikan kamera" : "Nyalakan kamera", on ? .gray : Palette.red) {
             if on { morePage = "" } else { morePage = "camera"; state.tab = .more }
         }
     }
@@ -740,6 +748,30 @@ struct QuickToggles: View {
                 .frame(width: 20, height: 22).contentShape(Rectangle())
         }
         .buttonStyle(.plain).tip(tip)
+    }
+}
+
+/// Long-running features that are on right now; each icon opens its page and disappears when the feature stops.
+struct ActiveFeatures: View {
+    @ObservedObject var state: NotchState
+    @ObservedObject private var tools = ToolsModel.shared
+    @AppStorage("downloadAlert") private var downloadAlert = false
+    @AppStorage("morePage") private var morePage = ""
+
+    var body: some View {
+        if NTab.more.enabled {
+            if tools.awake { icon("cup.and.saucer.fill", "Tetap menyala", "awake") }
+            if downloadAlert { icon("arrow.down.circle.fill", "Download", "downloads") }
+        }
+    }
+
+    func icon(_ name: String, _ tip: String, _ page: String) -> some View {
+        Button { morePage = page; state.tab = .more } label: {
+            Image(systemName: name).font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.accent)
+                .frame(width: 20, height: 22).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).tip(tip)
+        .transition(.opacity)
     }
 }
 

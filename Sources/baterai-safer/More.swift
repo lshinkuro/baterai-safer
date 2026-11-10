@@ -48,11 +48,9 @@ struct AudioSwitch {
 
     var muted: Bool {
         guard let d = device else { return false }
-        if canMute(d) {
-            var mute = address(kAudioDevicePropertyMute), v = UInt32(0), size = UInt32(MemoryLayout<UInt32>.size)
-            AudioObjectGetPropertyData(d, &mute, 0, nil, &size, &v)
-            return v != 0
-        }
+        // Silent counts as off either way: a read-only mute flag, or the level pulled to zero in System Settings.
+        var mute = address(kAudioDevicePropertyMute), flag = UInt32(0), flagSize = UInt32(MemoryLayout<UInt32>.size)
+        if AudioObjectHasProperty(d, &mute), AudioObjectGetPropertyData(d, &mute, 0, nil, &flagSize, &flag) == noErr, flag != 0 { return true }
         var volume = address(kAudioDevicePropertyVolumeScalar), v = Float32(1), size = UInt32(MemoryLayout<Float32>.size)
         AudioObjectGetPropertyData(d, &volume, 0, nil, &size, &v)
         return v == 0
@@ -64,7 +62,14 @@ struct AudioSwitch {
         guard let d = device else { return false }
         if canMute(d) {
             var mute = address(kAudioDevicePropertyMute), v: UInt32 = on ? 1 : 0
-            return AudioObjectSetPropertyData(d, &mute, 0, nil, UInt32(MemoryLayout<UInt32>.size), &v) == noErr
+            let ok = AudioObjectSetPropertyData(d, &mute, 0, nil, UInt32(MemoryLayout<UInt32>.size), &v) == noErr
+            // Unmuting a device whose level sits at zero would still leave it silent.
+            var volume = address(kAudioDevicePropertyVolumeScalar), level = Float32(1), size = UInt32(MemoryLayout<Float32>.size)
+            if !on, AudioObjectHasProperty(d, &volume), AudioObjectGetPropertyData(d, &volume, 0, nil, &size, &level) == noErr, level == 0 {
+                level = UserDefaults.standard.object(forKey: savedVolume) as? Float32 ?? 0.75
+                AudioObjectSetPropertyData(d, &volume, 0, nil, size, &level)
+            }
+            return ok
         }
         var volume = address(kAudioDevicePropertyVolumeScalar), v = Float32(0), size = UInt32(MemoryLayout<Float32>.size)
         if on {
@@ -271,7 +276,8 @@ struct MoreView: View {
         ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.accent),
         ("drives", "eject.fill", "Lepas USB", "Lepas flashdisk dengan aman", Palette.accent),
         ("lang", "character.book.closed.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
-        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu, X-O, kata, catur", Palette.accent),
+        ("todo", "checkmark.circle.fill", "Todo", "Daftar tugas harian", Palette.accent),
+        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu, X-O, catur, hangman, sudoku", Palette.accent),
         ("selfcare", "heart.circle", "Self-care", "Skor harian, istirahat terpandu, mood, kebiasaan", Palette.accent),
         ("update", "arrow.down.circle.fill", "Pembaruan", "Cek dan pasang versi baru", Palette.accent),
     ]
@@ -291,6 +297,7 @@ struct MoreView: View {
                     case "downloads": downloadsPage
                     case "drives": drivesPage
                     case "lang": LangPage()
+                    case "todo": TodoPage()
                     case "games": GamesPage()
                     case "selfcare": SelfCareView()
                     case "update": NotchUpdatePage()
