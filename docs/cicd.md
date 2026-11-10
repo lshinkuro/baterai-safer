@@ -140,7 +140,7 @@ Di Mac yang akan menandatangani:
 | `make appstore-validate` | Validasi ke App Store Connect |
 | `make appstore-upload` | Validasi lalu upload, hanya kalau git bersih |
 
-`VERSION` diambil dari tag git terakhir dan `BUILD_NUMBER` dari jumlah commit. Untuk upload ulang dari commit yang sama, naikkan nomor build: `make appstore-upload BUILD_NUMBER=90`.
+`VERSION` diambil dari tag git terakhir dan `BUILD_NUMBER` dari jumlah commit. Untuk upload ulang dari commit yang sama, naikkan nomor build: `make appstore-upload BUILD_NUMBER=100`.
 
 `make appstore-upload` menjalankan semuanya berurutan, jadi untuk rilis cukup satu perintah ini:
 
@@ -182,7 +182,7 @@ Tutup Poni yang terpasang sebelum membuka hasil `make lite`.
 Nilai `VERSION` dan `BUILD_NUMBER` bisa ditimpa untuk satu kali jalan:
 
 ```
-make appstore-upload VERSION=0.18.2 BUILD_NUMBER=90
+make appstore-upload VERSION=0.18.2 BUILD_NUMBER=100
 ```
 
 `make appstore-app` selalu menghapus isi `.build/appstore` lebih dulu, jadi salin `Poni.pkg` ke tempat lain kalau ingin menyimpannya.
@@ -197,7 +197,7 @@ make appstore-upload VERSION=0.18.2 BUILD_NUMBER=90
 | `forbidden code in the Lite binary` | Ada kode terlarang yang belum dibungkus `#if !LITE` |
 | `refusing: signed with the company certificate` | Nilai sign ID menunjuk sertifikat kantor. Ganti ke sertifikat tim yang benar |
 | `productbuild` tidak menemukan identity | Sertifikat installer belum terpasang, private key-nya tidak ada, atau `INSTALLER_SIGN_ID` tidak persis sama |
-| Nomor build sudah pernah dipakai | Naikkan nomornya, misalnya `make appstore-upload BUILD_NUMBER=90` |
+| Nomor build sudah pernah dipakai | Naikkan nomornya, misalnya `make appstore-upload BUILD_NUMBER=100` |
 
 ## Setelah upload
 
