@@ -869,8 +869,6 @@
 "Aktifkan speaker" = "Unmute speaker";
 "Bisukan speaker" = "Mute speaker";
 "Speaker ini tidak bisa dibisukan" = "This speaker can’t be muted";
-"Matikan kamera" = "Turn camera off";
-"Nyalakan kamera" = "Turn camera on";
 "Update tersedia" = "Update available";
 "Cek update" = "Check for updates";
 "Perlindungan panas" = "Heat protection";
@@ -1146,3 +1144,6 @@
 "Baris %lld kolom %@" = "Row %lld column %@";
 "Baris %lld kolom %lld" = "Row %lld column %lld";
 "Kosong" = "Empty";
+"Matikan kamera cermin" = "Turn mirror off";
+"Nyalakan kamera cermin" = "Turn mirror on";
+"Klik untuk buka, seret untuk mengubah urutan" = "Click to open, drag to reorder";

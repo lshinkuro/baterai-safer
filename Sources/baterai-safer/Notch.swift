@@ -28,7 +28,7 @@ func placedTab(_ tabs: [NTab], _ t: NTab, at target: NTab) -> [NTab] {
 }
 
 /// Swaps a tab with its neighbor on that side, stepping over tabs that aren't showing.
-func movedTab(_ tabs: [NTab], _ t: NTab, by d: Int, showing: (NTab) -> Bool) -> [NTab] {
+func movedTab<T: Equatable>(_ tabs: [T], _ t: T, by d: Int, showing: (T) -> Bool) -> [T] {
     var o = tabs
     guard let i = o.firstIndex(of: t) else { return o }
     var j = i + d
@@ -43,20 +43,20 @@ func orderedTabs(_ saved: String) -> [NTab] {
     return s + NTab.allCases.filter { !s.contains($0) }
 }
 
-/// An icon being dragged along a strip of tabs: neighbors swap as it passes them.
-struct TabDrag {
-    var tab: NTab?
+/// An item being dragged along a strip (tab icons, Home cards): neighbors swap as it passes them.
+struct TabDrag<T: Equatable> {
+    var tab: T?
     var offset: CGFloat = 0 // from the slot the icon has swapped into
     private var moved = 0   // slots swapped across so far
 
     /// `x` is the whole drag so far, in a coordinate space that doesn't move with the icon.
-    mutating func update(_ t: NTab, _ x: CGFloat, step: CGFloat, showing: @escaping (NTab) -> Bool) {
+    mutating func update(_ t: T, _ x: CGFloat, step: CGFloat, items: [T], move: (Int) -> Void) {
         tab = t
         let want = Int((x / step).rounded())
         if want != moved {
-            let d = want > moved ? 1 : -1, tabs = NTab.ordered.filter(showing)
-            if let i = tabs.firstIndex(of: t), tabs.indices.contains(i + d) {
-                withAnimation(Motion.snap) { t.move(by: d, showing: showing) }
+            let d = want > moved ? 1 : -1
+            if let i = items.firstIndex(of: t), items.indices.contains(i + d) {
+                withAnimation(Motion.snap) { move(d) }
                 moved += d
             }
         }
@@ -497,7 +497,7 @@ struct NotchView: View {
     @ObservedObject var meet: MeetingModel
     let clips: ClipboardModel, shelf: Shelf, sys: SystemModel, git: GitModel, pr: PRModel, notes: NotesModel
     @Local private var dropping = false
-    @Local private var drag = TabDrag()
+    @Local private var drag = TabDrag<NTab>()
     @Namespace private var ns
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
     @AppStorage(NTab.orderKey) private var tabOrder = ""
@@ -531,7 +531,7 @@ struct NotchView: View {
             .frame(width: size.width, height: size.height)
             .clipShape(NotchShape(radius: radius))
             .overlay(NotchShape(radius: radius).stroke(Color.white.opacity(state.expanded ? 0.08 : 0), lineWidth: 1))
-            .shadow(color: .black.opacity(state.expanded ? 0.55 : 0), radius: 18, y: 8)
+            .shadow(color: .black.opacity(state.expanded ? 0.55 : 0), radius: 8, y: 3)
 
             // Sized and clipped out here, so content on its way out shrinks with the island.
             ZStack(alignment: .top) {
@@ -632,7 +632,7 @@ struct NotchView: View {
                         .zIndex(grabbed ? 1 : 0)
                         // Press and slide: the icon pops up and neighbors swap as it passes them.
                         .simultaneousGesture(DragGesture(minimumDistance: 6, coordinateSpace: .named("tabs"))
-                            .onChanged { drag.update(t, $0.translation.width, step: w + 1, showing: \.enabled) }
+                            .onChanged { drag.update(t, $0.translation.width, step: w + 1, items: NTab.ordered.filter(\.enabled)) { t.move(by: $0, showing: \.enabled) } }
                             .onEnded { _ in withAnimation(Motion.snap) { drag = TabDrag() } })
                     }
                 }
@@ -737,7 +737,7 @@ struct QuickToggles: View {
     // macOS has no switch that turns the camera off for every app; this one is Poni's own mirror.
     var camera: some View {
         let on = state.tab == .more && morePage == "camera"
-        return button(on ? "video.fill" : "video.slash.fill", on ? "Matikan kamera" : "Nyalakan kamera", on ? .gray : Palette.red) {
+        return button(on ? "video.fill" : "video.slash.fill", on ? "Matikan kamera cermin" : "Nyalakan kamera cermin", on ? Palette.accent : .gray) {
             if on { morePage = "" } else { morePage = "camera"; state.tab = .more }
         }
     }

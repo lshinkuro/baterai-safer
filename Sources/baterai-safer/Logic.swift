@@ -334,8 +334,9 @@ func selfTest() {
     assert(AIModel.known[1].2("q", .last).contains("--resume") && !AIModel.known[1].2("q", .none).contains("--resume"), "ai: kiro resume flag")
     let saved = try! JSONDecoder().decode([AISession].self, from: JSONEncoder().encode([AISession(id: sid, cli: "Claude", chat: talk)]))
     assert(saved.first?.title == "hai" && saved.first?.chat.count == 3, "ai: sessions round-trip")
-    assert(movedTab([.home, .music, .focus], .home, by: 1) { $0 != .music } == [.focus, .music, .home], "tab drag steps over hidden tabs")
-    assert(movedTab([.home, .music], .music, by: 1) { _ in true } == [.home, .music], "tab drag stops at the end")
+    assert(movedTab([NTab.home, .music, .focus], .home, by: 1) { $0 != .music } == [.focus, .music, .home], "tab drag steps over hidden tabs")
+    assert(movedTab([NTab.home, .music], .music, by: 1) { _ in true } == [.home, .music], "tab drag stops at the end")
+    assert(movedTab(["music", "git", "todo"], "todo", by: -1) { $0 != "git" } == ["todo", "git", "music"], "home drag steps over cards that are switched off")
     assert(placedTab([.home, .music, .focus], .home, at: .focus) == [.music, .focus, .home] && placedTab([.home, .music, .focus], .focus, at: .home) == [.focus, .home, .music], "tab drop in the feature list")
     assert(netCounters()["lo0"] != nil && ipv4("lo0") == "127.0.0.1", "jaringan: lo0 counters and address")
     // Kemenag RI schedule for Kota Jakarta on 8 Nov 2026 (api.myquran.com, id 1301), to the minute ±1.

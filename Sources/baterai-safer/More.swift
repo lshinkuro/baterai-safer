@@ -91,7 +91,7 @@ final class CameraBox: ObservableObject {
     let session = AVCaptureSession()
     @Published var denied = false
     @Published var aspect: CGFloat = 16 / 9 // of the camera's actual picture
-    private var configured = false
+    @Published private(set) var configured = false
 
     func start() {
         AVCaptureDevice.requestAccess(for: .video) { ok in
@@ -117,21 +117,22 @@ final class CameraBox: ObservableObject {
 
 struct CameraPreview: NSViewRepresentable {
     let session: AVCaptureSession
+    let flipped: Bool
 
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         let layer = AVCaptureVideoPreviewLayer(session: session)
         layer.videoGravity = .resizeAspect
-        if let c = layer.connection, c.isVideoMirroringSupported {
-            c.automaticallyAdjustsVideoMirroring = false
-            c.isVideoMirrored = true
-        }
         v.layer = layer
         v.wantsLayer = true
         return v
     }
 
-    func updateNSView(_ v: NSView, context: Context) {}
+    func updateNSView(_ v: NSView, context: Context) {
+        guard let c = (v.layer as? AVCaptureVideoPreviewLayer)?.connection, c.isVideoMirroringSupported else { return }
+        c.automaticallyAdjustsVideoMirroring = false
+        c.isVideoMirrored = flipped
+    }
 }
 
 // MARK: Color picker
@@ -262,6 +263,7 @@ struct MoreView: View {
     @Local private var colors = ColorPick.recent
     @Local private var hoveredColor: String?
     @StateObject private var camera = CameraBox()
+    @AppStorage("cameraFlipped") private var cameraFlipped = true // like a real mirror: your right hand shows on the right
     @ObservedObject private var tools = ToolsModel.shared
     @ObservedObject private var downloads = Downloads.shared
     @ObservedObject private var volumes = Volumes.shared
@@ -440,9 +442,16 @@ struct MoreView: View {
                 Placeholder(icon: "camera.fill", title: "Izin kamera ditolak", subtitle: "System Settings → Privacy & Security → Camera")
             } else {
                 // Whole picture at the camera's own shape, not cropped to the wide notch.
-                CameraPreview(session: camera.session)
+                CameraPreview(session: camera.session, flipped: cameraFlipped)
+                    .id(camera.configured) // a layer made before the camera is attached has no connection to flip
                     .aspectRatio(camera.aspect, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        NButton(icon: "flip.horizontal", title: "Flip", prominent: cameraFlipped) { cameraFlipped.toggle() }
+                            .background(Color.black.opacity(0.45), in: Capsule()) // stays readable over a bright picture
+                            .accessibilityValue(tr(cameraFlipped ? "Aktif" : "Mati"))
+                            .padding(8)
+                    }
             }
         }
         .onAppear { camera.start() }

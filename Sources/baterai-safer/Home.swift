@@ -12,6 +12,8 @@ struct HomeView: View {
     @ObservedObject var study = LangModel.shared
     @ObservedObject var todos = TodoModel.shared
     @Local private var newTodo = ""
+    @Local private var drag = TabDrag<String>()
+    @Local private var dragEnded = Date.distantPast
     @ObservedObject var notes = Notch.shared.notes
     @ObservedObject var clips = Notch.shared.clips
     @ObservedObject var git = Notch.shared.git
@@ -31,10 +33,10 @@ struct HomeView: View {
     ]
 
     var chosen: [String] { stored.split(separator: ",").map(String.init) }
+    // Features switched off in Tools don't get a card (their background work is stopped).
+    var shown: [(id: String, icon: String, title: String, tab: NTab)] { chosen.compactMap { id in Self.all.first { $0.id == id && $0.tab.enabled } } }
 
     var body: some View {
-        // Features switched off in Tools don't get a card (their background work is stopped).
-        let shown = chosen.compactMap { id in Self.all.first { $0.id == id && $0.tab.enabled } }
         VStack(spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 TimelineView(.periodic(from: .now, by: 60)) { ctx in
@@ -57,11 +59,13 @@ struct HomeView: View {
             } else {
                 if shown.count <= 4 {
                     HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0) } }
+                        .coordinateSpace(name: "homeCards")
                 } else {
                     // More than fit: the fifth card peeks in so it's clear the row scrolls.
                     GeometryReader { geo in
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0).frame(width: 165) } }
+                            HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0, width: 165) } }
+                                .coordinateSpace(name: "homeCards")
                                 .frame(height: geo.size.height)
                         }
                     }
@@ -76,10 +80,12 @@ struct HomeView: View {
         .onDisappear { if Notch.shared.state.tab != .stats { sys.stop() } } // the Stats tab keeps the same poller going
     }
 
-    func widget(_ w: (id: String, icon: String, title: String, tab: NTab)) -> some View {
-        NCard(padding: 12, glow: true) {
+    func widget(_ w: (id: String, icon: String, title: String, tab: NTab), width: CGFloat? = nil) -> some View {
+        let n = CGFloat(shown.count), grabbed = drag.tab == w.id
+        let step = width.map { $0 + 10 } ?? (NotchView.open.width - 36 + 10) / max(n, 1) // card plus gap
+        return NCard(padding: 12, glow: true) {
             VStack(alignment: .leading, spacing: 10) {
-                Button { open(w.id, w.tab) } label: {
+                Button { if drag.tab == nil, Date().timeIntervalSince(dragEnded) > 0.25 { open(w.id, w.tab) } } label: {
                     HStack(spacing: 5) {
                         Image(systemName: w.icon).font(.system(size: 10, weight: .semibold))
                         Text(tr(w.title).uppercased()).font(.system(size: 10, weight: .semibold)).tracking(0.8).lineLimit(1)
@@ -89,7 +95,10 @@ struct HomeView: View {
                     }
                     .foregroundStyle(.gray).contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).tip("Buka")
+                .buttonStyle(.plain).tip("Klik untuk buka, seret untuk mengubah urutan")
+                .simultaneousGesture(reorder(w.id, step: step)) // a Button swallows the card's own drag
+                .accessibilityAction(named: tr("Geser ke kiri")) { move(w.id, by: -1) }
+                .accessibilityAction(named: tr("Geser ke kanan")) { move(w.id, by: 1) }
                 card(w.id).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
@@ -100,6 +109,26 @@ struct HomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
         }
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .gesture(reorder(w.id, step: step)) // lower priority than the card's own controls (scrubber, text fields)
+        .frame(width: width)
+        .scaleEffect(grabbed ? 1.03 : 1)
+        .offset(x: grabbed ? drag.offset : 0)
+        .zIndex(grabbed ? 1 : 0)
+    }
+
+    func reorder(_ id: String, step: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .named("homeCards"))
+            .onChanged { drag.update(id, $0.translation.width, step: step, items: shown.map(\.id)) { move(id, by: $0) } }
+            .onEnded { _ in // a release over the header also presses its button; the time check in widget ignores that
+                dragEnded = Date()
+                withAnimation(Motion.snap) { drag = TabDrag() }
+            }
+    }
+
+    func move(_ id: String, by d: Int) {
+        let visible = shown.map(\.id)
+        stored = movedTab(chosen, id, by: d) { visible.contains($0) }.joined(separator: ",")
     }
 
     func greeting(_ d: Date) -> String {
