@@ -1,6 +1,6 @@
 # CI/CD Poni Lite ke App Store
 
-Status: **pipeline siap, belum pernah upload sungguhan** (menunggu akun Apple Developer). Build Lite juga belum diuji di dalam sandbox.
+Status: **pipeline siap, belum pernah upload sungguhan.** Penghalang terakhir: private key sertifikat Mac Installer Distribution belum ada di Mac pengembang. Build Lite juga belum diuji di dalam sandbox.
 
 Pipeline ini dijalankan dari Mac pengembang. `Makefile` dan `.env.appstore` sengaja hanya ada di Mac itu (lewat `.git/info/exclude`), tidak ikut ter-commit. Versi DMG dan Homebrew tetap memakai alur rilis biasa dan tidak terpengaruh.
 
@@ -16,13 +16,58 @@ Versi penuh tidak bisa masuk App Store: helper root dan SMC, API privat `PowerUI
 
 Daftarnya ada di `enum Lite` (`Sources/baterai-safer/UI.swift`). Fitur baru yang butuh akses di luar sandbox harus ditambahkan ke `Lite.cutTabs` atau `Lite.cutTools`, atau dibungkus `#if !LITE`.
 
+## Yang dibutuhkan untuk upload
+
+| Komponen | Fungsi | Disimpan di |
+|---|---|---|
+| Sertifikat **Apple Distribution** | Menandatangani `Poni.app` | Keychain, lengkap dengan private key |
+| Sertifikat **Mac Installer Distribution** | Menandatangani `Poni.pkg` | Keychain, lengkap dengan private key |
+| Provisioning profile **Mac App Store** | Mengikat App ID, tim, dan sertifikat Apple Distribution. Ditanam ke dalam app | File, path-nya di `PROVISION_PROFILE` |
+| API key App Store Connect | Izin `altool` untuk validasi dan upload | `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8` |
+
+Jangan tertukar dengan Mac Development (hanya untuk development) atau Developer ID Installer (untuk distribusi di luar App Store).
+
+### Jenis file
+
+| File | Isi | Asal |
+|---|---|---|
+| `.certSigningRequest` (CSR) | Permintaan sertifikat. Private key-nya tetap di Mac pembuat CSR | Keychain Access → Certificate Assistant |
+| `.cer` | Sertifikat saja, **tanpa private key** | Diunduh dari portal Apple |
+| `.p12` | Sertifikat **dan** private key, dilindungi password | Diekspor dari Keychain Access di Mac pembuat sertifikat |
+| `.p8` | Private key API. Hanya untuk login ke App Store Connect, tidak bisa menandatangani | Dibuat di App Store Connect, hanya bisa diunduh sekali |
+
+Apple tidak menyimpan private key, jadi `.p12` tidak bisa diunduh dari portal dan tidak bisa dibuat ulang dari `.cer`. Sertifikat hanya bisa dipakai menandatangani di Mac yang punya private key-nya.
+
 ## Persiapan (sekali)
 
-1. Daftar Apple Developer Program sebagai Individual.
-2. Di portal developer, buat App ID, sertifikat **Apple Distribution** dan **Mac Installer Distribution**, lalu unduh provisioning profile **Mac App Store**.
-3. Di App Store Connect, buat aplikasi dengan App ID tadi. Nama harus unik; kalau "Poni" sudah dipakai, gunakan variasi seperti "Poni Notch".
-4. Di App Store Connect → Users and Access → Integrations, buat API key, lalu simpan di `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`.
-5. Isi `.env.appstore`, dan ganti semua nilai berawalan `ISI_`. Pakai sertifikat atas nama pribadi, bukan sertifikat kantor.
+1. Pakai tim Apple yang memegang app record di App Store Connect. Pastikan nama tim di kanan atas portal sudah benar sebelum membuat apa pun, dan jangan pakai sertifikat kantor.
+2. Di portal developer, buat App ID dan provisioning profile **Mac App Store** yang memuat sertifikat Apple Distribution.
+3. Siapkan sertifikat Apple Distribution dan Mac Installer Distribution dengan salah satu cara di bawah.
+4. Di App Store Connect, buat aplikasi dengan App ID tadi. Nama harus unik; kalau "Poni" sudah dipakai, gunakan variasi seperti "Poni Notch".
+5. Di App Store Connect → Users and Access → Integrations, buat API key, lalu simpan di `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`.
+6. Isi `.env.appstore`, dan ganti semua nilai berawalan `ISI_`.
+
+### Mendapatkan sertifikat
+
+**Kalau slot masih kosong**, buat dari Mac ini:
+
+1. Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority, pilih **Saved to disk**.
+2. Di portal, klik **+**, pilih jenis sertifikat, lalu unggah CSR tadi.
+3. Unduh `.cer` dan klik dua kali untuk memasangnya.
+4. Ekspor `.p12` dari Keychain Access sebagai cadangan.
+
+**Kalau slot penuh** (pilihannya abu-abu di portal), ada dua cara:
+
+- Minta `.p12` dari pembuat sertifikat yang ada, lalu impor lewat Keychain Access → File → Import Items. Pembuatnya terlihat di halaman detail sertifikat. Mengunduh `.cer`-nya saja tidak cukup.
+- Kalau pembuatnya tidak bisa dihubungi, minta admin tim me-revoke sertifikat itu, lalu buat yang baru. Setelah di-revoke, pemakai lain tidak bisa lagi menandatangani dengan sertifikat itu. Kuota tiap jenis sertifikat terpisah, jadi me-revoke jenis lain tidak menambah slot.
+
+### Mengecek sertifikat
+
+```
+security find-identity -v | grep -i installer
+```
+
+Baris yang muncul adalah nilai untuk `INSTALLER_SIGN_ID`. Jangan tambahkan `-p codesigning`, karena opsi itu menyembunyikan sertifikat installer. Kalau kosong padahal sertifikatnya terlihat di Keychain Access, berarti private key-nya tidak ada di Mac ini.
 
 | Variabel | Isi |
 |---|---|
@@ -46,9 +91,35 @@ Daftarnya ada di `enum Lite` (`Sources/baterai-safer/UI.swift`). Fitur baru yang
 
 `VERSION` diambil dari tag git terakhir dan `BUILD_NUMBER` dari jumlah commit. Untuk upload ulang dari commit yang sama, naikkan nomor build: `make appstore-upload BUILD_NUMBER=90`.
 
+`make appstore-upload` menjalankan semuanya berurutan, jadi untuk rilis cukup satu perintah ini:
+
+1. Memastikan git bersih dan semua nilai `.env.appstore` terisi.
+2. Build debug dan selftest versi penuh.
+3. Build Lite, lalu gagal kalau binary memuat kode terlarang.
+4. Menambahkan bundle ID, nomor build, profile, dan entitlement sandbox, lalu menandatangani `Poni.app`.
+5. Membungkus jadi `.build/appstore/Poni.pkg` dan menandatanganinya dengan sertifikat installer.
+6. Validasi ke App Store Connect, lalu upload.
+
+Kalau baru ingin mengecek tanpa mengirim build, pakai `make appstore-validate`.
+
+## Kalau gagal
+
+| Pesan | Penyebab dan solusi |
+|---|---|
+| `git tree is not clean` | Commit perubahan, atau tambahkan file lokal ke `.git/info/exclude` |
+| `isi <NAMA> di .env.appstore` | Nilainya kosong atau masih berawalan `ISI_` |
+| `PROVISION_PROFILE not found` | Path profile salah atau file-nya sudah dipindah |
+| `forbidden code in the Lite binary` | Ada kode terlarang yang belum dibungkus `#if !LITE` |
+| `refusing: signed with the company certificate` | Nilai sign ID menunjuk sertifikat kantor. Ganti ke sertifikat tim yang benar |
+| `productbuild` tidak menemukan identity | Sertifikat installer belum terpasang, private key-nya tidak ada, atau `INSTALLER_SIGN_ID` tidak persis sama |
+| Nomor build sudah pernah dipakai | Naikkan nomornya, misalnya `make appstore-upload BUILD_NUMBER=90` |
+
 ## Setelah upload
 
-Upload tidak langsung tampil ke publik. Build masuk ke App Store Connect, lalu isi deskripsi, screenshot, dan label privasi, pilih build-nya, dan klik Submit for Review.
+Upload tidak langsung tampil ke publik. Tunggu build selesai diproses di App Store Connect.
+
+- **TestFlight:** buka tab TestFlight, jawab pertanyaan enkripsi kalau diminta, lalu tambahkan build ke grup penguji.
+- **App Store:** isi deskripsi, screenshot, dan label privasi, pilih build-nya, dan klik Submit for Review.
 
 ## Mencoba Lite di Mac sendiri
 
