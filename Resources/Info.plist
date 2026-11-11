@@ -44,6 +44,6 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Untuk menghitung jadwal sholat di lokasimu. Lokasi hanya dipakai di Mac ini.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Untuk menampilkan dan mengontrol lagu di Spotify/Music, menyimpan catatan ke Apple Notes, dan mengganti mode gelap.</string>
+	<string>Untuk menampilkan dan mengontrol lagu di Spotify/Music, membuka video YouTube dari tab browser ke jendela mengambang, menyimpan catatan ke Apple Notes, dan mengganti mode gelap.</string>
 </dict>
 </plist>

@@ -11,6 +11,22 @@ cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 cp -R Resources/*.lproj "$APP/Contents/Resources/"
 cp Resources/lottie/lottie_light.min.js "$APP/Contents/Resources/" # Lottie preview in AI → Visual
 sed "s/__VERSION__/${1:-dev}/" Resources/Info.plist > "$APP/Contents/Info.plist"
+if [ -z "$BIN" ]; then # the App Store build (BIN set) ships no private API
+  # Now Playing for every app (YouTube in a browser, Netflix, IINA): /usr/bin/perl loads this to reach MediaRemote.
+  MRA=Vendor/mediaremote-adapter
+  FW="$APP/Contents/Resources/MediaRemoteAdapter.framework"
+  mkdir -p "$FW"
+  clang -arch arm64 -arch x86_64 -dynamiclib -fobjc-arc -fvisibility=default -mmacosx-version-min=13.0 -I$MRA/include -I$MRA/src \
+    -install_name @rpath/MediaRemoteAdapter.framework/MediaRemoteAdapter \
+    $MRA/src/adapter/*.m $MRA/src/private/*.m $MRA/src/utility/*.m \
+    -framework Foundation -framework AppKit -framework UniformTypeIdentifiers -o "$FW/MediaRemoteAdapter"
+  cp $MRA/bin/mediaremote-adapter.pl "$APP/Contents/Resources/"
+  if [ -n "$SIGN_ID" ]; then
+    codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$FW/MediaRemoteAdapter"
+  else
+    codesign --force --sign - "$FW/MediaRemoteAdapter"
+  fi
+fi
 if [ -n "$SIGN_ID" ]; then
   # Only a Developer ID certificate may sign the release; the keychain also holds a company one (docs/signing-plan.md).
   case "$SIGN_ID" in "Developer ID Application:"*) ;; *) echo "SIGN_ID must be a Developer ID Application certificate" >&2; exit 1;; esac

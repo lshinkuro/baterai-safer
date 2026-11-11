@@ -1,7 +1,10 @@
 import AppKit
 import Vision
 
-// MARK: Now Playing (Spotify / Apple Music via AppleScript; MediaRemote is closed to third parties on recent macOS)
+// MARK: Now Playing
+// Any app (YouTube in a browser, Netflix, IINA, Spotify) through mediaremote-adapter: MediaRemote is closed to
+// third-party apps since macOS 15.4, but /usr/bin/perl may still load it. Spotify / Apple Music via AppleScript
+// is the fallback when the adapter isn't bundled (dev builds, Poni Lite) or stops working.
 
 struct Lyric: Equatable {
     let t: Double
@@ -16,6 +19,23 @@ func parseLRC(_ s: String) -> [Lyric] {
         guard ts.count == 2, let m = Double(ts[0]), let sec = Double(ts[1]) else { return nil }
         return Lyric(t: m * 60 + sec, line: l[l.index(after: close)...].trimmingCharacters(in: .whitespaces))
     }
+}
+
+/// Applies one adapter `stream` payload: a full one replaces the state, a diff updates it (null removes a key).
+func mergeNowPlaying(_ old: [String: Any], _ payload: [String: Any], diff: Bool) -> [String: Any] {
+    guard diff else { return payload }
+    var m = old
+    for (k, v) in payload { m[k] = v is NSNull ? nil : v }
+    return m
+}
+
+/// `elapsedTime` was true at `timestamp`; while playing, time has moved on since.
+func nowPlayingPosition(_ info: [String: Any], at now: Date) -> Double {
+    let elapsed = info["elapsedTime"] as? Double ?? 0
+    guard info["playing"] as? Bool == true, let s = info["timestamp"] as? String, let t = ISO8601DateFormatter().date(from: s) else { return elapsed }
+    let d = info["duration"] as? Double ?? 0
+    let p = elapsed + now.timeIntervalSince(t) * (info["playbackRate"] as? Double ?? 1)
+    return d > 0 ? min(d, p) : p
 }
 
 final class NowPlaying: ObservableObject {
@@ -40,8 +60,100 @@ final class NowPlaying: ObservableObject {
 
     static let players = [("com.spotify.client", "Spotify"), ("com.apple.Music", "Music")]
 
-    func start() { stop(); poll(); timer = .scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.poll() } }
-    func stop() { timer?.invalidate(); timer = nil }
+    static let adapter: (script: String, framework: String)? = {
+        guard let r = Bundle.main.resourcePath, FileManager.default.fileExists(atPath: r + "/MediaRemoteAdapter.framework/MediaRemoteAdapter") else { return nil }
+        return (r + "/mediaremote-adapter.pl", r + "/MediaRemoteAdapter.framework")
+    }()
+    private var stream: Process?
+    private var info: [String: Any] = [:]
+    private var adapterFailed = false
+    private var viaAdapter: Bool { stream != nil }
+
+    func start() {
+        if Self.adapter != nil, !adapterFailed {
+            if stream == nil { timer?.invalidate(); timer = nil; startStream() }
+            return
+        }
+        stop(); poll(); timer = .scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.poll() }
+    }
+
+    func stop() {
+        timer?.invalidate(); timer = nil
+        let p = stream
+        stream = nil // first, so the termination handler knows we ended it
+        p?.terminate()
+    }
+
+    private func adapterProcess(_ args: [String]) -> Process? {
+        guard let a = Self.adapter else { return nil }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+        p.arguments = [a.script, a.framework] + args
+        p.standardError = FileHandle.nullDevice
+        return p
+    }
+
+    /// One JSON line per change; `diff` lines carry only the keys that changed (null = gone).
+    private func startStream() {
+        guard let p = adapterProcess(["stream", "--debounce=100"]) else { return }
+        let out = Pipe()
+        p.standardOutput = out
+        var buf = Data() // only touched by the pipe's serial handler
+        out.fileHandleForReading.readabilityHandler = { h in
+            let d = h.availableData
+            guard !d.isEmpty else { h.readabilityHandler = nil; return }
+            buf.append(d)
+            while let nl = buf.firstIndex(of: 10) {
+                let line = Data(buf[..<nl])
+                buf.removeSubrange(...nl)
+                DispatchQueue.main.async { self.applyStream(line) }
+            }
+        }
+        p.terminationHandler = { [weak self] p in
+            DispatchQueue.main.async {
+                guard let self, self.stream === p else { return }
+                // It died on its own (a macOS update closed the door): fall back to AppleScript.
+                self.stream = nil
+                self.adapterFailed = true
+                self.start()
+            }
+        }
+        do { try p.run(); stream = p } catch { adapterFailed = true; start() }
+    }
+
+    private func applyStream(_ line: Data) {
+        guard viaAdapter, let j = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+              let payload = j["payload"] as? [String: Any] else { return }
+        let diff = j["diff"] as? Bool ?? false
+        info = mergeNowPlaying(info, payload, diff: diff)
+        // Safari and Poni's own floating video play in WebKit's GPU process; the parent is the app that owns it.
+        guard let t = info["title"] as? String, let id = info["parentApplicationBundleIdentifier"] as? String ?? info["bundleIdentifier"] as? String else {
+            if app != nil { app = nil; playing = false; artwork = nil; lyrics = []; trackKey = "" }
+            return
+        }
+        let pid = (info["processIdentifier"] as? Int).flatMap { NSRunningApplication(processIdentifier: pid_t($0)) }
+        bundleID = id
+        app = isFloating ? "Poni"
+            : NSWorkspace.shared.urlForApplication(withBundleIdentifier: id).map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") }
+            ?? pid?.localizedName ?? id
+        title = t
+        artist = info["artist"] as? String ?? ""
+        album = info["album"] as? String ?? ""
+        playing = info["playing"] as? Bool ?? false
+        duration = info["duration"] as? Double ?? 0
+        position = nowPlayingPosition(info, at: Date())
+        polledAt = Date()
+        shuffle = (info["shuffleMode"] as? Int ?? 1) > 1
+        repeatMode = [2: "one", 3: "all"][info["repeatMode"] as? Int ?? 1] ?? "off"
+        if title + artist != trackKey {
+            trackKey = title + artist
+            artwork = nil
+            loadLyrics()
+        }
+        if !diff || payload.keys.contains("artworkData") {
+            artwork = (info["artworkData"] as? String).flatMap { Data(base64Encoded: $0) }.flatMap(NSImage.init(data:))
+        }
+    }
 
     /// Position extrapolated between polls, for a smooth progress bar and lyrics.
     func now(_ date: Date) -> Double { min(duration, position + (playing ? date.timeIntervalSince(polledAt) : 0)) }
@@ -54,6 +166,7 @@ final class NowPlaying: ObservableObject {
     }
 
     func poll() {
+        guard !viaAdapter else { return } // the stream pushes changes itself
         // Only talk to a player that is already running; `tell application` would launch it.
         guard let (id, name) = Self.players.first(where: { !NSRunningApplication.runningApplications(withBundleIdentifier: $0.0).isEmpty }) else {
             if app != nil { app = nil; playing = false; artwork = nil; lyrics = []; trackKey = "" }
@@ -127,6 +240,25 @@ final class NowPlaying: ObservableObject {
         }.resume()
     }
 
+    /// Browsers whose tabs AppleScript can read (Firefox can't), for "show the video".
+    static let browsers: Set = ["com.apple.Safari", "com.google.Chrome", "company.thebrowser.dia", "company.thebrowser.Browser",
+                                "com.brave.Browser", "com.microsoft.edgemac", "com.vivaldi.Vivaldi", "org.chromium.Chromium"]
+    var inBrowser: Bool { viaAdapter && Self.browsers.contains(bundleID) }
+    var isFloating: Bool { FloatingVideo.shared.isOpen && (bundleID == Bundle.main.bundleIdentifier || bundleID.hasPrefix("com.apple.WebKit")) }
+
+    /// Moves the YouTube video playing in the browser into Poni's floating window, at the same second.
+    func floatVideo() {
+        let (browser, title, start) = (bundleID, title, Int(now(Date())))
+        q.async {
+            let id = FloatingVideo.tabURL(browser: browser, title: title).flatMap(youtubeID)
+            DispatchQueue.main.async {
+                guard let id else { return NSSound.beep() } // not YouTube, or Automation was refused
+                self.send("pause")
+                FloatingVideo.shared.open(id, start: start)
+            }
+        }
+    }
+
     /// Players installed on this Mac, for the empty state's play buttons.
     static var installed: [(id: String, name: String)] {
         players.filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.0) != nil }
@@ -134,9 +266,17 @@ final class NowPlaying: ObservableObject {
     }
 
     /// Resumes the last track in a player, launching it first if needed.
-    func play(_ id: String) { bundleID = id; send("play") }
+    func play(_ id: String) { bundleID = id; script("play") }
 
+    /// AppleScript-style player commands; through the adapter they become MediaRemote commands for whatever is playing.
     func send(_ cmd: String) {
+        guard viaAdapter else { return script(cmd) }
+        if let id = ["play": 0, "pause": 1, "playpause": 2, "next track": 4, "previous track": 5][cmd] {
+            try? adapterProcess(["send", "\(id)"])?.run()
+        }
+    }
+
+    private func script(_ cmd: String) {
         let id = bundleID
         q.async {
             _ = self.run("tell application id \"\(id)\" to \(cmd)")
@@ -156,17 +296,20 @@ final class NowPlaying: ObservableObject {
     func seek(_ t: Double) {
         position = t
         polledAt = Date()
+        if viaAdapter { try? adapterProcess(["seek", "\(Int(t * 1_000_000))"])?.run(); return }
         send(String(format: "set player position to %.2f", t))
     }
 
     func toggleShuffle() {
         shuffle.toggle()
+        if viaAdapter { try? adapterProcess(["shuffle", shuffle ? "3" : "1"])?.run(); return }
         send("set \(bundleID == "com.spotify.client" ? "shuffling" : "shuffle enabled") to \(shuffle)")
     }
 
     /// off → all → one → off.
     func cycleRepeat() {
         repeatMode = ["off": "all", "all": "one"][repeatMode] ?? "off"
+        if viaAdapter { try? adapterProcess(["repeat", ["off": "1", "one": "2", "all": "3"][repeatMode]!])?.run(); return }
         if bundleID == "com.spotify.client" {
             spotifyRepeatOne = repeatMode == "one"
             send("set repeating to \(repeatMode == "all")")

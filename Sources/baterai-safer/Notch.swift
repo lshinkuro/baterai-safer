@@ -284,7 +284,7 @@ final class Notch {
         if NTab.clipboard.enabled { clips.start() } else { clips.stop() }   // pasteboard check every 0.5 s
         // These ask for permissions (Automation, Calendar, Location, Notifications): wait for the welcome screen.
         if Onboarding.done {
-            if NTab.music.enabled { media.start() } else { media.stop() }   // AppleScript poll every second
+            if NTab.music.enabled { media.start() } else { media.stop() }   // Now Playing stream (or AppleScript poll every second)
             if FeatureFlags.isOn("meeting") { meet.start() } else { meet.stop() }
             if NTab.ibadah.enabled { Ibadah.shared.start() } else { Ibadah.shared.stop() } // reminders
             LangModel.shared.startReminders()
@@ -836,7 +836,7 @@ struct MusicView: View {
             let players = NowPlaying.installed
             VStack(spacing: 14) {
                 Placeholder(icon: "music.note", title: m.app == nil ? "Tidak ada musik" : "\(m.app!) dijeda",
-                            subtitle: players.isEmpty ? "Pasang Spotify atau Apple Music" : "Lanjutkan lagu terakhir langsung dari sini")
+                            subtitle: NowPlaying.adapter != nil ? "Putar musik atau video di aplikasi apa pun" : players.isEmpty ? "Pasang Spotify atau Apple Music" : "Lanjutkan lagu terakhir langsung dari sini")
                     .frame(height: 140)
                 HStack(spacing: 8) {
                     ForEach(players, id: \.id) { p in
@@ -861,6 +861,11 @@ struct MusicView: View {
                             }
                             Spacer()
                             if m.playing { Equalizer(color: .white.opacity(0.8)) }
+                            if m.isFloating {
+                                musicControl("pip.exit", 14, "Tutup video", tint: .gray) { FloatingVideo.shared.close() }
+                            } else if m.inBrowser {
+                                musicControl("pip.enter", 14, "Tampilkan video (YouTube)", tint: Palette.accent) { m.floatVideo() }
+                            }
                         }
 
                         Group {
