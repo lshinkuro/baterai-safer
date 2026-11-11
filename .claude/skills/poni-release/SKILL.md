@@ -63,4 +63,6 @@ remaining commands into a script in the scratchpad, and ask the user to run it w
 - `scripts/bundle.sh` copies whatever is in `.build/release`; always build release before bundling
   for a local test (a stale binary once shipped an infinite loop).
 - The DMG carries a hidden `Baterai Safer.app` copy so v0.6.10 can still auto-update; keep it.
-- Signing is ad-hoc until the Developer ID plan in `docs/signing-plan.md` is done.
+- Signing is ad-hoc unless `SIGN_ID="Developer ID Application: …"` is set for `scripts/dmg.sh`, which then
+  also notarizes and staples the DMG (needs the `poni` notarytool profile, see `docs/signing-plan.md`).
+  Once a signed release ships, every later DMG must be signed by the same team or installed copies refuse the update.

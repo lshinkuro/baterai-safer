@@ -1,9 +1,10 @@
 import SwiftUI
 import CryptoKit
+import Security
 
 // Update check against GitHub Releases. Homebrew installs upgrade through brew; DMG installs download
-// the release DMG, check its SHA-256 against GitHub's digest (the app isn't Apple-signed, so this is
-// what tells us the file is the one we published), swap the app bundle and relaunch.
+// the release DMG, check its SHA-256 against GitHub's digest (and, once the installed copy is
+// Developer ID signed, that the new one is signed by the same team), swap the app bundle and relaunch.
 
 /// Numeric dotted-version compare ("0.6.10" > "0.6.9"); a "-dev" style suffix is ignored.
 func isNewer(_ a: String, than b: String) -> Bool {
@@ -118,6 +119,11 @@ final class Updater: ObservableObject {
         guard shRun("/usr/bin/ditto", mount.appendingPathComponent("Poni.app").path, staged.path) == 0 else {
             throw UpdateError("Tidak bisa menyalin ke \(appURL.deletingLastPathComponent().path)")
         }
+        // Ad-hoc installs from before Developer ID have no team and rely on the SHA-256 alone.
+        if let team = teamID(of: appURL), !signed(staged, by: team) {
+            try? fm.removeItem(at: staged)
+            throw UpdateError("Tanda tangan update tidak cocok, update dibatalkan")
+        }
         _ = try fm.replaceItemAt(appURL, withItemAt: staged)
     }
 
@@ -140,6 +146,24 @@ final class Updater: ObservableObject {
 }
 
 struct UpdateError: Error { let message: String; init(_ m: String) { message = m } }
+
+/// Team ID in a bundle's code signature; nil when ad-hoc or signed by Apple itself.
+func teamID(of url: URL) -> String? {
+    var code: SecStaticCode?, info: CFDictionary?
+    guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code,
+          SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess else { return nil }
+    return (info as? [String: Any])?[kSecCodeInfoTeamIdentifier as String] as? String
+}
+
+/// The bundle is untampered and signed with an Apple-issued certificate of `team`.
+func signed(_ url: URL, by team: String) -> Bool {
+    var code: SecStaticCode?, req: SecRequirement?
+    guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code,
+          SecRequirementCreateWithString("anchor apple generic and certificate leaf[subject.OU] = \"\(team)\"" as CFString, [], &req) == errSecSuccess
+    else { return false }
+    let flags = SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckNestedCode | kSecCSCheckAllArchitectures)
+    return SecStaticCodeCheckValidity(code, flags, req) == errSecSuccess
+}
 
 /// Exit status of a short command; output is discarded.
 @discardableResult

@@ -13,4 +13,10 @@ cp -R .build/Poni.app "$STAGE/Baterai Safer.app"
 chflags hidden "$STAGE/Baterai Safer.app"
 ln -s /Applications "$STAGE/Applications"
 hdiutil create -volname "Poni" -srcfolder "$STAGE" -format UDZO -ov .build/Poni.dmg >/dev/null
+if [ -n "$SIGN_ID" ]; then
+  # Gatekeeper opens a notarized, stapled DMG without "Open Anyway", even offline.
+  codesign --sign "$SIGN_ID" --timestamp .build/Poni.dmg
+  xcrun notarytool submit .build/Poni.dmg --keychain-profile poni --wait
+  xcrun stapler staple .build/Poni.dmg
+fi
 echo .build/Poni.dmg

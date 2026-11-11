@@ -1,6 +1,10 @@
 # Rencana: Developer ID + notarisasi
 
-Status: **menunggu akun Apple Developer**. Rilis tetap jalan dengan tanda tangan ad-hoc sampai langkah 1–3 selesai.
+Status: **kode siap, menunggu sertifikat Developer ID dan profil notarisasi** (langkah 1–3). Tanpa `SIGN_ID`, rilis tetap ad-hoc seperti sebelumnya. Setelah langkah 1–3 selesai, rilis bertanda tangan dibuat dengan:
+
+```sh
+SIGN_ID="Developer ID Application: <nama> (<TEAMID>)" scripts/dmg.sh X.Y.Z
+```
 
 ## Kenapa
 
@@ -27,7 +31,9 @@ Status: **menunggu akun Apple Developer**. Rilis tetap jalan dengan tanda tangan
 
 `notarytool` dan `stapler` sudah ada di Mac ini (dari Xcode).
 
-## Perubahan kode (dikerjakan setelah langkah 1–3)
+## Perubahan kode
+
+Langkah 1–4 sudah dikerjakan. Updater hanya memeriksa tim kalau aplikasi yang terpasang sudah bertanda tangan Developer ID, jadi pengguna versi ad-hoc tetap bisa update. Langkah 5 menunggu rilis bertanda tangan pertama.
 
 1. **`Resources/Poni.entitlements`** (hardened runtime butuh izin eksplisit untuk fitur yang dipakai):
    - `com.apple.security.automation.apple-events` — Spotify/Music, Apple Notes, dark mode, Finder
