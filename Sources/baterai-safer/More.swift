@@ -269,6 +269,17 @@ struct MoreView: View {
     @ObservedObject private var volumes = Volumes.shared
     @AppStorage("downloadAlert") private var downloadAlert = false
     @Local private var until = Date().addingTimeInterval(3600)
+    @Local private var hoveredTool: String?
+
+    /// Tools that are switched on right now get a mint dot on their tile.
+    private func isOn(_ id: String) -> Bool {
+        switch id {
+        case "charge": fullCharge
+        case "awake": tools.awake
+        case "downloads": downloadAlert
+        default: false
+        }
+    }
 
     static let tools: [(id: String, icon: String, title: String, subtitle: String, color: Color)] = [
         ("charge", "battery.100percent.bolt", "Notif baterai penuh", "Kabari saat sampai batas", Palette.green),
@@ -279,9 +290,9 @@ struct MoreView: View {
         ("drives", "eject.fill", "Lepas USB", "Lepas flashdisk dengan aman", Palette.accent),
         ("lang", "character.book.closed.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
         ("todo", "checkmark.circle.fill", "Todo", "Daftar tugas harian", Palette.accent),
-        ("games", "gamecontroller.fill", "Gabut", "Ular, kartu, X-O, catur, hangman, sudoku, tetris", Palette.accent),
-        ("selfcare", "heart.circle", "Self-care", "Skor harian, istirahat terpandu, mood, kebiasaan", Palette.accent),
-        ("update", "arrow.down.circle.fill", "Pembaruan", "Cek dan pasang versi baru", Palette.accent),
+        ("games", "gamecontroller.fill", "Gabut", "8 game ringan buat jeda", Palette.accent),
+        ("selfcare", "heart.circle", "Self-care", "Istirahat, mood, kebiasaan", Palette.accent),
+        ("update", "arrow.triangle.2.circlepath", "Pembaruan", "Cek dan pasang versi baru", Palette.accent),
     ]
 
     var body: some View {
@@ -313,19 +324,34 @@ struct MoreView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
                 // The camera opens from the switches at the top of the island.
                 ForEach(Self.tools.filter { $0.id != "camera" && !Lite.cutTools.contains($0.id) }, id: \.id) { t in
+                    let hover = hoveredTool == t.id
                     Button { withAnimation(Motion.ease) { page = t.id } } label: {
                         VStack(alignment: .leading, spacing: 8) {
-                            Image(systemName: t.icon).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.85))
-                                .frame(width: 36, height: 36).background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            HStack(alignment: .top) {
+                                Image(systemName: t.icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.accent)
+                                    .frame(width: 36, height: 36)
+                                    .background(Palette.accent.opacity(hover ? 0.2 : 0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                Spacer(minLength: 0)
+                                if isOn(t.id) {
+                                    Circle().fill(Palette.accent).frame(width: 6, height: 6).padding(4).accessibilityLabel(tr("Aktif"))
+                                } else {
+                                    Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white.opacity(hover ? 0.6 : 0.2)).padding(2)
+                                }
+                            }
                             Text(tr(t.title)).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.85)
                             Text(tr(t.subtitle)).font(.system(size: 11)).foregroundStyle(.gray).lineLimit(2, reservesSpace: true)
                         }
                         .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
                         .padding(12)
-                        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.07), lineWidth: 1))
+                        .background(
+                            LinearGradient(colors: [.white.opacity(hover ? 0.09 : 0.065), .white.opacity(0.025)], startPoint: .top, endPoint: .bottom),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(hover ? Palette.accent.opacity(0.35) : .white.opacity(0.07), lineWidth: 1))
                         .contentShape(Rectangle())
                     }
+                    .onHover { h in withAnimation(Motion.ease) { hoveredTool = h ? t.id : (hoveredTool == t.id ? nil : hoveredTool) } }
                     .buttonStyle(.plain)
                 }
             }

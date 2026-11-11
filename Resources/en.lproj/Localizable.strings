@@ -1152,3 +1152,13 @@
 "Suara dikenali di Mac ini · ketuk Poni untuk berhenti" = "Speech is recognized on this Mac · tap Poni to stop";
 "Ucapan %@ dikenali lewat server Apple · ketuk Poni untuk berhenti" = "%@ speech is recognized by Apple's servers · tap Poni to stop";
 "Ucapan %lld dikenali lewat server Apple · ketuk Poni untuk berhenti" = "%lld speech is recognized by Apple's servers · tap Poni to stop";
+"Mengunduh…" = "Downloading…";
+"Checksum DMG tidak cocok" = "DMG checksum mismatch";
+"Tidak ada aplikasi di dalam DMG" = "No app inside the DMG";
+"Tidak bisa menyalin game" = "Could not copy the game";
+"Dibuat dengan Godot, jalan di jendela sendiri. Diunduh sekali dari GitHub." = "Made with Godot, runs in its own window. Downloaded once from GitHub.";
+"Perbarui" = "Update";
+"Versi baru %@ tersedia" = "New version %@ available";
+"8 game ringan buat jeda" = "8 light games for a break";
+"Istirahat, mood, kebiasaan" = "Breaks, mood, habits";
+"Todo" = "Todo";

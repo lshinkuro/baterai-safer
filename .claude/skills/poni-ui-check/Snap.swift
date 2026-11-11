@@ -50,7 +50,7 @@ import SwiftUI
         }
         if t == .more {
             HangmanGame.shared.game = Hangman(word: "PENGUIN", guessed: ["P", "N", "A", "S"])
-            for (i, name) in [(0, "ular"), (1, "kartu"), (2, "xo"), (4, "catur"), (5, "hangman"), (6, "sudoku"), (7, "tetris")] {
+            for (i, name) in [(0, "ular"), (1, "kartu"), (2, "xo"), (4, "catur"), (5, "hangman"), (6, "sudoku"), (7, "tetris"), (8, "desa")] {
                 UserDefaults.standard.set(i, forKey: "game")
                 write("game-\(name)", GamesPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
             }

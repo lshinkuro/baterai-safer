@@ -417,25 +417,25 @@ struct XOView: View {
 struct GamesPage: View {
     @AppStorage("game") private var game = 0
     // Only games that fit the notch belong here. The first value is what "game" stores, so don't renumber.
-    static let games = [(0, "Ular", "scribble.variable"), (1, "Kartu Kembar", "square.grid.2x2"), (2, "X-O", "number"), (4, "Catur", "crown"), (5, "Hangman", "textformat.abc"), (6, "Sudoku", "square.grid.3x3"), (7, "Tetris", "square.stack.3d.up.fill")]
+    static let games = [(0, "Ular", "scribble.variable"), (1, "Kartu Kembar", "square.grid.2x2"), (2, "X-O", "number"), (4, "Catur", "crown"), (5, "Hangman", "textformat.abc"), (6, "Sudoku", "square.grid.3x3"), (7, "Tetris", "square.stack.3d.up.fill"), (8, GodotGame.title, "cube")]
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            VStack(spacing: 4) {
-                ForEach(Self.games, id: \.0) { g in
+            LazyVGrid(columns: [GridItem(.fixed(34), spacing: 6), GridItem(.fixed(34), spacing: 6)], spacing: 6) {
+                ForEach(Self.games.filter { !Lite.on || $0.0 != 8 }, id: \.0) { g in
                     let on = game == g.0
-                    Button { game = g.0 } label: {
-                        Label(tr(g.1), systemImage: g.2).font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.85))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(on ? Palette.accent : Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    Button { withAnimation(Motion.snap) { game = g.0 } } label: {
+                        Image(systemName: g.2).font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(on ? Palette.onAccent : .white.opacity(0.8))
+                            .frame(width: 34, height: 34)
+                            .background(on ? Palette.accent : Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .tip(g.1)
                 }
             }
-            .frame(width: 140)
+            .frame(width: 74)
             Group {
                 switch game {
                 case 0: SnakeView()
@@ -444,6 +444,7 @@ struct GamesPage: View {
                 case 5: HangmanView()
                 case 6: SudokuView()
                 case 7: TetrisView()
+                case 8: GodotGameView()
                 default: XOView()
                 }
             }
