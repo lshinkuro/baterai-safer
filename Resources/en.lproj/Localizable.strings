@@ -241,15 +241,11 @@
 "dengan %lld" = "with %lld";
 "⌨️ Ketik" = "⌨️ Type";
 "🎙 Suara" = "🎙 Voice";
-"Ketuk orb untuk mulai bicara" = "Tap the orb to start talking";
 "Mendengarkan…" = "Listening…";
 "%@ berpikir…" = "%@ is thinking…";
 "%lld berpikir…" = "%lld is thinking…";
 "Bicara…" = "Speaking…";
 "Berhenti" = "Stop";
-"Suara dikenali di Mac ini · ketuk orb untuk berhenti" = "Speech is recognized on this Mac · tap the orb to stop";
-"Ucapan %@ dikenali lewat server Apple · ketuk orb untuk berhenti" = "%@ speech is recognized by Apple's servers · tap the orb to stop";
-"Ucapan %lld dikenali lewat server Apple · ketuk orb untuk berhenti" = "%lld speech is recognized by Apple's servers · tap the orb to stop";
 "Kirim" = "Send";
 "Percakapan baru" = "New conversation";
 "akurasi 7 hari" = "7-day accuracy";
@@ -554,6 +550,7 @@
 "Unduhan gagal" = "Download failed";
 "Checksum DMG tidak cocok, update dibatalkan" = "DMG checksum mismatch, update cancelled";
 "DMG tidak bisa dibuka" = "Couldn't open the DMG";
+"Tanda tangan update tidak cocok, update dibatalkan" = "Update signature doesn't match, update cancelled";
 "Diperbarui ke v%@, memulai ulang…" = "Updated to v%@, restarting…";
 "Diperbarui ke v%lld, memulai ulang…" = "Updated to v%lld, restarting…";
 "Diperbarui ke v%@ · memulai ulang" = "Updated to v%@ · restarting";
@@ -1109,7 +1106,6 @@
 "Tugas ini akan dihapus." = "This task will be deleted.";
 "Daftar tugas harian" = "Daily task list";
 "Selesai" = "Done";
-"Ular, kartu, X-O, catur, hangman, sudoku" = "Snake, cards, X-O, chess, hangman, sudoku";
 "Kata baru" = "New word";
 "Hewan" = "Animals";
 "Makanan" = "Food";
@@ -1148,3 +1144,11 @@
 "Nyalakan kamera cermin" = "Turn mirror on";
 "Klik untuk buka, seret untuk mengubah urutan" = "Click to open, drag to reorder";
 "Notch yang berguna. Dua langkah singkat." = "A notch that earns its place. Two quick steps.";
+"Baris %@" = "Lines %@";
+"Baris %lld" = "Lines %lld";
+"Mulai, lalu ← → geser, ↑ putar, ↓ turun, spasi jatuh" = "Start, then ← → to move, ↑ to rotate, ↓ to lower, space to drop";
+"Ular, kartu, X-O, catur, hangman, sudoku, tetris" = "Snake, cards, X-O, chess, hangman, sudoku, tetris";
+"Ketuk Poni untuk mulai bicara" = "Tap Poni to start talking";
+"Suara dikenali di Mac ini · ketuk Poni untuk berhenti" = "Speech is recognized on this Mac · tap Poni to stop";
+"Ucapan %@ dikenali lewat server Apple · ketuk Poni untuk berhenti" = "%@ speech is recognized by Apple's servers · tap Poni to stop";
+"Ucapan %lld dikenali lewat server Apple · ketuk Poni untuk berhenti" = "%lld speech is recognized by Apple's servers · tap Poni to stop";

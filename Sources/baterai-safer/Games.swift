@@ -112,6 +112,160 @@ struct SnakeView: View {
     }
 }
 
+// MARK: Tetris
+
+struct Tetris {
+    static let cols = 10, rows = 14 // shortcut: 14 rows instead of 20 so the board fits the notch, raise if it ever gets a window
+    // Each shape in its own n×n box; a rotation turns the box clockwise.
+    static let shapes: [(n: Int, cells: [(Int, Int)])] = [
+        (4, [(0, 1), (1, 1), (2, 1), (3, 1)]), (2, [(0, 0), (1, 0), (0, 1), (1, 1)]), (3, [(0, 1), (1, 1), (2, 1), (1, 0)]),
+        (3, [(1, 0), (2, 0), (0, 1), (1, 1)]), (3, [(0, 0), (1, 0), (1, 1), (2, 1)]), (3, [(0, 0), (0, 1), (1, 1), (2, 1)]), (3, [(2, 0), (0, 1), (1, 1), (2, 1)]),
+    ]
+
+    var board = [[Bool]](repeating: Array(repeating: false, count: cols), count: rows)
+    var kind = Int.random(in: 0..<7), next = Int.random(in: 0..<7)
+    var rot = 0, x = 3, y = 0
+    var lines = 0, score = 0
+    var over = false
+
+    static func cells(_ kind: Int, _ rot: Int, _ x: Int, _ y: Int) -> [Snake.Point] {
+        let s = shapes[kind]
+        return s.cells.map { c in
+            var (cx, cy) = c
+            for _ in 0..<(rot & 3) { (cx, cy) = (s.n - 1 - cy, cx) }
+            return Snake.Point(x: x + cx, y: y + cy)
+        }
+    }
+    var piece: [Snake.Point] { Self.cells(kind, rot, x, y) }
+
+    func fits(_ rot: Int, _ x: Int, _ y: Int) -> Bool {
+        Self.cells(kind, rot, x, y).allSatisfy { $0.x >= 0 && $0.x < Self.cols && $0.y >= 0 && $0.y < Self.rows && !board[$0.y][$0.x] }
+    }
+
+    mutating func move(_ dx: Int) { if !over, fits(rot, x + dx, y) { x += dx } }
+
+    /// Turns clockwise, nudging sideways when a wall or block is in the way.
+    mutating func rotate() {
+        guard !over else { return }
+        for dx in [0, -1, 1, -2, 2] where fits(rot + 1, x + dx, y) { rot = (rot + 1) & 3; x += dx; return }
+    }
+
+    /// One tick: fall a cell, or lock, clear full rows and spawn the next piece.
+    mutating func step() {
+        guard !over else { return }
+        if fits(rot, x, y + 1) { y += 1; return }
+        for p in piece { board[p.y][p.x] = true }
+        let kept = board.filter { !$0.allSatisfy { $0 } }
+        let n = Self.rows - kept.count
+        board = Array(repeating: Array(repeating: false, count: Self.cols), count: n) + kept
+        lines += n
+        score += [0, 100, 300, 500, 800][n]
+        kind = next; next = .random(in: 0..<7); rot = 0; x = 3; y = 0
+        over = !fits(rot, x, y)
+    }
+
+    /// Hard drop: a point per cell fallen, then lock.
+    mutating func drop() {
+        guard !over else { return }
+        while fits(rot, x, y + 1) { y += 1; score += 1 }
+        step()
+    }
+}
+
+final class TetrisGame: ObservableObject {
+    @Published var s = Tetris()
+    @Published var running = false
+    @Published var best = UserDefaults.standard.integer(forKey: "tetrisBest")
+    private var timer: Timer?
+    private var keys: Any?
+
+    func start() {
+        if s.over || !running { s = Tetris() }
+        running = true
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first { $0 is NotchPanel }?.makeKey()
+        keys = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+            guard let self else { return e }
+            switch e.keyCode {
+            case 123, 0: apply { $0.move(-1) }  // ← A
+            case 124, 2: apply { $0.move(1) }   // → D
+            case 125, 1: apply { $0.step() }    // ↓ S
+            case 126, 13: apply { $0.rotate() } // ↑ W
+            case 49: apply { $0.drop() }        // space
+            default: return e
+            }
+            return nil
+        }
+        schedule()
+    }
+
+    func stop() {
+        timer?.invalidate(); timer = nil
+        if let keys { NSEvent.removeMonitor(keys) }
+        keys = nil
+    }
+
+    /// Falls faster every ten lines.
+    private func schedule() {
+        timer?.invalidate()
+        timer = .scheduledTimer(withTimeInterval: max(0.12, 0.6 - 0.05 * Double(s.lines / 10)), repeats: true) { [weak self] _ in self?.apply { $0.step() } }
+    }
+
+    private func apply(_ f: (inout Tetris) -> Void) {
+        let level = s.lines / 10
+        f(&s)
+        if s.over {
+            stop()
+            if s.score > best { best = s.score; UserDefaults.standard.set(best, forKey: "tetrisBest") }
+        } else if s.lines / 10 != level { schedule() }
+    }
+}
+
+struct TetrisView: View {
+    @StateObject private var g = TetrisGame()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Skor \(g.s.score)").font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                Text("Baris \(g.s.lines)").font(.system(size: 11)).foregroundStyle(.gray).monospacedDigit()
+                Text("Terbaik \(g.best)").font(.system(size: 11)).foregroundStyle(.gray).monospacedDigit()
+                Spacer()
+                NButton(icon: "play.fill", title: g.running && !g.s.over ? "Ulang" : "Mulai", tint: Palette.accent, prominent: true) { g.stop(); g.start() }
+            }
+            GeometryReader { geo in
+                let cell = min(geo.size.width / CGFloat(Tetris.cols + 6), geo.size.height / CGFloat(Tetris.rows))
+                let block = { (ctx: GraphicsContext, p: Snake.Point, color: Color) in
+                    ctx.fill(Path(roundedRect: CGRect(x: CGFloat(p.x) * cell, y: CGFloat(p.y) * cell, width: cell, height: cell).insetBy(dx: 1, dy: 1), cornerRadius: cell * 0.2), with: .color(color))
+                }
+                HStack(alignment: .top, spacing: cell) {
+                    Canvas { ctx, _ in
+                        for (y, row) in g.s.board.enumerated() { for (x, on) in row.enumerated() where on { block(ctx, Snake.Point(x: x, y: y), .white.opacity(0.55)) } }
+                        if !g.s.over { for p in g.s.piece { block(ctx, p, Palette.accent) } }
+                    }
+                    .frame(width: cell * CGFloat(Tetris.cols), height: cell * CGFloat(Tetris.rows))
+                    .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(.white.opacity(0.07), lineWidth: 1))
+                    .overlay {
+                        if !g.running || g.s.over {
+                            Text(g.s.over ? "Game over · skor \(g.s.score)" : "Mulai, lalu ← → geser, ↑ putar, ↓ turun, spasi jatuh")
+                                .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.85)).fixedSize()
+                                .padding(.horizontal, 12).padding(.vertical, 6).background(.black.opacity(0.6), in: Capsule())
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Berikutnya").font(.system(size: 10)).foregroundStyle(.gray)
+                        Canvas { ctx, _ in for p in Tetris.cells(g.s.next, 0, 0, 0) { block(ctx, p, .white.opacity(0.55)) } }
+                            .frame(width: cell * 4, height: cell * 2)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onDisappear { g.stop() }
+    }
+}
+
 // MARK: Kartu Kembar
 
 struct Memory {
@@ -263,7 +417,7 @@ struct XOView: View {
 struct GamesPage: View {
     @AppStorage("game") private var game = 0
     // Only games that fit the notch belong here. The first value is what "game" stores, so don't renumber.
-    static let games = [(0, "Ular", "scribble.variable"), (1, "Kartu Kembar", "square.grid.2x2"), (2, "X-O", "number"), (4, "Catur", "crown"), (5, "Hangman", "textformat.abc"), (6, "Sudoku", "square.grid.3x3")]
+    static let games = [(0, "Ular", "scribble.variable"), (1, "Kartu Kembar", "square.grid.2x2"), (2, "X-O", "number"), (4, "Catur", "crown"), (5, "Hangman", "textformat.abc"), (6, "Sudoku", "square.grid.3x3"), (7, "Tetris", "square.stack.3d.up.fill")]
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -289,6 +443,7 @@ struct GamesPage: View {
                 case 4: ChessView()
                 case 5: HangmanView()
                 case 6: SudokuView()
+                case 7: TetrisView()
                 default: XOView()
                 }
             }

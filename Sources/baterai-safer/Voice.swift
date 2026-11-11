@@ -6,9 +6,9 @@ import Speech
 // speak the reply → listen again. The mic is closed while the reply plays, so it never hears itself.
 
 final class VoiceChat: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
-    enum Phase { case idle, listening, thinking, speaking }
+    enum Phase: Hashable { case idle, listening, thinking, speaking }
     @Published var phase = Phase.idle
-    @Published var level: CGFloat = 0          // mic loudness 0…1, drives the orb
+    @Published var level: CGFloat = 0          // mic loudness 0…1, drives the face
     @Published var heard = ""
     @Published var error: String?
     @Published var onDevice = true             // false: this language's recognizer sends audio to Apple
@@ -131,40 +131,60 @@ func spokenPart(_ reply: String) -> String {
     reply.split(separator: "\n").filter { !$0.hasPrefix("✏️") && !$0.hasPrefix("(") }.joined(separator: " ").replacingOccurrences(of: "*", with: "")
 }
 
-struct Orb: View {
+/// The Poni logo, alive: tinted by phase, blinks, mouth moves while it speaks, eyes drift up while it thinks,
+/// and the notch camera lights with the mic while it listens.
+struct PoniFace: View {
     let phase: VoiceChat.Phase
     let level: CGFloat
 
-    var colors: [Color] {
+    var tint: [Color] {
         switch phase {
-        case .listening: return [Color(hex: 0x34D399), Color(hex: 0x0EA5E9), Color(hex: 0x6366F1)]
-        case .thinking: return [Color(hex: 0xC084FC), Color(hex: 0xEC4899), Color(hex: 0x6366F1)]
-        case .speaking: return [Color(hex: 0x60A5FA), Color(hex: 0x6366F1), Color(hex: 0x22D3EE)]
-        case .idle: return [Color(hex: 0x64748B), Color(hex: 0x334155), Color(hex: 0x475569)]
+        case .listening: [Color(hex: 0x5EEAD4), Color(hex: 0x818CF8)]
+        case .thinking: [Color(hex: 0xC084FC), Color(hex: 0xEC4899)]
+        case .speaking: [Color(hex: 0x22D3EE), Color(hex: 0x6366F1)]
+        case .idle: [Color(hex: 0x94A3B8), Color(hex: 0x475569)]
         }
     }
 
     var body: some View {
         TimelineView(.animation) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
-            let pulse: CGFloat = switch phase {
-            case .listening: level
-            case .speaking: 0.3 + 0.2 * CGFloat(sin(t * 7))
-            case .thinking: 0.12 + 0.08 * CGFloat(sin(t * 3))
-            case .idle: 0.04 * CGFloat(sin(t * 1.5))
+            let blink = t.truncatingRemainder(dividingBy: 3.7) < 0.12
+            let mouth: CGFloat = phase == .speaking ? 0.3 + 0.7 * abs(CGFloat(sin(t * 9))) : 0
+            let look: CGFloat = phase == .thinking ? 1 : 0
+            Canvas { g, size in
+                let s = size.width, ink = Color.black.opacity(0.85)
+                func at(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * s, y: y * s) }
+                func box(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> CGRect { CGRect(x: (x - w / 2) * s, y: (y - h / 2) * s, width: w * s, height: h * s) }
+                let body = Path(roundedRect: box(0.5, 0.5, 0.9, 0.9), cornerRadius: s * 0.2, style: .continuous)
+                g.fill(body, with: .linearGradient(Gradient(colors: tint), startPoint: at(0.1, 0.05), endPoint: at(0.9, 0.95)))
+                g.fill(Path(roundedRect: box(0.5, 0.08, 0.42, 0.16), cornerRadius: s * 0.05, style: .continuous), with: .color(ink))
+                let cam = phase == .listening ? Palette.accent.opacity(0.5 + 0.5 * level) : Color.white.opacity(0.25)
+                g.fill(Path(ellipseIn: box(0.5, 0.11, 0.045, 0.045)), with: .color(cam))
+                let eyeY = 0.5 - look * 0.05
+                for d in [-1.0, 1.0] as [CGFloat] {
+                    g.fill(Path(ellipseIn: box(0.5 + d * 0.33, 0.6, 0.12, 0.07)), with: .color(Color(hex: 0xFB7185).opacity(0.45)))
+                    let ex = 0.5 + d * 0.19 + look * 0.04, eh: CGFloat = blink ? 0.015 : 0.14
+                    g.fill(Path(ellipseIn: box(ex, eyeY, 0.11, eh)), with: .color(ink))
+                    if !blink { g.fill(Path(ellipseIn: box(ex - 0.025, eyeY - 0.04, 0.035, 0.035)), with: .color(.white)) }
+                }
+                if mouth > 0 {
+                    g.fill(Path(ellipseIn: box(0.5, 0.7, 0.14, 0.12 * mouth)), with: .color(ink))
+                } else {
+                    var smile = Path()
+                    smile.move(to: at(0.42, 0.66))
+                    smile.addQuadCurve(to: at(0.58, 0.66), control: at(0.5, 0.76))
+                    g.stroke(smile, with: .color(ink), style: StrokeStyle(lineWidth: s * 0.03, lineCap: .round))
+                }
+                if phase == .thinking {
+                    for k in 0..<3 {
+                        let on = (t * 2 + Double(k) * 0.33).truncatingRemainder(dividingBy: 1) < 0.5
+                        g.fill(Path(ellipseIn: box(0.76 + CGFloat(k) * 0.09, 0.3, 0.05, 0.05)), with: .color(.white.opacity(on ? 0.95 : 0.35)))
+                    }
+                }
             }
-            ZStack {
-                Circle()
-                    .fill(AngularGradient(colors: colors + [colors[0]], center: .center, angle: .degrees(t * 50)))
-                    .blur(radius: 22)
-                    .scaleEffect(1 + pulse * 0.45)
-                    .opacity(0.85)
-                Circle()
-                    .fill(AngularGradient(colors: colors.reversed() + [colors[2]], center: .center, angle: .degrees(-t * 70)))
-                    .overlay(Circle().fill(RadialGradient(colors: [.white.opacity(0.75), .clear], center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: 45)))
-                    .scaleEffect(0.78 + pulse * 0.22)
-                    .shadow(color: colors[0].opacity(0.6), radius: 14)
-            }
+            .shadow(color: tint[0].opacity(0.3 + 0.5 * (phase == .listening ? level : 0)), radius: 14)
+            .scaleEffect(1 + 0.015 * CGFloat(sin(t * 1.6)))
             .animation(.easeOut(duration: 0.12), value: level)
         }
     }

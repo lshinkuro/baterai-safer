@@ -303,6 +303,13 @@ func selfTest() {
     assert(sn.body[0] == Snake.Point(x: 7, y: 5), "snake: can't reverse into its neck")
     sn.turn(Snake.Point(x: 0, y: -1)); for _ in 0..<6 { sn.step() }
     assert(sn.over, "snake: wall ends the game")
+    var tt = Tetris(); tt.kind = 0; tt.rot = 0; tt.x = 0; tt.y = 0 // flat I piece at the top-left
+    for c in 4..<Tetris.cols { tt.board[Tetris.rows - 1][c] = true } // bottom row missing exactly its four cells
+    tt.drop()
+    assert(tt.lines == 1 && tt.score == 100 + Tetris.rows - 2 && !tt.board.joined().contains(true), "tetris: hard drop completes and clears the row")
+    var tw = Tetris(); tw.kind = 0; tw.rot = 0; tw.x = Tetris.cols - 2; tw.y = 0
+    tw.rotate()
+    assert(tw.rot == 1 && tw.piece.allSatisfy { $0.x < Tetris.cols }, "tetris: rotation kicks off the wall")
     var mem = Memory(shuffled: false)
     mem.flip(0); mem.flip(1)
     assert(mem.moves == 1 && mem.matched.isEmpty && mem.open == [0, 1], "memory: miss stays open")
@@ -357,5 +364,7 @@ func selfTest() {
     let ago = { (n: Int) in dayKey(cal.date(byAdding: .day, value: -n, to: today)!) }
     assert(streak([ago(0), ago(1), ago(2), ago(4)], today: today) == 3, "habit: streak counts back from today")
     assert(streak([ago(1), ago(2)], today: today) == 2 && streak([ago(2)], today: today) == 0, "habit: today not done yet keeps yesterday's streak")
+    let ls = URL(fileURLWithPath: "/bin/ls")
+    assert(teamID(of: ls) == nil && !signed(ls, by: "ABCDE12345"), "update: Apple's own binary has no team and doesn't pass as a release")
     print("selftest ok")
 }

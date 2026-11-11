@@ -50,7 +50,7 @@ import SwiftUI
         }
         if t == .more {
             HangmanGame.shared.game = Hangman(word: "PENGUIN", guessed: ["P", "N", "A", "S"])
-            for (i, name) in [(0, "ular"), (1, "kartu"), (2, "xo"), (4, "catur"), (5, "hangman"), (6, "sudoku")] {
+            for (i, name) in [(0, "ular"), (1, "kartu"), (2, "xo"), (4, "catur"), (5, "hangman"), (6, "sudoku"), (7, "tetris")] {
                 UserDefaults.standard.set(i, forKey: "game")
                 write("game-\(name)", GamesPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
             }
@@ -77,6 +77,10 @@ import SwiftUI
                 UserDefaults.standard.set(mode, forKey: "langMode"); UserDefaults.standard.set(quiz, forKey: "langQuiz")
                 write("lang-\(name)", LangPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
             }
+            UserDefaults.standard.set(3, forKey: "langMode"); UserDefaults.standard.set(true, forKey: "langVoice")
+            write("lang-suara", LangPage().padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 16).foregroundStyle(.white).frame(width: 720, height: 232).background(Color.black), .dark)
+            UserDefaults.standard.set(false, forKey: "langVoice")
+            write("lang-wajah", HStack(spacing: 30) { ForEach([VoiceChat.Phase.idle, .listening, .thinking, .speaking], id: \.self) { PoniFace(phase: $0, level: 0.7).frame(width: 110, height: 110) } }.padding(30).background(Color.black), .dark)
             write("lang-window", LangPage(windowed: true).padding(20).foregroundStyle(.white).frame(width: 920, height: 640).background(Color.black), .dark)
             lm.s.mistakes.removeLast()
         }

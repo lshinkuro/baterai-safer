@@ -509,7 +509,7 @@ struct LangPage: View {
     var voiceView: some View {
         let reply = m.chat.last(where: { !$0.me })?.text
         let status = switch voice.phase {
-        case .idle: tr("Ketuk orb untuk mulai bicara")
+        case .idle: tr("Ketuk Poni untuk mulai bicara")
         case .listening: tr("Mendengarkan…")
         case .thinking: String(format: tr("%@ berpikir…"), m.engineName)
         case .speaking: tr("Bicara…")
@@ -526,7 +526,7 @@ struct LangPage: View {
                     voice.stop()
                 }
             } label: {
-                Orb(phase: voice.phase, level: voice.level).frame(width: 110, height: 110).contentShape(Circle())
+                PoniFace(phase: voice.phase, level: voice.level).frame(width: 110, height: 110).contentShape(Rectangle())
             }
             .buttonStyle(.plain).help(voice.phase == .idle ? "Mulai" : "Berhenti")
             VStack(alignment: .leading, spacing: 6) {
@@ -543,8 +543,8 @@ struct LangPage: View {
                 }
                 if let e = voice.error { Text(e).font(.system(size: 11)).foregroundStyle(Palette.red) }
                 Spacer(minLength: 0)
-                Text(voice.onDevice ? tr("Suara dikenali di Mac ini · ketuk orb untuk berhenti")
-                     : String(format: tr("Ucapan %@ dikenali lewat server Apple · ketuk orb untuk berhenti"), tr(m.s.lang.title)))
+                Text(voice.onDevice ? tr("Suara dikenali di Mac ini · ketuk Poni untuk berhenti")
+                     : String(format: tr("Ucapan %@ dikenali lewat server Apple · ketuk Poni untuk berhenti"), tr(m.s.lang.title)))
                     .font(.system(size: 10)).foregroundStyle(.gray)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
