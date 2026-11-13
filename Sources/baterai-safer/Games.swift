@@ -417,7 +417,7 @@ struct XOView: View {
 struct GamesPage: View {
     @AppStorage("game") private var game = 0
     // Only games that fit the notch belong here. The first value is what "game" stores, so don't renumber.
-    static let games = [(0, "Ular", "scribble.variable"), (1, "Kartu Kembar", "square.grid.2x2"), (2, "X-O", "number"), (4, "Catur", "crown"), (5, "Hangman", "textformat.abc"), (6, "Sudoku", "square.grid.3x3"), (7, "Tetris", "square.stack.3d.up.fill"), (8, GodotGame.title, "cube")]
+    static let games = [(0, "Ular", "scribble.variable"), (1, "Kartu Kembar", "square.grid.2x2"), (2, "X-O", "number"), (4, "Catur", "crown"), (5, "Hangman", "textformat.abc"), (6, "Sudoku", "square.grid.3x3"), (7, "Tetris", "square.stack.3d.up.fill"), (8, GodotGame.title, "cube"), (9, "Piano", "pianokeys")]
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -445,6 +445,7 @@ struct GamesPage: View {
                 case 6: SudokuView()
                 case 7: TetrisView()
                 case 8: GodotGameView()
+                case 9: PianoPage()
                 default: XOView()
                 }
             }

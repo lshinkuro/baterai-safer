@@ -64,7 +64,7 @@ struct HomeView: View {
                     // More than fit: the fifth card peeks in so it's clear the row scrolls.
                     GeometryReader { geo in
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0, width: 165) } }
+                            HStack(spacing: 10) { ForEach(shown, id: \.id) { widget($0, width: $0.id == "calendar" ? 250 : 165) } } // room for the month
                                 .coordinateSpace(name: "homeCards")
                                 .frame(height: geo.size.height)
                         }
@@ -207,14 +207,53 @@ struct HomeView: View {
     }
 
     @ViewBuilder var calendar: some View {
-        let events = a.today
         if a.access == false {
             Placeholder(icon: "calendar.badge.exclamationmark", title: "Izin Kalender ditolak")
         } else {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(Date(), format: .dateTime.day().locale(appLocale)).font(.system(size: 34, weight: .semibold)).monospacedDigit()
-                    Text(Date(), format: .dateTime.weekday(.wide).locale(appLocale)).font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.accent)
+            // Like the medium Calendar widget: the month beside today's events. Four equal cards are too narrow for it.
+            if shown.count != 4 {
+                HStack(alignment: .top, spacing: 8) { agenda(compact: true); miniMonth }
+            } else {
+                agenda(compact: false)
+            }
+        }
+    }
+
+    var miniMonth: some View {
+        var cal = Calendar.current
+        cal.locale = appLocale
+        cal.firstWeekday = Calendar.current.firstWeekday
+        let symbols = cal.veryShortStandaloneWeekdaySymbols, now = Date()
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(now.formatted(.dateTime.month(.wide).locale(appLocale)).uppercased())
+                .font(.system(size: 9, weight: .bold)).tracking(0.6).foregroundStyle(Palette.accent)
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(15), spacing: 0), count: 7), spacing: 2) {
+                ForEach(-7..<0, id: \.self) { i in // negative ids so they don't collide with the day cells' offsets
+                    Text(symbols[(cal.firstWeekday + 6 + i) % 7]).font(.system(size: 8, weight: .semibold)).foregroundStyle(.white.opacity(0.35))
+                }
+                ForEach(Array(monthGrid(now).enumerated()), id: \.offset) { _, day in
+                    let today = day.map { cal.isDateInToday($0) } ?? false
+                    Text(day.map { "\(cal.component(.day, from: $0))" } ?? "")
+                        .font(.system(size: 9, weight: today ? .bold : .medium)).monospacedDigit()
+                        .foregroundStyle(today ? Palette.onAccent : .white.opacity(0.8))
+                        .frame(width: 15, height: 14)
+                        .background { if today { Circle().fill(Palette.accentFill) } }
+                }
+            }
+        }
+        .fixedSize()
+        .accessibilityHidden(true) // the date is already read out beside it
+    }
+
+    func agenda(compact: Bool) -> some View {
+        let events = a.today
+        let day = Text(Date(), format: .dateTime.day().locale(appLocale)).font(.system(size: 34, weight: .semibold)).monospacedDigit()
+        let weekday = Text(Date(), format: .dateTime.weekday(.wide).locale(appLocale)).font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.accent)
+        return VStack(alignment: .leading, spacing: 8) {
+                if compact {
+                    VStack(alignment: .leading, spacing: 0) { weekday; day }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) { day; weekday }
                 }
                 if events.isEmpty { note("Tidak ada acara hari ini") }
                 ForEach(events.prefix(3), id: \.eventIdentifier) { e in
@@ -233,7 +272,6 @@ struct HomeView: View {
                     }
                 }
                 if events.count > 3 { note(String(format: tr("+%@ lainnya"), "\(events.count - 3)")) }
-            }
         }
     }
 

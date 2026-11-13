@@ -290,7 +290,7 @@ struct MoreView: View {
         ("drives", "eject.circle.fill", "Lepas USB", "Lepas flashdisk dengan aman", Palette.accent),
         ("lang", "character.bubble.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
         ("todo", "checklist", "Todo", "Daftar tugas harian", Palette.accent),
-        ("games", "gamecontroller.fill", "Gabut", "8 game ringan buat jeda", Palette.accent),
+        ("games", "gamecontroller.fill", "Gabut", "9 game ringan buat jeda", Palette.accent),
         ("selfcare", "heart.fill", "Self-care", "Istirahat, mood, kebiasaan", Palette.accent),
         ("update", "arrow.triangle.2.circlepath.circle.fill", "Pembaruan", "Cek dan pasang versi baru", Palette.accent),
     ]
