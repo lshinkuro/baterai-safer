@@ -284,15 +284,15 @@ struct MoreView: View {
     static let tools: [(id: String, icon: String, title: String, subtitle: String, color: Color)] = [
         ("charge", "battery.100percent.bolt", "Notif baterai penuh", "Kabari saat sampai batas", Palette.green),
         ("camera", "camera.fill", "Kamera cermin", "Cek penampilan sebelum rapat", Palette.accent),
-        ("color", "eyedropper", "Pemilih warna", "Ambil warna dari layar", Palette.accent),
+        ("color", "eyedropper.halffull", "Pemilih warna", "Ambil warna dari layar", Palette.accent),
         ("awake", "cup.and.saucer.fill", "Tetap menyala", "Cegah Mac tidur sementara", Palette.amber),
         ("downloads", "arrow.down.circle.fill", "Download", "Kabari saat download selesai", Palette.accent),
-        ("drives", "eject.fill", "Lepas USB", "Lepas flashdisk dengan aman", Palette.accent),
-        ("lang", "character.book.closed.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
-        ("todo", "checkmark.circle.fill", "Todo", "Daftar tugas harian", Palette.accent),
+        ("drives", "eject.circle.fill", "Lepas USB", "Lepas flashdisk dengan aman", Palette.accent),
+        ("lang", "character.bubble.fill", "Belajar Bahasa", "Kuis & ngobrol dengan AI", Palette.accent),
+        ("todo", "checklist", "Todo", "Daftar tugas harian", Palette.accent),
         ("games", "gamecontroller.fill", "Gabut", "8 game ringan buat jeda", Palette.accent),
-        ("selfcare", "heart.circle", "Self-care", "Istirahat, mood, kebiasaan", Palette.accent),
-        ("update", "arrow.triangle.2.circlepath", "Pembaruan", "Cek dan pasang versi baru", Palette.accent),
+        ("selfcare", "heart.fill", "Self-care", "Istirahat, mood, kebiasaan", Palette.accent),
+        ("update", "arrow.triangle.2.circlepath.circle.fill", "Pembaruan", "Cek dan pasang versi baru", Palette.accent),
     ]
 
     var body: some View {
@@ -328,9 +328,15 @@ struct MoreView: View {
                     Button { withAnimation(Motion.ease) { page = t.id } } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(alignment: .top) {
-                                Image(systemName: t.icon).font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.accent)
-                                    .frame(width: 36, height: 36)
-                                    .background(Palette.accent.opacity(hover ? 0.2 : 0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                // Lit-from-above badge: mint symbol over a deep tile with a light catching its top edge.
+                                Image(systemName: t.icon).font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Palette.accentFill)
+                                    .frame(width: 38, height: 38)
+                                    .background(LinearGradient(colors: [Palette.accent.opacity(hover ? 0.26 : 0.18), .white.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                                in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .strokeBorder(LinearGradient(colors: [Palette.accent.opacity(hover ? 0.6 : 0.4), .white.opacity(0.04)], startPoint: .top, endPoint: .bottom), lineWidth: 1))
+                                    .scaleEffect(hover ? 1.06 : 1)
                                 Spacer(minLength: 0)
                                 if isOn(t.id) {
                                     Circle().fill(Palette.accent).frame(width: 6, height: 6).padding(4).accessibilityLabel(tr("Aktif"))

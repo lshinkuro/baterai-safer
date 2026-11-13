@@ -118,6 +118,7 @@ func selfTest() {
     assert(typedCorrect("facil", Word(word: "fácil", meaning: "mudah", example: ""), .es) && !typedCorrect("かっこう", Word(word: "がっこう", meaning: "sekolah", example: ""), .ja), "accents")
     assert(parseCorrection("✏️ She goes. — Subjek — butuh goes.\nNice!")! == ("She goes.", "Subjek — butuh goes.") && parseCorrection("Nice!") == nil, "chat correction")
     assert(Palette.customHue("hue:0.530") == 0.53 && Palette.customHue("mint") == nil && Palette.color("hue:x") == Palette.color("mint"), "custom accent id")
+    assert(Palette.color("aurora") == Palette.color("mint") && Palette.color2("aurora") == Palette.color("sky") && Palette.color2("violet") == Palette.color("violet"), "gradient accent stops")
     let jakarta = TimeZone(identifier: "Asia/Jakarta")!
     func iso(_ s: String) -> Date { ISO8601DateFormatter().date(from: s)! }
     assert(ramadanDay(on: iso("2027-02-08T05:00:00Z"), shift: 0, tz: jakarta) == 1, "ramadan first day")

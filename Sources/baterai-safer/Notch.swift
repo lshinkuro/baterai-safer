@@ -3,7 +3,7 @@ import Charts
 
 enum NTab: Int, CaseIterable {
     case home, music, focus, agenda, ai, notes, dev, clipboard, shelf, git, stats, ibadah, more
-    var icon: String { ["house.fill", "music.note", "timer", "calendar", "sparkles", "note.text", "curlybraces", "doc.on.clipboard", "tray.full", "arrow.triangle.branch", "gauge.medium", "moon.stars.fill", "square.grid.2x2.fill"][rawValue] }
+    var icon: String { ["house.fill", "headphones", "scope", "calendar.badge.clock", "sparkles", "doc.text.fill", "chevron.left.forwardslash.chevron.right", "list.clipboard.fill", "tray.full.fill", "arrow.triangle.branch", "gauge.with.dots.needle.67percent", "moon.stars.fill", "square.grid.2x2.fill"][rawValue] }
     var title: String { ["Home", "Musik", "Fokus", "Rapat", "AI", "Catatan", "Dev Utils", "Clipboard", "Shelf", "Git", "Stats", "Ibadah", "Lainnya"][rawValue] }
     var enabled: Bool { !Lite.cutTabs.contains(self) && FeatureFlags.isOn("\(self)") }
 
@@ -427,7 +427,8 @@ struct NButton: View {
             .foregroundStyle(prominent ? Palette.onAccent : tint)
             .padding(.horizontal, title == nil ? 0 : 11)
             .frame(minWidth: 28, minHeight: 28)
-            .background(prominent ? AnyShapeStyle(Palette.accent.opacity(hover ? 0.85 : 1)) : AnyShapeStyle(Color.white.opacity(hover ? 0.14 : 0.08)), in: Capsule())
+            .background(prominent ? AnyShapeStyle(Palette.accentFill.opacity(hover ? 0.85 : 1)) : AnyShapeStyle(Color.white.opacity(hover ? 0.14 : 0.08)), in: Capsule())
+            .overlay { if prominent { Capsule().strokeBorder(Palette.sheen, lineWidth: 1) } }
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -505,8 +506,9 @@ struct NotchView: View {
     @AppStorage("accent") private var accentID = "mint"
 
     @ObservedObject var ramadan = Ramadan.shared
+    @ObservedObject var tools = ToolsModel.shared
     var soon: Meeting? { meet.next.flatMap { $0.isSoon(Date()) ? $0 : nil } }
-    var live: Bool { media.playing || focus.running || ai.running || soon != nil || ramadan.soon != nil }
+    var live: Bool { media.playing || focus.running || ai.running || soon != nil || ramadan.soon != nil || tools.awake }
     /// The focus intention, shown beside the camera while it's the live activity on display.
     var task: String {
         guard focus.running, !focus.onBreak, !ai.running, soon == nil else { return "" }
@@ -531,7 +533,9 @@ struct NotchView: View {
             }
             .frame(width: size.width, height: size.height)
             .clipShape(NotchShape(radius: radius))
-            .overlay(NotchShape(radius: radius).stroke(Color.white.opacity(state.expanded ? 0.08 : 0), lineWidth: 1))
+            // The island's rim picks up the accent along the bottom, where it meets the screen.
+            .overlay(NotchShape(radius: radius).stroke(LinearGradient(colors: [.white.opacity(0.06), Palette.accent2.opacity(0.4)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                .opacity(state.expanded ? 1 : 0))
             .shadow(color: .black.opacity(state.expanded ? 0.55 : 0), radius: 8, y: 3)
 
             // Sized and clipped out here, so content on its way out shrinks with the island.
@@ -584,6 +588,8 @@ struct NotchView: View {
                     }
                 } else if let fast = ramadan.soon {
                     Image(systemName: fast.icon).foregroundStyle(Palette.accent)
+                } else if tools.awake, !media.playing {
+                    Image(systemName: "cup.and.saucer.fill").foregroundStyle(Palette.accent)
                 } else if let art = media.artwork {
                     Image(nsImage: art).resizable().aspectRatio(contentMode: .fill).frame(width: 20, height: 20)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -602,8 +608,18 @@ struct NotchView: View {
                 Text(focus.clock).font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
             } else if let fast = ramadan.soon {
                 Text("\(fast.minutes)m").font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
+            } else if media.playing {
+                HStack(spacing: 6) {
+                    if tools.awake { Image(systemName: "cup.and.saucer.fill").foregroundStyle(Palette.accent) }
+                    Equalizer()
+                }
+            } else if let end = tools.awakeUntil {
+                // Minutes like the Ramadan countdown; a full timer doesn't fit beside the camera.
+                TimelineView(.everyMinute) { _ in
+                    Text("\(max(1, Int(end.timeIntervalSinceNow / 60 + 0.99)))m").font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Palette.accent)
+                }
             } else {
-                Equalizer()
+                Image(systemName: "infinity").font(.system(size: 12, weight: .bold)).foregroundStyle(Palette.accent)
             }
         }
         .font(.system(size: 12, weight: .semibold))
@@ -621,10 +637,13 @@ struct NotchView: View {
                     ForEach(tabs, id: \.self) { t in
                         let on = state.tab == t, grabbed = drag.tab == t
                         Button { withAnimation(Motion.snap) { state.tab = t } } label: {
-                            PinchIcon(icon: t.icon, color: on ? Palette.onAccent : Color.gray, grabbed: grabbed)
+                            PinchIcon(icon: t.icon, on: on, grabbed: grabbed)
                                 .frame(width: w, height: 22)
                                 .background {
-                                    if on { Capsule().fill(Palette.accent).matchedGeometryEffect(id: "tab", in: ns) }
+                                    if on {
+                                        Capsule().fill(Palette.accentFill).overlay(Capsule().strokeBorder(Palette.sheen, lineWidth: 1))
+                                            .matchedGeometryEffect(id: "tab", in: ns)
+                                    }
                                 }
                                 .contentShape(Rectangle())
                         }
@@ -691,13 +710,15 @@ struct NotchView: View {
 /// Lifts under the pointer with a little spring, like the Dock; further while it's being dragged.
 struct PinchIcon: View {
     let icon: String
-    let color: Color
+    let on: Bool
     var grabbed = false
     @Local private var hover = false
 
     var body: some View {
+        // Inactive icons lit from above, brightening and taking the accent under the pointer.
         Image(systemName: icon).font(.system(size: 11, weight: .bold))
-            .foregroundStyle(color)
+            .foregroundStyle(on ? AnyShapeStyle(Palette.onAccent)
+                                : AnyShapeStyle(LinearGradient(colors: hover ? [.white, Palette.accent] : [.white.opacity(0.75), .white.opacity(0.35)], startPoint: .top, endPoint: .bottom)))
             .scaleEffect(grabbed ? 1.45 : hover ? 1.28 : 1)
             .animation(Motion.snap, value: hover)
             .animation(Motion.snap, value: grabbed)
@@ -955,7 +976,7 @@ struct FocusView: View {
         HStack(spacing: 14) {
             NCard {
                 VStack(spacing: 12) {
-                    Ring(value: f.remaining / f.total, color: color, label: f.clock, caption: f.onBreak ? (f.longBreak ? "istirahat panjang" : "istirahat") : String(format: tr("fokus %@/4"), "\(f.finished + 1)"), size: 128, line: 10)
+                    Ring(value: f.remaining / f.total, color: color, end: f.onBreak ? nil : Palette.accent2, label: f.clock, caption: f.onBreak ? (f.longBreak ? "istirahat panjang" : "istirahat") : String(format: tr("fokus %@/4"), "\(f.finished + 1)"), size: 128, line: 10)
                     HStack(spacing: 8) {
                         NButton(icon: "arrow.counterclockwise") { f.reset() }.tip("Ulang")
                         NButton(icon: f.running ? "pause.fill" : "play.fill", title: f.running ? "Jeda" : "Mulai", tint: color, prominent: true) { f.toggle() }
@@ -1048,7 +1069,7 @@ struct FocusView: View {
                 .font(.system(size: 10, weight: .bold))
                 Chart(f.last7, id: \.day) { d in
                     BarMark(x: .value("Hari", d.day), y: .value("Menit", d.minutes), width: .ratio(0.55))
-                        .foregroundStyle(Palette.accent.gradient).cornerRadius(4)
+                        .foregroundStyle(LinearGradient(colors: [Palette.accent2, Palette.accent], startPoint: .top, endPoint: .bottom)).cornerRadius(4)
                 }
                 .chartYAxis(.hidden)
                 .chartXAxis { AxisMarks { _ in AxisValueLabel().font(.system(size: 9)).foregroundStyle(Color.gray) } }

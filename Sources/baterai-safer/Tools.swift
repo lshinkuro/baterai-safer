@@ -66,6 +66,19 @@ struct ToolsTab: View {
     @Local private var draggingTab: NTab?
     @AppStorage("accent") private var accentID = "mint"
 
+    func swatch(_ id: String, _ name: String, _ colors: [Color]) -> some View {
+        let on = id == accentID, fill = LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+        return Button { Palette.setAccent(id); accentID = id } label: {
+            Circle().fill(fill).frame(width: 26, height: 26)
+                .overlay(Circle().strokeBorder(Palette.sheen, lineWidth: 1))
+                .overlay { if on { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.onAccent) } }
+                .padding(3)
+                .overlay(Circle().strokeBorder(on ? AnyShapeStyle(fill) : AnyShapeStyle(Color.clear), lineWidth: 1.5))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain).tip(name)
+    }
+
     func feature(_ id: String) -> Binding<Bool> {
         Binding(get: { FeatureFlags.isOn(id) }, set: { FeatureFlags.set(id, $0); Notch.shared.applyFeatures() })
     }
@@ -82,16 +95,11 @@ struct ToolsTab: View {
             }
             Card(title: "Tampilan", icon: "paintpalette") {
                 HStack(spacing: 10) {
-                    ForEach(Palette.accents, id: \.id) { a in
-                        Button { Palette.setAccent(a.id); accentID = a.id } label: {
-                            Circle().fill(a.color).frame(width: 26, height: 26)
-                                .overlay { if a.id == accentID { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.onAccent) } }
-                                .padding(3)
-                                .overlay(Circle().strokeBorder(a.id == accentID ? Color.primary.opacity(0.5) : .clear, lineWidth: 1.5))
-                                .contentShape(Circle())
-                        }
-                        .buttonStyle(.plain).tip(a.name)
-                    }
+                    ForEach(Palette.accents, id: \.id) { a in swatch(a.id, a.name, [a.color]) }
+                }
+                HStack(spacing: 10) {
+                    ForEach(Palette.gradients, id: \.id) { g in swatch(g.id, g.name, [g.a, g.b]) }
+                    Text("Gradasi").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                 }
                 HuePicker(current: Palette.customHue(accentID)) { h in
                     let id = String(format: "hue:%.3f", h)

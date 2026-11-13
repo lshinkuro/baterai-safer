@@ -25,7 +25,7 @@ struct Theme {
     let a: Color, b: Color
     var gradient: LinearGradient { LinearGradient(colors: [a, b], startPoint: .topLeading, endPoint: .bottomTrailing) }
 
-    static var accent: Theme { Theme(a: Palette.accent, b: Palette.accent) }
+    static var accent: Theme { Theme(a: Palette.accent, b: Palette.accent2) }
     static let rose = Theme(a: Color(hex: 0xF43F5E), b: Color(hex: 0xE11D48))
 }
 
@@ -42,18 +42,33 @@ enum Palette {
         ("mint", "Mint", Color(hex: 0x34D399)), ("sky", "Langit", Color(hex: 0x38BDF8)), ("violet", "Ungu", Color(hex: 0xA78BFA)),
         ("pink", "Pink", Color(hex: 0xF472B6)), ("lime", "Lime", Color(hex: 0xA3E635)),
     ]
+    /// Two-stop accents, same rules as `accents` for both stops. Text, toggles and hairlines take the
+    /// first stop; only filled shapes (`accentFill`) show the blend.
+    static let gradients: [(id: String, name: String, a: Color, b: Color)] = [
+        ("aurora", "Aurora", Color(hex: 0x34D399), Color(hex: 0x38BDF8)), ("lavender", "Lavender", Color(hex: 0xA78BFA), Color(hex: 0xF472B6)),
+        ("ocean", "Laut", Color(hex: 0x38BDF8), Color(hex: 0x818CF8)), ("citrus", "Citrus", Color(hex: 0xA3E635), Color(hex: 0x34D399)),
+        // Deep tones only as the second stop: a solid maroon or navy vanishes on the black notch.
+        ("maroon", "Marun", Color(hex: 0xFB7185), Color(hex: 0x9F1239)), ("navy", "Dongker", Color(hex: 0x60A5FA), Color(hex: 0x1E3A8A)),
+    ]
     /// The one brand color; everything else stays neutral. Views rebuild on change via `.id(accentID)`.
     private(set) static var accent = color(UserDefaults.standard.string(forKey: "accent"))
+    /// Second stop of a gradient accent; the accent itself for a solid one.
+    private(set) static var accent2 = color2(UserDefaults.standard.string(forKey: "accent"))
+    static var accentFill: LinearGradient { LinearGradient(colors: [accent, accent2], startPoint: .topLeading, endPoint: .bottomTrailing) }
     static func color(_ id: String?) -> Color {
         if let h = customHue(id) { return custom(h) }
+        if let g = gradients.first(where: { $0.id == id }) { return g.a }
         return accents.first { $0.id == id }?.color ?? accents[0].color
     }
+    static func color2(_ id: String?) -> Color { gradients.first { $0.id == id }?.b ?? color(id) }
     /// A custom accent is stored as "hue:0.53".
     static func customHue(_ id: String?) -> Double? { id.flatMap { $0.hasPrefix("hue:") ? Double($0.dropFirst(4)) : nil } }
     /// Fixed saturation and brightness keep every hue light enough for dark text on top, like `accents`.
     static func custom(_ hue: Double) -> Color { Color(hue: hue, saturation: 0.6, brightness: 0.95) }
-    static func setAccent(_ id: String) { accent = color(id); UserDefaults.standard.set(id, forKey: "accent") }
+    static func setAccent(_ id: String) { accent = color(id); accent2 = color2(id); UserDefaults.standard.set(id, forKey: "accent") }
     static let onAccent = Color.black.opacity(0.85) // text and icons on an accent fill
+    /// Light catching the top edge of an accent fill; stroke it over `Palette.accentFill`.
+    static let sheen = LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0)], startPoint: .top, endPoint: .center)
     static let hairline = Color.primary.opacity(0.08)
 }
 
@@ -151,7 +166,7 @@ struct TabBar: View {
                     .padding(.vertical, 6)
                     .foregroundStyle(on ? Palette.onAccent : Color.secondary)
                     .background {
-                        if on { Capsule().fill(Palette.accent).matchedGeometryEffect(id: "sel", in: ns) }
+                        if on { Capsule().fill(Palette.accentFill).overlay(Capsule().strokeBorder(Palette.sheen, lineWidth: 1)).matchedGeometryEffect(id: "sel", in: ns) }
                     }
                     .contentShape(Capsule())
                 }
@@ -324,6 +339,7 @@ func level(_ v: Double) -> Color { v > 0.85 ? Palette.red : v > 0.65 ? Palette.a
 struct Ring: View {
     let value: Double // 0...1
     let color: Color
+    var end: Color? // a second stop the arc sweeps into, for a gradient accent
     let label: String
     var caption: String?
     var size: CGFloat = 76
@@ -335,7 +351,7 @@ struct Ring: View {
         ZStack {
             Circle().stroke(color.opacity(0.16), lineWidth: line)
             Circle().trim(from: 0, to: v)
-                .stroke(AngularGradient(colors: [color.opacity(0.55), color], center: .center, startAngle: .zero, endAngle: .degrees(360 * max(v, 0.01))),
+                .stroke(AngularGradient(colors: end.map { [color, $0] } ?? [color.opacity(0.55), color], center: .center, startAngle: .zero, endAngle: .degrees(360 * max(v, 0.01))),
                         style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             if let marker {
