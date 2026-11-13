@@ -96,6 +96,8 @@ final class NowPlaying: ObservableObject {
     /// One JSON line per change; `diff` lines carry only the keys that changed (null = gone).
     private func startStream() {
         guard let p = adapterProcess(["stream", "--debounce=100"]) else { return }
+        // A force-quit Poni leaves its adapter behind (re-parented to launchd, ~19 MB) until the next track change.
+        _ = capture("/usr/bin/pkill", "-P", "1", "-f", "mediaremote-adapter.pl")
         let out = Pipe()
         p.standardOutput = out
         var buf = Data() // only touched by the pipe's serial handler

@@ -278,6 +278,7 @@ struct Tile: View {
             Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(tone ?? .secondary)
             Spacer(minLength: 6)
             Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                .contentTransition(.numericText()).animation(Motion.ease, value: value) // digits roll, Live Activity style
             Text(tr(title).uppercased()).font(.system(size: 9, weight: .semibold)).tracking(0.4).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
             if let fraction {
                 Capsule().fill(Color.primary.opacity(0.08)).frame(height: 3)
@@ -309,10 +310,15 @@ struct BatteryGlyph: View {
             GeometryReader { g in
                 ZStack(alignment: .bottom) {
                     RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.18))
-                    UnevenRoundedRectangle(cornerRadii: .init(topLeading: 4, bottomLeading: 10, bottomTrailing: 10, topTrailing: 4), style: .continuous)
-                        .fill(LinearGradient(colors: [color, color.opacity(0.75)], startPoint: .top, endPoint: .bottom))
-                        .frame(height: max(8, (g.size.height - 8) * v))
-                        .padding(4)
+                    // While charging the top of the charge ripples; the timeline is paused (no redraws) otherwise.
+                    // 12 fps: a slow ripple doesn't need more, and each frame redraws the hero.
+                    TimelineView(.animation(minimumInterval: 1 / 12, paused: !charging || Motion.reduced)) { ctx in
+                        Wave(phase: charging ? ctx.date.timeIntervalSinceReferenceDate * 2.4 : 0, amplitude: charging && !Motion.reduced ? 2.5 : 0)
+                            .fill(LinearGradient(colors: [color, color.opacity(0.75)], startPoint: .top, endPoint: .bottom))
+                    }
+                    .frame(height: max(8, (g.size.height - 8) * v))
+                    .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 4, bottomLeading: 10, bottomTrailing: 10, topTrailing: 4), style: .continuous))
+                    .padding(4)
                     if let limit {
                         Rectangle().fill(.white).frame(height: 2)
                             .overlay(alignment: .trailing) { Text("\(Int(limit * 100))").font(.system(size: 8, weight: .semibold)).offset(x: 16) }
@@ -330,6 +336,65 @@ struct BatteryGlyph: View {
         }
         .frame(width: 52, height: 96)
         .animation(Motion.snap, value: v)
+    }
+}
+
+/// Reports whether the hosting window is on screen (occlusion state), e.g. a MenuBarExtra window
+/// that is ordered out rather than closed.
+struct WindowVisibility: NSViewRepresentable {
+    let changed: (Bool) -> Void
+
+    func makeNSView(context: Context) -> Watcher { Watcher(changed) }
+    func updateNSView(_ v: Watcher, context: Context) {}
+
+    final class Watcher: NSView {
+        let changed: (Bool) -> Void
+        private var token: NSObjectProtocol?
+        init(_ changed: @escaping (Bool) -> Void) { self.changed = changed; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { nil }
+        deinit { token.map(NotificationCenter.default.removeObserver) }
+
+        override func viewDidMoveToWindow() {
+            token.map(NotificationCenter.default.removeObserver)
+            guard let window else { return }
+            token = NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self, weak window] _ in
+                if let window { self?.changed(window.occlusionState.contains(.visible)) }
+            }
+        }
+    }
+}
+
+/// A rectangle whose top edge is a sine wave; `amplitude` 0 is a flat top.
+struct Wave: Shape {
+    var phase: Double, amplitude: Double
+
+    func path(in r: CGRect) -> Path {
+        Path { p in
+            p.move(to: CGPoint(x: r.minX, y: r.maxY))
+            for x in stride(from: r.minX, through: r.maxX, by: 2) {
+                p.addLine(to: CGPoint(x: x, y: r.minY + amplitude * (1 + sin(phase + x / r.width * 2 * .pi))))
+            }
+            p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+            p.closeSubpath()
+        }
+    }
+}
+
+/// A dot that blinks once per new sample: "this is live". A continuous pulse would redraw the whole
+/// popover (rings, chart, background blur) every frame, about 35% CPU; one short fade per beat is nearly free.
+struct LivePulse: View {
+    let beat: Int
+    var size: CGFloat = 7
+    @Local private var lit = false
+
+    var body: some View {
+        Circle().fill(Palette.accent).frame(width: size, height: size)
+            .opacity(lit ? 1 : 0.35)
+            .onChange(of: beat) { _ in
+                lit = true
+                withAnimation(Motion.ease?.delay(0.25)) { lit = false }
+            }
+            .accessibilityHidden(true)
     }
 }
 
@@ -354,12 +419,14 @@ struct Ring: View {
                 .stroke(AngularGradient(colors: end.map { [color, $0] } ?? [color.opacity(0.55), color], center: .center, startAngle: .zero, endAngle: .degrees(360 * max(v, 0.01))),
                         style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+                .animation(Motion.ease, value: v) // glides between samples instead of jumping
             if let marker {
                 Capsule().fill(Color.primary).frame(width: 3, height: line + 5)
                     .offset(y: -(size - line) / 2).rotationEffect(.degrees(marker * 360))
             }
             VStack(spacing: 0) {
                 Text(label).font(.system(size: size * 0.22, weight: .semibold)).monospacedDigit()
+                    .contentTransition(.numericText()).animation(Motion.ease, value: label)
                 if let caption { Text(tr(caption)).font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary) }
             }
         }

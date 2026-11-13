@@ -42,16 +42,28 @@ final class SystemModel: ObservableObject {
     @Published var diskFree = 0.0
     @Published var diskTotal = 0.0
     @Published var procs: [Proc] = []
-    @Published var live: [(t: Date, cpu: Double, mem: Double)] = [] // last ~3 minutes
+    @Published var live: [(t: Date, cpu: Double, mem: Double)] = [] // last minute, one per second
     let net = NetModel()
     private var lastTicks: [UInt32] = []
     private var timer: Timer?
+    private var ticks = 0
 
-    // Only polls while the Sistem tab is visible.
-    func start() { stop(); refresh(); timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.refresh() } }
+    // Only polls while the Sistem tab is visible. CPU, memory and network are cheap syscalls, so they
+    // update every second for the live chart; the process list spawns `ps`, so it only runs every 3 s.
+    func start() {
+        stop(); refresh()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            ticks += 1
+            sample()
+            if ticks % 3 == 0 { slow() }
+        }
+    }
     func stop() { timer?.invalidate(); timer = nil }
 
-    func refresh() {
+    func refresh() { sample(); slow() }
+
+    private func sample() {
         let page = Double(vm_kernel_page_size)
         var vm = vm_statistics64(), n = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         if withUnsafeMutablePointer(to: &vm, { $0.withMemoryRebound(to: integer_t.self, capacity: Int(n)) { host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &n) } }) == KERN_SUCCESS {
@@ -71,13 +83,15 @@ final class SystemModel: ObservableObject {
             lastTicks = t
         }
 
+        live = live.suffix(59) + [(Date(), cpu, memUsed / memTotal)]
+        net.refresh()
+    }
+
+    private func slow() {
         if let v = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey]) {
             diskFree = Double(v.volumeAvailableCapacityForImportantUsage ?? 0)
             diskTotal = Double(v.volumeTotalCapacity ?? 0)
         }
-
-        live = live.suffix(59) + [(Date(), cpu, memUsed / memTotal)]
-        net.refresh()
         procs = parsePS(capture("/bin/ps", "-Aceo", "pid=,pcpu=,rss=,user=,comm="))
     }
 
@@ -107,6 +121,7 @@ struct SystemTab: View {
                     }
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(bytes(s.memTotal - s.memUsed)).font(.system(size: 40, weight: .semibold)).monospacedDigit()
+                            .contentTransition(.numericText()).animation(Motion.ease, value: s.memUsed)
                         Text("tersisa").font(.system(size: 14, weight: .bold)).opacity(0.8)
                     }
                     Meter(value: mem, color: .white)
@@ -124,14 +139,18 @@ struct SystemTab: View {
             Card(title: "Aktivitas live", icon: "waveform.path.ecg") {
                 Chart {
                     ForEach(s.live, id: \.t) { p in
-                        LineMark(x: .value("Waktu", p.t), y: .value("%", p.cpu * 100), series: .value("Seri", "CPU"))
-                            .foregroundStyle(by: .value("Seri", "CPU")).interpolationMethod(.monotone)
+                        // Bars fade with age, so the newest second reads as "now".
+                        BarMark(x: .value("Waktu", p.t, unit: .second), y: .value("%", max(p.cpu * 100, 1.5)), width: .ratio(0.6))
+                            .foregroundStyle(by: .value("Seri", "CPU"))
+                            .opacity(0.35 + 0.65 * max(0, 1 - Date().timeIntervalSince(p.t) / 60))
+                            .cornerRadius(2)
                         LineMark(x: .value("Waktu", p.t), y: .value("%", p.mem * 100), series: .value("Seri", tr("Memori")))
                             .foregroundStyle(by: .value("Seri", tr("Memori"))).interpolationMethod(.monotone)
                     }
                 }
                 .chartForegroundStyleScale(["CPU": Palette.accent, tr("Memori"): Color.gray])
                 .chartYScale(domain: 0...100)
+                .chartXScale(domain: (s.live.last?.t ?? Date()).addingTimeInterval(-60)...(s.live.last?.t ?? Date()).addingTimeInterval(1)) // a fixed minute, so bars stay thin from the first sample
                 .chartXAxis(.hidden)
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: [0, 50, 100]) { v in
@@ -140,6 +159,10 @@ struct SystemTab: View {
                     }
                 }
                 .chartLegend(position: .top, alignment: .leading)
+                .overlay(alignment: .topTrailing) {
+                    HStack(spacing: 5) { LivePulse(beat: Int(s.live.last?.t.timeIntervalSince1970 ?? 0), size: 5); Text("LIVE").font(.system(size: 9, weight: .bold)).foregroundStyle(Palette.accent) }
+                        .padding(.trailing, 40)
+                }
                 .frame(height: 90)
             }
 

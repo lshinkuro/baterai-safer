@@ -40,6 +40,13 @@ final class Model: ObservableObject {
     static let healthFile = Paths.user + "/health.json"
     @Published var error = ""
     private var timer: Timer?
+    private var fast: Timer?
+
+    /// While the Baterai tab is on screen, percent and watts follow the battery every second (one IOKit read).
+    func live(_ on: Bool) {
+        fast?.invalidate()
+        fast = on ? Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.battery = Battery.read() } : nil
+    }
 
     init() {
         timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.refresh() }
@@ -155,6 +162,7 @@ struct Panel: View {
     @AppStorage("tab") private var tab = 0
     @AppStorage(FeatureFlags.key) private var featuresOff = "" // re-render when features change
     @AppStorage("accent") private var accentID = "mint"
+    @Local private var shown = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -178,7 +186,9 @@ struct Panel: View {
 
             // Fixed panel size: the menu bar window doesn't resize cleanly between tabs of different heights.
             ScrollView {
-                Group {
+                // The menu bar window is only hidden when closed, so tabs never get onDisappear and kept
+                // polling and redrawing (15–35% CPU). Dropping them while hidden stops all of that.
+                if shown { Group {
                     switch Tab(rawValue: tab).flatMap({ $0.enabled ? $0 : nil }) ?? (Lite.on ? .tools : .battery) {
                     case .battery: BatteryTab(m: m)
                     case .system: SystemTab(s: sys)
@@ -186,13 +196,14 @@ struct Panel: View {
                     case .tools: ToolsTab(t: tools)
                     }
                 }
-                .padding(16)
+                .padding(16) }
             }
             .id(tab) // each tab opens scrolled to the top
             .transition(.opacity)
         }
         .id(accentID) // rebuild everything in the new accent
         .frame(width: 400, height: 620)
+        .background(WindowVisibility { shown = $0 })
         .background(alignment: .top) {
             // A faint accent wash behind the header.
             RadialGradient(colors: [Palette.accent.opacity(0.1), .clear], center: .top, startRadius: 0, endRadius: 330)
@@ -362,7 +373,8 @@ struct BatteryTab: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
-        .onAppear { m.refresh() }
+        .onAppear { m.refresh(); m.live(true) }
+        .onDisappear { m.live(false) }
     }
 }
 
